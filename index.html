@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mesa Móvil</title>
+<meta name="description" content="Campañas, escala y creativos en vivo">
+<meta name="theme-color" content="#0f1115">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mesa">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<style>
+:root{--bg:#0f1115;--card:#181b22;--card2:#20242d;--line:#2a2f3a;--tx:#e9ecf1;--mut:#8a93a3;--ok:#3ecf8e;--warn:#f5b84a;--bad:#ff6b6b;--acc:#6aa8ff}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
+header{position:sticky;top:0;z-index:5;background:rgba(15,17,21,.92);backdrop-filter:blur(12px);padding:calc(env(safe-area-inset-top) + 10px) 16px 10px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line)}
+header h1{font-size:19px;margin:0;flex:1}
+header small{color:var(--mut);font-size:12px}
+button{font:inherit;border:0;border-radius:10px;padding:9px 14px;background:var(--card2);color:var(--tx)}
+button.pri{background:var(--acc);color:#071222;font-weight:600}
+main{padding:12px 16px calc(84px + env(safe-area-inset-bottom))}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:rgba(15,17,21,.95);backdrop-filter:blur(12px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:5}
+nav a{flex:1;text-align:center;padding:9px 0 8px;color:var(--mut);text-decoration:none;font-size:11px}
+nav a b{display:block;font-size:20px;line-height:1.2;font-weight:400}
+nav a.on{color:var(--acc)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:0 0 12px}
+.row{display:flex;align-items:center;gap:8px}
+.sp{flex:1}
+.t{font-weight:600;font-size:16px}
+.mut{color:var(--mut);font-size:13px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+.kpi{background:var(--card2);border-radius:10px;padding:8px 6px;text-align:center}
+.kpi b{display:block;font-size:16px;font-variant-numeric:tabular-nums}
+.kpi span{font-size:11px;color:var(--mut)}
+.pill{font-size:12px;padding:2px 8px;border-radius:99px;background:var(--card2)}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+.seg{display:flex;background:var(--card);border-radius:10px;padding:3px;margin-bottom:12px;border:1px solid var(--line)}
+.seg button{flex:1;background:none;padding:7px;color:var(--mut)}
+.seg button.on{background:var(--card2);color:var(--tx)}
+.ad{display:flex;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.ad:first-of-type{border-top:0}
+.ad img,.ad .ph{width:58px;height:58px;border-radius:9px;object-fit:cover;background:var(--card2);flex:none}
+.ad .n{font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.cre{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;color:inherit;text-decoration:none}
+.cre img,.cre .ph{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:var(--card2)}
+.cre div{padding:8px 9px;font-size:12px}
+.big{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.empty{text-align:center;color:var(--mut);padding:40px 10px}
+input{font:inherit;width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--card2);color:var(--tx);margin:10px 0}
+.hint{background:#1d2633;border:1px solid #2c3d55;border-radius:12px;padding:12px;font-size:13px;margin-bottom:12px}
+.load{opacity:.5;pointer-events:none}
+</style>
+</head>
+<body>
+<header><h1 id="tit">Mesa</h1><small id="act"></small><button id="ref" aria-label="Actualizar">↻</button></header>
+<main id="m"></main>
+<nav id="nav">
+  <a href="#hoy"><b>◉</b>Hoy</a>
+  <a href="#escalar"><b>🚀</b>Escalar</a>
+  <a href="#testeos"><b>🧪</b>Testeos</a>
+  <a href="#creativos"><b>▦</b>Creativos</a>
+  <a href="#ajustes"><b>⚙︎</b>Ajustes</a>
+</nav>
+<script>
+const API = "https://tppcpnfzcxxusdhrlmdx.supabase.co/functions/v1/app-movil";
+const $ = (s) => document.querySelector(s);
+const get = (k, d) => { try { return localStorage.getItem(k) ?? d } catch { return d } };
+const set = (k, v) => { try { localStorage.setItem(k, v) } catch {} };
+let P = null, rango = get("rango", "d4");
+const usd = (n) => n == null ? "—" : (n < 0 ? "-" : "") + "$" + Math.abs(n).toLocaleString("es-AR", { maximumFractionDigits: n >= 100 || n <= -100 ? 0 : 2 });
+const ro = (n) => n == null ? "—" : n.toFixed(2).replace(".", ",");
+const col = (r) => r == null ? "" : r >= 2 ? "ok" : r >= 1.1 ? "warn" : "bad";
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const img = (u) => u ? `<img loading="lazy" src="${esc(u)}" alt="">` : `<div class="ph"></div>`;
+const fb = (post) => post ? `https://www.facebook.com/${post}` : null;
+
+async function api(accion, opt = {}) {
+  const r = await fetch(`${API}?accion=${accion}${opt.q ?? ""}`, { method: opt.body ? "POST" : "GET",
+    headers: { "x-app-clave": get("clave", ""), "content-type": "application/json" }, body: opt.body ? JSON.stringify(opt.body) : undefined });
+  if (r.status === 401) { set("clave", ""); throw new Error("clave"); }
+  return r.json();
+}
+async function cargar(forzar) {
+  $("#ref").classList.add("load"); $("#act").textContent = "actualizando…";
+  try { P = await api("panel", { q: forzar ? "&forzar=1" : "" }); set("panel", JSON.stringify(P)); }
+  catch (e) { if (e.message === "clave") return login(); const c = get("panel"); if (c) P = JSON.parse(c); }
+  $("#ref").classList.remove("load"); hora(); render();
+}
+function hora() { if (!P) return; const m = Math.round((Date.now() - new Date(P.generado)) / 60000); $("#act").textContent = m < 1 ? "recién" : `hace ${m} min`; }
+
+function login() {
+  $("#nav").style.display = "none"; $("#tit").textContent = "Mesa";
+  $("#m").innerHTML = `<div class="card"><div class="t">Entrar</div><div class="mut">Poné la clave de la app.</div>
+    <input id="cl" type="password" autocomplete="current-password" placeholder="Clave"><button class="pri" id="ok" style="width:100%">Entrar</button></div>`;
+  $("#ok").onclick = async () => { set("clave", $("#cl").value.trim()); $("#nav").style.display = ""; await cargar(); };
+}
+
+const vistas = {
+  hoy() {
+    $("#tit").textContent = "Hoy";
+    const k = rango;
+    const seg = `<div class="seg"><button data-r="hoy" class="${k === "hoy" ? "on" : ""}">Hoy</button><button data-r="d4" class="${k === "d4" ? "on" : ""}">Últimos 4 días</button></div>`;
+    const tot = P.ofertas.reduce((s, o) => { const x = o[k]; s.g += x.gasto; s.f += x.facturacion_real ?? 0; s.n += x.ganancia_real ?? -x.gasto; return s; }, { g: 0, f: 0, n: 0 });
+    const head = `<div class="card"><div class="mut">Ganancia real ${k === "hoy" ? "de hoy" : "de 4 días"}</div><div class="big ${tot.n >= 0 ? "ok" : "bad"}">${usd(tot.n)}</div>
+      <div class="kpis" style="grid-template-columns:repeat(3,1fr)"><div class="kpi"><b>${usd(tot.g)}</b><span>Gasto</span></div><div class="kpi"><b>${usd(tot.f)}</b><span>Facturado</span></div><div class="kpi"><b class="${col(tot.g ? tot.f / tot.g : null)}">${ro(tot.g ? tot.f / tot.g : null)}</b><span>ROAS real</span></div></div></div>`;
+    const cards = P.ofertas.map((o) => { const x = o[k]; const r = x.roas_real ?? x.roas_pixel; const sem = r == null ? "⚪️" : r >= 1.5 ? "🟢" : r >= 1.1 ? "🟡" : "🔴";
+      return `<div class="card"><div class="row"><span>${sem}</span><span class="t sp">${esc(o.oferta)}</span><span class="${(x.ganancia_real ?? -x.gasto) >= 0 ? "ok" : "bad"}">${usd(x.ganancia_real ?? -x.gasto)}</span></div>
+      <div class="kpis"><div class="kpi"><b>${usd(x.gasto)}</b><span>Gasto</span></div><div class="kpi"><b>${x.ventas_reales ?? x.ventas_pixel}</b><span>Ventas</span></div>
+      <div class="kpi"><b class="${col(x.roas_real)}">${ro(x.roas_real)}</b><span>ROAS real</span></div><div class="kpi"><b class="${col(x.roas_pixel)}">${ro(x.roas_pixel)}</b><span>ROAS pixel</span></div></div></div>`; }).join("");
+    return seg + head + (cards || `<div class="empty">Sin gasto en este rango.</div>`);
+  },
+  escalar() {
+    $("#tit").textContent = "Para escalar";
+    const intro = `<div class="mut" style="margin-bottom:10px">Anuncios de testeo o reno con <b>ROAS &gt; 2</b> en los últimos 4 días que todavía no están en ninguna estructura de escala. Avisos: miércoles CostCap, viernes BidCap.</div>`;
+    if (!P.escalar.length) return intro + `<div class="empty">Hoy no hay anuncios para escalar.</div>`;
+    return intro + P.escalar.map((o) => `<div class="card"><div class="row"><span class="t sp">${esc(o.oferta)}</span><span class="pill">${o.anuncios.length} anuncio${o.anuncios.length > 1 ? "s" : ""}</span></div>
+      <div class="kpis" style="grid-template-columns:repeat(3,1fr)"><div class="kpi"><b>${usd(o.cpa_promedio)}</b><span>CPA prom.</span></div><div class="kpi"><b>${usd(o.bid_sugerido)}</b><span>Bid (×2)</span></div><div class="kpi"><b>${usd(o.costcap_sugerido)}</b><span>CostCap</span></div></div>
+      <div style="margin-top:8px">${o.anuncios.map((a) => `<a class="ad" style="color:inherit;text-decoration:none" href="${fb(a.post) ?? "#"}" target="_blank">${img(a.thumb)}<div class="sp"><div class="n">${esc(a.anuncio)}</div><div class="mut">${esc(a.campana)}</div>
+        <div><span class="ok">ROAS ${ro(a.roas)}</span> · ${a.ventas} venta${a.ventas > 1 ? "s" : ""} · CPA ${usd(a.cpa)} · gasto ${usd(a.gasto)}${a.ventas < 2 ? ` · <span class="warn">1 venta</span>` : ""}</div></div></a>`).join("")}</div></div>`).join("");
+  },
+  testeos() {
+    $("#tit").textContent = "Testeos";
+    if (!P.testeos.length) return `<div class="empty">No hay testeos activos de los últimos 7 días.</div>`;
+    return P.testeos.map((t) => `<div class="card"><div class="t">${esc(t.campana)}</div><div class="mut">${esc(t.cuenta)} · creada ${new Date(t.creada).toLocaleDateString("es-AR", { day: "numeric", month: "numeric" })}</div>
+      <div class="kpis"><div class="kpi"><b>${usd(t.d4.gasto)}</b><span>Gasto 4d</span></div><div class="kpi"><b>${t.d4.ventas}</b><span>Ventas</span></div><div class="kpi"><b class="${col(t.d4.roas)}">${ro(t.d4.roas)}</b><span>ROAS</span></div><div class="kpi"><b>${usd(t.hoy.gasto)}</b><span>Hoy</span></div></div>
+      <div style="margin-top:8px">${t.anuncios.slice(0, 8).map((a) => `<a class="ad" style="color:inherit;text-decoration:none" href="${fb(a.post) ?? "#"}" target="_blank">${img(a.thumb)}<div class="sp"><div class="row"><span class="n sp">${esc(a.anuncio)}</span>${a.ventas ? `<span class="pill">${a.pct_ventas}% de las ventas</span>` : ""}</div>
+        <div><span class="${col(a.roas)}">ROAS ${ro(a.roas)}</span> · ${a.ventas} ventas · ${usd(a.gasto)} · CTR ${ro(a.ctr)}%</div></div></a>`).join("") || `<div class="mut">Todavía sin gasto.</div>`}</div></div>`).join("");
+  },
+  creativos() {
+    $("#tit").textContent = "Creativos";
+    return `<div class="mut" style="margin-bottom:10px">Los que más gastaron en 4 días, por Post ID. Tocá para abrir el post.</div><div class="grid">` +
+      P.creativos.map((c) => `<a class="cre" href="${fb(c.post) ?? "#"}" target="_blank">${img(c.thumb)}<div><b>${esc(c.anuncio)}</b><div class="mut">${esc(c.oferta)}</div>
+        <div><span class="${col(c.roas)}">ROAS ${ro(c.roas)}</span> · ${c.ventas}v</div><div class="mut">${usd(c.gasto)} · CPA ${usd(c.cpa)}</div></div></a>`).join("") + `</div>`;
+  },
+  ajustes() {
+    $("#tit").textContent = "Ajustes";
+    const inst = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+    const perm = "Notification" in window ? Notification.permission : "no";
+    return (inst ? "" : `<div class="hint">📲 <b>Instalá la app</b> para recibir avisos: en Safari tocá <b>Compartir</b> → <b>Agregar a inicio</b>, y abrila desde el ícono.</div>`) +
+      `<div class="card"><div class="t">Avisos push</div><div class="mut">Estado: ${perm === "granted" ? "✅ activados" : perm === "denied" ? "⛔️ bloqueados en Ajustes del celular" : "sin activar"}</div>
+      <input id="quien" placeholder="Tu nombre (Lorenzo, Franco…)" value="${esc(get("quien", ""))}">
+      <button class="pri" id="push" style="width:100%">Activar avisos en este celular</button>
+      <button id="prueba" style="width:100%;margin-top:8px">Mandar aviso de prueba</button><div id="pm" class="mut" style="margin-top:8px"></div></div>
+      <div class="card"><div class="t">Cuándo avisa</div><div class="mut">🗓️ Miércoles 22:00 — anuncios para CostCap (datos lun–mié)<br>🗓️ Viernes 10:00 — anuncios para BidCap (datos lun–jue)<br>Regla: ROAS &gt; 2 en 4 días y no escalado.</div></div>
+      <div class="card"><button id="salir" style="width:100%">Cerrar sesión</button></div>`;
+  },
+};
+
+async function activarPush() {
+  const pm = $("#pm"); set("quien", $("#quien").value.trim());
+  try {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) { pm.textContent = "Este navegador no soporta avisos. En iPhone: instalá la app en la pantalla de inicio (iOS 16.4+)."; return; }
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") { pm.textContent = "No diste permiso para avisos."; return; }
+    const reg = await navigator.serviceWorker.ready;
+    const { clave } = await api("vapid");
+    const k = Uint8Array.from(atob(clave.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - clave.length % 4) % 4)), (c) => c.charCodeAt(0));
+    const sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: k }));
+    await api("suscribir", { body: { suscripcion: sub.toJSON(), quien: get("quien", "") } });
+    pm.textContent = "✅ Listo. Este celular va a recibir los avisos.";
+  } catch (e) { pm.textContent = "Error: " + e.message; }
+}
+
+function render() {
+  if (!get("clave", "")) return login();
+  if (!P) { $("#m").innerHTML = `<div class="empty">Cargando…</div>`; return; }
+  const v = (location.hash || "#hoy").slice(1);
+  document.querySelectorAll("nav a").forEach((a) => a.classList.toggle("on", a.getAttribute("href") === "#" + v));
+  $("#m").innerHTML = (vistas[v] ?? vistas.hoy)();
+  document.querySelectorAll("[data-r]").forEach((b) => b.onclick = () => { rango = b.dataset.r; set("rango", rango); render(); });
+  if (v === "ajustes") {
+    $("#push").onclick = activarPush;
+    $("#prueba").onclick = async () => { const r = await api("probar", { body: {} }); $("#pm").textContent = `Enviado a ${r.enviados} celular${r.enviados === 1 ? "" : "es"}.`; };
+    $("#salir").onclick = () => { set("clave", ""); P = null; login(); };
+  }
+  scrollTo(0, 0);
+}
+addEventListener("hashchange", render);
+$("#ref").onclick = () => cargar(true);
+setInterval(hora, 30000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && P && Date.now() - new Date(P.generado) > 10 * 60000) cargar(); });
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+try { const c = get("panel"); if (c) P = JSON.parse(c); } catch {}
+render(); if (get("clave", "")) cargar();
+</script>
+</body>
+</html>
