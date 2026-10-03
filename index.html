@@ -170,7 +170,8 @@ function render() {
   if (!P) { $("#m").innerHTML = `<div class="empty">Cargando…</div>`; return; }
   const v = (location.hash || "#hoy").slice(1);
   document.querySelectorAll("nav a").forEach((a) => a.classList.toggle("on", a.getAttribute("href") === "#" + v));
-  $("#m").innerHTML = (vistas[v] ?? vistas.hoy)();
+  const faltan = (P.errores ?? []).map((e) => e.split(":")[0]);
+  $("#m").innerHTML = (faltan.length && v !== "ajustes" ? `<div class="hint">⚠️ Meta no devolvió datos de <b>${esc(faltan.join(", "))}</b> (demasiadas consultas). Los números de esas cuentas faltan: tocá ↻ en unos minutos.</div>` : "") + (vistas[v] ?? vistas.hoy)();
   document.querySelectorAll("[data-r]").forEach((b) => b.onclick = () => { rango = b.dataset.r; set("rango", rango); render(); });
   if (v === "ajustes") {
     $("#push").onclick = activarPush;
