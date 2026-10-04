@@ -60,6 +60,7 @@ input{font:inherit;width:100%;padding:12px;border-radius:10px;border:1px solid v
 <main id="m"></main>
 <nav id="nav">
   <a href="#hoy"><b>◉</b>Hoy</a>
+  <a href="#reporte"><b>📊</b>Reporte</a>
   <a href="#escalar"><b>🚀</b>Escalar</a>
   <a href="#testeos"><b>🧪</b>Testeos</a>
   <a href="#creativos"><b>▦</b>Creativos</a>
@@ -70,7 +71,7 @@ const API = "https://tppcpnfzcxxusdhrlmdx.supabase.co/functions/v1/app-movil";
 const $ = (s) => document.querySelector(s);
 const get = (k, d) => { try { return localStorage.getItem(k) ?? d } catch { return d } };
 const set = (k, v) => { try { localStorage.setItem(k, v) } catch {} };
-let P = null, rango = get("rango", "d4");
+let P = null, R = undefined, rango = get("rango", "d4");
 const usd = (n) => n == null ? "—" : (n < 0 ? "-" : "") + "$" + Math.abs(n).toLocaleString("es-AR", { maximumFractionDigits: n >= 100 || n <= -100 ? 0 : 2 });
 const ro = (n) => n == null ? "—" : n.toFixed(2).replace(".", ",");
 const col = (r) => r == null ? "" : r >= 2 ? "ok" : r >= 1.1 ? "warn" : "bad";
@@ -100,6 +101,23 @@ function login() {
 }
 
 const vistas = {
+  reporte() {
+    $("#tit").textContent = "Reporte";
+    if (R === undefined) { api("reporte").then((r) => { R = r; render(); }).catch(() => {}); return `<div class="empty">Cargando…</div>`; }
+    if (!R) return `<div class="empty">Todavía no hay reporte. Llega todos los días a las 10:00 y a las 22:00.</div>`;
+    const cuando = R.momento === "manana" ? `Cómo cerró ayer (${R.dia.slice(8)}/${R.dia.slice(5, 7)})` : `Cómo va hoy (${R.dia.slice(8)}/${R.dia.slice(5, 7)})`;
+    const lista = (arr, f) => arr.length ? arr.map(f).join("") : `<div class="mut">Nada.</div>`;
+    return `<div class="card"><div class="mut">${cuando}</div><div class="big ${R.total.ganancia >= 0 ? "ok" : "bad"}">${usd(R.total.ganancia)}</div>
+      <div class="kpis" style="grid-template-columns:repeat(3,1fr)"><div class="kpi"><b>${usd(R.total.gasto)}</b><span>Gasto</span></div><div class="kpi"><b>${usd(R.total.facturado)}</b><span>Facturado</span></div><div class="kpi"><b class="${col(R.total.gasto ? R.total.facturado / R.total.gasto : null)}">${ro(R.total.gasto ? R.total.facturado / R.total.gasto : null)}</b><span>ROAS real</span></div></div></div>
+      <div class="card"><div class="t">🏆 Lideran</div>
+        ${R.ofertaLider ? `<div style="margin-top:6px"><b>${esc(R.ofertaLider.oferta)}</b> · <span class="ok">${usd(R.ofertaLider.ganancia)}</span> · ROAS ${ro(R.ofertaLider.roas_real ?? R.ofertaLider.roas_pixel)}</div>` : ""}
+        ${R.paisLider ? `<div>${R.paisLider.bandera} <b>${esc(R.paisLider.pais)}</b> · ROAS ${ro(R.paisLider.roas)} · ${R.paisLider.ventas} ventas · ${usd(R.paisLider.gasto)}</div>` : ""}</div>
+      <div class="card"><div class="t">⚠️ Vienen flojos</div>${lista([...R.ofertasFlojas.map((o) => `<div style="margin-top:6px"><b>${esc(o.oferta)}</b> · <span class="bad">${usd(o.ganancia)}</span> · ROAS ${ro(o.roas_real ?? o.roas_pixel)}</div>`), ...R.paisesFlojos.map((p) => `<div style="margin-top:6px">${p.bandera} <b>${esc(p.pais)}</b> · ROAS <span class="bad">${ro(p.roas)}</span> · ${usd(p.gasto)}</div>`)], (x) => x)}</div>
+      <div class="card"><div class="t">📈 Para surfear</div><div class="mut">ROAS pixel &gt; 2 y 2+ ventas (regla de surfeo3). Lo que dice «a mano» lo decidís vos.</div>${lista(R.surfear, (s) => `<div class="ad" style="display:block"><div class="n">${esc(s.campana)}</div><div><span class="ok">ROAS ${ro(s.roas)}</span> · ${s.ventas} ventas · ${usd(s.gasto)} · <b>${esc(s.accion)}</b></div></div>`)}</div>
+      <div class="card"><div class="t">🔍 Para revisar</div><div class="mut">Gastaron $30+ con ROAS pixel &lt; 0,8.</div>${lista(R.revisar, (s) => `<div class="ad" style="display:block"><div class="n">${esc(s.campana)}</div><div><span class="bad">ROAS ${ro(s.roas)}</span> · ${s.ventas} ventas · ${usd(s.gasto)}</div></div>`)}</div>
+      <div class="card"><div class="t">Por oferta</div>${R.ofertas.map((o) => `<div class="row" style="margin-top:8px"><span class="sp">${esc(o.oferta)}</span><span class="${col(o.roas_real ?? o.roas_pixel)}">${ro(o.roas_real ?? o.roas_pixel)}</span><span class="${o.ganancia >= 0 ? "ok" : "bad"}" style="min-width:70px;text-align:right">${usd(o.ganancia)}</span></div>`).join("")}</div>
+      <div class="card"><div class="t">Por país</div><div class="mut">ROAS del pixel.</div>${R.paises.map((p) => `<div class="row" style="margin-top:8px"><span class="sp">${p.bandera} ${esc(p.pais)}</span><span class="mut">${p.ventas}v · ${usd(p.gasto)}</span><span class="${col(p.roas)}" style="min-width:44px;text-align:right">${ro(p.roas)}</span></div>`).join("")}</div>`;
+  },
   hoy() {
     $("#tit").textContent = "Hoy";
     const k = rango;
@@ -145,7 +163,7 @@ const vistas = {
       <input id="quien" placeholder="Tu nombre (Lorenzo, Franco…)" value="${esc(get("quien", ""))}">
       <button class="pri" id="push" style="width:100%">Activar avisos en este celular</button>
       <button id="prueba" style="width:100%;margin-top:8px">Mandar aviso de prueba</button><div id="pm" class="mut" style="margin-top:8px"></div></div>
-      <div class="card"><div class="t">Cuándo avisa</div><div class="mut">🗓️ Miércoles 22:00 — anuncios para CostCap (datos lun–mié)<br>🗓️ Viernes 10:00 — anuncios para BidCap (datos lun–jue)<br>Regla: ROAS &gt; 2 en 4 días y no escalado.</div></div>
+      <div class="card"><div class="t">Cuándo avisa</div><div class="mut">🎉 Al toque: testeo con 2+ ventas y ROAS ≥ 2 → «Validaste un producto nuevo»<br>📊 Todos los días 10:00 y 22:00 — reporte<br>🗓️ Miércoles 22:00 — anuncios para CostCap (datos lun–mié)<br>🗓️ Viernes 10:00 — anuncios para BidCap (datos lun–jue)<br>Regla: ROAS &gt; 2 en 4 días y no escalado.</div></div>
       <div class="card"><button id="salir" style="width:100%">Cerrar sesión</button></div>`;
   },
 };
@@ -181,7 +199,7 @@ function render() {
   scrollTo(0, 0);
 }
 addEventListener("hashchange", render);
-$("#ref").onclick = () => cargar(true);
+$("#ref").onclick = () => { R = undefined; cargar(true); };
 setInterval(hora, 30000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden && P && Date.now() - new Date(P.generado) > 10 * 60000) cargar(); });
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
