@@ -53,17 +53,41 @@ nav a.on{color:var(--acc)}
 input{font:inherit;width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--card2);color:var(--tx);margin:10px 0}
 .hint{background:#1d2633;border:1px solid #2c3d55;border-radius:12px;padding:12px;font-size:13px;margin-bottom:12px}
 .load{opacity:.5;pointer-events:none}
+.fil{display:flex;gap:6px;overflow-x:auto;margin-bottom:10px;padding-bottom:2px}
+.fil button{flex:none;padding:7px 12px;font-size:13px}.fil button.on{background:var(--acc);color:#071222;font-weight:600}
+.rng{display:flex;gap:6px;margin-bottom:10px}.rng input{margin:0;padding:8px;font-size:13px}
+.grp{margin:16px 0 6px;font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px}
+.cmp{display:flex;gap:10px;align-items:flex-start;padding:11px 12px;background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:8px}
+.cmp input[type=checkbox]{width:22px;height:22px;margin:2px 0 0;flex:none;accent-color:var(--acc)}
+.cmp .n{font-weight:600;font-size:14px;line-height:1.3;word-break:break-word}
+.cmp .m{display:flex;gap:10px;font-size:13px;margin-top:4px;font-variant-numeric:tabular-nums;flex-wrap:wrap}
+.off{opacity:.45}
+.barra{position:fixed;left:0;right:0;bottom:calc(58px + env(safe-area-inset-bottom));padding:10px 16px;background:rgba(15,17,21,.97);border-top:1px solid var(--line);display:flex;gap:8px;z-index:6}
+.barra button{flex:1;padding:12px;font-weight:600}
+button.del{background:var(--bad);color:#2a0606}
+.sub{margin-left:18px}
+.chip{font-size:11px;padding:1px 7px;border-radius:99px;background:var(--card2);color:var(--mut)}
+.of{margin:18px 0 8px;display:flex;align-items:baseline;gap:8px}.of b{font-size:16px}
+.arr{width:26px;height:26px;flex:none;display:grid;place-items:center;border-radius:8px;background:var(--card2);font-size:12px;transition:transform .15s}
+.arr.op{transform:rotate(90deg)}
+.lvl1{margin:-2px 0 8px 14px;border-left:2px solid var(--line);padding-left:8px}
+.lvl2{margin:0 0 6px 14px;border-left:2px dashed var(--line);padding-left:8px}
+.lvl1 .cmp,.lvl2 .cmp{padding:9px 10px}
+.cat-winner{color:#ffd166}.cat-rentable{color:var(--ok)}.cat-malo{color:var(--bad)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:20;display:flex;align-items:flex-end}
+.sheet{background:var(--card);width:100%;border-radius:18px 18px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));max-height:88vh;overflow:auto}
+.sheet h3{margin:0 0 4px}.opt{display:block;width:100%;text-align:left;margin-top:8px;padding:12px;background:var(--card2)}
+.opt.on{outline:2px solid var(--acc)}.paso{font-size:12px;color:var(--mut)}
 </style>
 </head>
 <body>
 <header><h1 id="tit">Mesa</h1><small id="act"></small><button id="ref" aria-label="Actualizar">↻</button></header>
 <main id="m"></main>
 <nav id="nav">
-  <a href="#hoy"><b>◉</b>Hoy</a>
-  <a href="#reporte"><b>📊</b>Reporte</a>
-  <a href="#escalar"><b>🚀</b>Escalar</a>
   <a href="#testeos"><b>🧪</b>Testeos</a>
-  <a href="#creativos"><b>▦</b>Creativos</a>
+  <a href="#validadas"><b>✅</b>Validadas</a>
+  <a href="#escala"><b>🚀</b>Escala</a>
+  <a href="#reporte"><b>📊</b>Reporte</a>
   <a href="#ajustes"><b>⚙︎</b>Ajustes</a>
 </nav>
 <script>
@@ -72,7 +96,7 @@ const $ = (s) => document.querySelector(s);
 const get = (k, d) => { try { return localStorage.getItem(k) ?? d } catch { return d } };
 const set = (k, v) => { try { localStorage.setItem(k, v) } catch {} };
 let P = null, R = undefined, rango = get("rango", "d4");
-const usd = (n) => n == null ? "—" : (n < 0 ? "-" : "") + "$" + Math.abs(n).toLocaleString("es-AR", { maximumFractionDigits: n >= 100 || n <= -100 ? 0 : 2 });
+const usd = (n) => n == null || isNaN(n) ? "—" : (n < 0 ? "-" : "") + "$" + Math.abs(n).toLocaleString("es-AR", { maximumFractionDigits: n >= 100 || n <= -100 ? 0 : 2 });
 const ro = (n) => n == null ? "—" : n.toFixed(2).replace(".", ",");
 const col = (r) => r == null ? "" : r >= 2 ? "ok" : r >= 1.1 ? "warn" : "bad";
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -168,6 +192,173 @@ const vistas = {
   },
 };
 
+
+
+// ===================== Testeos · Validadas · Escala =====================
+const hoyAR = () => new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);
+const menos = (d, n) => new Date(new Date(d + "T12:00:00Z").getTime() - n * 86400e3).toISOString().slice(0, 10);
+const dm = (d) => `${+d.slice(8)}.${+d.slice(5, 7)}`;
+let CF = JSON.parse(get("cfiltro", "null") || "null") ?? { r: "hoy" }; let C = null, cargandoC = false;
+const DET = new Map(), OPEN = new Set(), SEL = new Map();
+function rangoC() { const h = hoyAR(); if (CF.r === "hoy") return [h, h]; if (CF.r === "ayer") return [menos(h, 1), menos(h, 1)]; if (CF.r === "d4") return [menos(h, 3), h]; if (CF.r === "d7") return [menos(h, 6), h]; return [CF.desde ?? h, CF.hasta ?? h]; }
+async function cargarC(forzar) { cargandoC = true; const [d, h] = rangoC();
+  try { C = await api("campanas", { q: `&desde=${d}&hasta=${h}${forzar ? "&forzar=1" : ""}` }); } catch (e) { if (e.message === "clave") return login(); }
+  cargandoC = false; DET.clear(); [...OPEN].forEach((k) => k.startsWith("c:") && cargarDet(k.slice(2))); render(true); }
+async function cargarDet(id) { const x = C?.campanas.find((c) => c.id === id); if (!x) return; const [d, h] = rangoC();
+  try { DET.set(id, await api("detalle", { q: `&id=${id}&act=${x.act}&desde=${d}&hasta=${h}` })); } catch {} render(true); }
+const CAT = { winner: ["🏆", "Winner"], rentable: ["🟢", "Rentable"], malo: ["🔴", "Mal testeo"] };
+const met = (x) => `<div class="m"><span>${usd(x.gasto)}</span><span>${x.ventas} venta${x.ventas === 1 ? "" : "s"}</span><span class="${col(x.roas)}">ROAS ${ro(x.roas)}</span></div>`;
+function caja(tipo, x, extra, abre) {
+  const k = tipo + ":" + x.id, vivo = x.estado === "ACTIVE";
+  return `<div class="cmp ${vivo ? "" : "off"}">${abre ? `<span class="arr ${OPEN.has(k) ? "op" : ""}" data-tg="${esc(k)}">▶</span>` : ""}
+    ${vivo ? `<input type="checkbox" data-sel="${esc(k)}" ${SEL.has(k) ? "checked" : ""}>` : `<span class="chip">${x.estado === "PAUSED" ? "pausada" : esc(String(x.estado ?? "").toLowerCase().replace(/_/g, " "))}</span>`}
+    <div class="sp"><div class="n">${esc(x.nombre)}</div>${extra ?? ""}${met(x)}</div></div>`;
+}
+function vistaSeccion(sec, titulo) {
+  $("#tit").textContent = titulo;
+  const ops = [["hoy", "Hoy"], ["ayer", "Ayer"], ["d4", "4 días"], ["d7", "7 días"], ["rango", "Fechas…"]];
+  let html = `<div class="fil">${ops.map(([k, t]) => `<button data-cf="${k}" class="${CF.r === k ? "on" : ""}">${t}</button>`).join("")}</div>`;
+  if (CF.r === "rango") { const [d, h] = rangoC(); html += `<div class="rng"><input type="date" id="cd" value="${d}"><input type="date" id="ch" value="${h}"><button id="cok">Ver</button></div>`; }
+  if (!C) { if (!cargandoC) cargarC(); return html + `<div class="empty">Cargando…</div>`; }
+  if (C.errores?.length) html += `<div class="hint">⚠️ Faltan datos de ${esc(C.errores.map((e) => e.split(":")[0]).join(", "))} (Meta frenó las consultas). Tocá ↻ en unos minutos.</div>`;
+  let xs = C.campanas.filter((x) => x.seccion === sec);
+  if (sec === "testeos") xs = xs.filter((x) => x.estado === "ACTIVE" || (x.creada && Date.now() - new Date(x.creada) < 2 * 86400e3));
+  if (!xs.length) return html + `<div class="empty">${sec === "testeos" ? "No hay testeos en estas fechas." : "Nada en estas fechas."}</div>`;
+  const tot = xs.reduce((s, x) => ({ gasto: s.gasto + x.gasto, ventas: s.ventas + x.ventas, valor: s.valor + x.valor }), { gasto: 0, ventas: 0, valor: 0 }); tot.roas = tot.gasto ? tot.valor / tot.gasto : null;
+  html += `<div class="card"><div class="kpis" style="grid-template-columns:repeat(3,1fr);margin:0"><div class="kpi"><b>${usd(tot.gasto)}</b><span>Gasto</span></div><div class="kpi"><b>${tot.ventas}</b><span>Ventas</span></div><div class="kpi"><b class="${col(tot.roas)}">${ro(tot.roas)}</b><span>ROAS</span></div></div>
+    <div class="mut" style="margin-top:8px">Ventas = la mayor entre Meta e Impultienda. ▶ abre conjuntos y anuncios.</div></div>`;
+  const ofertas = [...new Set(xs.map((x) => x.oferta))].map((o) => { const ys = xs.filter((x) => x.oferta === o); const t = ys.reduce((s, x) => ({ gasto: s.gasto + x.gasto, ventas: s.ventas + x.ventas, valor: s.valor + x.valor }), { gasto: 0, ventas: 0, valor: 0 }); return { o, ys, ...t, roas: t.gasto ? t.valor / t.gasto : null }; }).sort((a, b) => b.gasto - a.gasto);
+  const orden = { malo: 0, rentable: 1, winner: 2 };
+  for (const g of ofertas) {
+    html += `<div class="of"><b>${esc(g.o)}</b><span class="mut">${usd(g.gasto)} · ${g.ventas}v · <span class="${col(g.roas)}">ROAS ${ro(g.roas)}</span></span></div>`;
+    const ys = sec === "testeos" ? [...g.ys].sort((a, b) => (orden[a.categoria] ?? 1.5) - (orden[b.categoria] ?? 1.5) || b.gasto - a.gasto) : g.ys;
+    for (const x of ys) {
+      const c = x.categoria && CAT[x.categoria];
+      const extra = `<div class="mut">${esc(x.cuenta)}${x.presupuesto ? ` · $${x.presupuesto}/día` : ""}${c ? ` · <b class="cat-${x.categoria}">${c[0]} ${c[1]}</b>` : ""}</div>${c && x.motivo ? `<div class="mut">${esc(x.motivo)}</div>` : ""}`;
+      html += caja("c", x, extra, true);
+      if (OPEN.has("c:" + x.id)) {
+        const d = DET.get(x.id);
+        html += `<div class="lvl1">` + (!d ? `<div class="mut" style="padding:6px">Cargando conjuntos…</div>` : d.conjuntos.map((s) =>
+          caja("s", s, `<div class="mut">${s.bid ? `bid $${s.bid} · ` : ""}${s.presupuesto ? `$${s.presupuesto}/día` : ""}</div>`, true) +
+          (OPEN.has("s:" + s.id) ? `<div class="lvl2">${s.anuncios.map((a) => caja("a", a, a.post ? `<a class="mut" href="https://www.facebook.com/${a.post}" target="_blank">ver post ↗</a>` : "", false)).join("") || `<div class="mut">Sin gasto en estas fechas.</div>`}</div>` : "")).join("")) + `</div>`;
+      }
+    }
+  }
+  return html + barra();
+}
+vistas.testeos = () => vistaSeccion("testeos", "Testeos");
+vistas.validadas = () => vistaSeccion("validadas", "Ofertas validadas");
+vistas.escala = () => vistaSeccion("escala", "Escala");
+// --- selección ---
+function buscar(k) {
+  const [t, id] = k.split(":");
+  if (t === "c") { const x = C.campanas.find((c) => c.id === id); return x && { t, id, act: x.act, nombre: x.nombre, campana: x, x }; }
+  for (const [cid, d] of DET) { const camp = C.campanas.find((c) => c.id === cid); for (const s of d.conjuntos) {
+    if (t === "s" && s.id === id) return { t, id, act: camp.act, nombre: s.nombre, campana: camp, x: s };
+    const a = s.anuncios.find((a) => a.id === id); if (t === "a" && a) return { t, id, act: camp.act, nombre: a.nombre, campana: camp, conjunto: s, x: a }; } }
+}
+function barra() {
+  if (!SEL.size) return "";
+  const its = [...SEL.keys()].map(buscar).filter(Boolean);
+  const testeo = its.length === 1 && its[0].t === "c" && its[0].campana.seccion === "testeos";
+  return `<div class="barra"><button class="del" id="b-apagar">Apagar ${its.length}</button><button class="pri" id="b-escalar">Escalar ▾</button>${testeo ? `<button id="b-validar">Validar</button>` : ""}<button id="b-claude" aria-label="Pedir a Claude">✳︎</button></div>`;
+}
+// anuncios elegidos (directos, o los que vendieron dentro de los conjuntos/campañas elegidos)
+function anunciosElegidos() {
+  const out = new Map();
+  for (const k of SEL.keys()) { const it = buscar(k); if (!it) continue;
+    if (it.t === "a") out.set(it.id, it);
+    if (it.t === "s") for (const a of it.x.anuncios) if (a.ventas > 0) out.set(a.id, { t: "a", id: a.id, act: it.act, nombre: a.nombre, campana: it.campana, conjunto: it.x, x: a });
+    if (it.t === "c") { const d = DET.get(it.id); for (const s of d?.conjuntos ?? []) for (const a of s.anuncios) if (a.ventas > 0) out.set(a.id, { t: "a", id: a.id, act: it.act, nombre: a.nombre, campana: it.campana, conjunto: s, x: a }); } }
+  return [...out.values()];
+}
+async function apagarSel() {
+  const its = [...SEL.keys()].map(buscar).filter(Boolean);
+  if (!confirm(`¿Apagar ${its.length}?\n\n${its.slice(0, 8).map((i) => "• " + i.nombre).join("\n")}${its.length > 8 ? "\n…" : ""}`)) return;
+  const r = await api("apagar", { body: { items: its.map((i) => ({ id: i.id, act: i.act, nombre: i.nombre, campana: i.campana.nombre })) } }).catch(() => null);
+  const mal = (r?.resultados ?? []).filter((x) => !x.ok);
+  alert(mal.length ? `Apagados ${its.length - mal.length}. Fallaron ${mal.length}: ${mal.map((m) => m.error).join(" · ")}` : `✅ Apagados ${its.length}.`);
+  SEL.clear(); cargarC(true);
+}
+async function validarSel() {
+  const it = buscar([...SEL.keys()][0]); const n = it.nombre;
+  const flags = (n.match(/^[^\p{L}\d]+/u) || [""])[0].trim();
+  const resto = n.replace(/^[^\p{L}\d]+/u, "").replace(/^\d{1,2}\.\d{1,2}\s*/, "").replace(/\b(CBO|ABO)\b\s*/i, "").replace(/\b(Testeo|Reno(vaci[oó]n)?)\b\s*/i, "").trim();
+  const nuevo = prompt("Pasa a «Ofertas validadas» con este nombre:", `${flags} ${dm(hoyAR())} CBO ${resto}`.trim());
+  if (!nuevo) return;
+  const r = await api("renombrar", { body: { id: it.id, act: it.act, nombre: nuevo } }).catch(() => null);
+  alert(r?.ok ? "✅ Validado: ahora está en «Ofertas validadas»." : "No se pudo: " + (r?.error ?? "error")); SEL.clear(); cargarC(true);
+}
+async function pedirClaude() {
+  const its = [...SEL.keys()].map(buscar).filter(Boolean); const [d, h] = rangoC();
+  const txt = `Desde Mesa (${d === h ? d : d + " a " + h}):\n${its.map((i) => `- ${i.t === "c" ? "Campaña" : i.t === "s" ? "Conjunto" : "Anuncio"} «${i.nombre}» (id ${i.id}, cuenta ${i.act}${i.x.post ? `, post ${i.x.post}` : ""}) · ${usd(i.x.gasto)} · ${i.x.ventas}v · ROAS ${ro(i.x.roas)}${i.t !== "c" ? ` · en ${i.campana.nombre}` : ""}`).join("\n")}\n\nQuiero: `;
+  try { await navigator.clipboard.writeText(txt); } catch {}
+  alert("📋 Copié el pedido. Se abre Claude: pegalo y escribí qué querés."); location.href = "claude://";
+}
+// --- escalar: menú + quiz ---
+function hoja(html) { const m = document.createElement("div"); m.className = "modal"; m.innerHTML = `<div class="sheet">${html}</div>`; m.onclick = (e) => { if (e.target === m) m.remove(); }; document.body.appendChild(m); return m; }
+function menuEscalar() {
+  const its = [...SEL.keys()].map(buscar).filter(Boolean);
+  const setBid = its.length === 1 && its[0].t === "s" && its[0].x.bid;
+  const m = hoja(`<h3>Escalar</h3><div class="mut">Con los anuncios elegidos (o los que vendieron dentro de lo que elegiste).</div>
+    <button class="opt" data-e="costcap">💰 <b>CostCap</b><div class="mut">Bids desde el CPA promedio hasta CPA + 5</div></button>
+    <button class="opt" data-e="bidcap">🎯 <b>BidCap</b><div class="mut">Bids desde CPA × 2 hasta CPA × 2 + 5</div></button>
+    <button class="opt" data-e="aislada">🧱 <b>CBO aislada</b><div class="mut">Una CBO solo con esos anuncios</div></button>
+    <button class="opt" data-e="intrapuja" ${setBid ? "" : "disabled style='opacity:.4'"}>🔬 <b>Intrapuja</b><div class="mut">${setBid ? `Copias del bid $${its[0].x.bid} con +$0,01 … +$0,09` : "Elegí un solo conjunto con bid (de una BidCap) para usarla"}</div></button>`);
+  m.querySelectorAll("[data-e]").forEach((b) => b.onclick = () => { if (b.disabled) return; m.remove(); quiz(b.dataset.e); });
+}
+async function quiz(tipo) {
+  const its = [...SEL.keys()].map(buscar).filter(Boolean);
+  const ads = anunciosElegidos(); const act = (its[0] || {}).act;
+  if (tipo !== "intrapuja" && !ads.length) return alert("Elegí anuncios (o abrí ▶ la campaña/conjunto para que cargue los anuncios que vendieron).");
+  const g = ads.reduce((s, a) => s + a.x.gasto, 0), v = ads.reduce((s, a) => s + a.x.ventas, 0);
+  const cpa = v ? g / v : null; const camp = (ads[0] || its[0]).campana; const n0 = camp.nombre;
+  const flags = (n0.match(/^[^\p{L}\d]+/u) || [""])[0].trim(); const mx = /🇲🇽/.test(n0);
+  const resto = n0.replace(/^[^\p{L}\d]+/u, "").replace(/^\d{1,2}\.\d{1,2}\s*/, "").replace(/\b(CBO|ABO|Testeo|Reno(vaci[oó]n)?|MADRE|AISLADA|BIDCAP|COSTCAP)\b/gi, "").replace(/\s+/g, " ").trim();
+  const manana = menos(hoyAR(), -1);
+  const base = tipo === "costcap" ? Math.round(cpa ?? 5) : Math.round((cpa ?? 5) * 2);
+  const R = { tipo, act, ads: ads.map((a) => a.id), pagina: "original", presupuesto: tipo === "intrapuja" ? null : 50.55,
+    bids: [0, 1, 2, 3, 4, 5].map((i) => base + i), fecha: manana, hora: mx ? "08:00" : "05:00",
+    nombre: `${flags} ${dm(manana)} ${tipo === "aislada" ? "CBO AISLADA" : tipo.toUpperCase()} ${resto}`.trim(), centavos: "1,2,3,4,5,6,7,8,9", activar: true };
+  let pags = null;
+  const pasos = tipo === "intrapuja" ? ["centavos", "presupuesto", "activar", "resumen"] : ["anuncios", "pagina", ...(tipo === "aislada" ? [] : ["bids"]), "presupuesto", "inicio", "nombre", "activar", "resumen"];
+  let i = 0; const m = hoja("");
+  const pinta = async () => {
+    const p = pasos[i]; let h = `<div class="paso">Paso ${i + 1} de ${pasos.length} · ${tipo === "aislada" ? "CBO aislada" : tipo === "intrapuja" ? "Intrapuja" : tipo === "costcap" ? "CostCap" : "BidCap"}</div>`;
+    if (p === "anuncios") h += `<h3>Estos anuncios</h3><div class="mut">CPA promedio: <b>${usd(cpa)}</b> (${v} ventas, ${usd(g)})</div>` + ads.map((a) => `<div class="ad" style="display:block"><div class="n">${esc(a.nombre)}</div><div class="mut">${a.x.ventas}v · ROAS ${ro(a.x.roas)} · ${usd(a.x.gasto)}</div></div>`).join("");
+    if (p === "pagina") { if (!pags) { h += `<h3>¿Con qué página?</h3><div class="mut">Cargando páginas…</div>`; m.firstChild.innerHTML = h; pags = await api("paginas", { q: `&act=${act}` }).catch(() => []); return pinta(); }
+      h += `<h3>¿Con qué página?</h3><button class="opt ${R.pagina === "original" ? "on" : ""}" data-pg="original"><b>La misma del anuncio original</b><div class="mut">Mantiene el post con sus comentarios (Post ID)</div></button>` + pags.map((pg) => `<button class="opt ${R.pagina === pg.id ? "on" : ""}" data-pg="${pg.id}">${esc(pg.nombre)}</button>`).join(""); }
+    if (p === "bids") h += `<h3>Bids (USD)</h3><div class="mut">${tipo === "costcap" ? "CPA promedio → CPA + 5" : "CPA × 2 → CPA × 2 + 5"}. Uno por conjunto, separados por coma.</div><input id="q" value="${R.bids.join(", ")}">`;
+    if (p === "presupuesto") h += `<h3>Presupuesto por ${tipo === "aislada" ? "campaña" : "conjunto"} (USD/día)</h3>${tipo === "intrapuja" ? `<div class="mut">Vacío = el mismo del conjunto original.</div>` : ""}<input id="q" inputmode="decimal" value="${R.presupuesto ?? ""}">`;
+    if (p === "inicio") h += `<h3>¿Cuándo sale?</h3><input id="qf" type="date" value="${R.fecha}"><input id="qh" type="time" value="${R.hora}">`;
+    if (p === "nombre") h += `<h3>Nombre de la campaña</h3><input id="q" value="${esc(R.nombre)}">`;
+    if (p === "centavos") h += `<h3>Intrapujas</h3><div class="mut">Centavos a sumarle al bid ganador, separados por coma.</div><input id="q" value="${R.centavos}">`;
+    if (p === "activar") h += `<h3>¿La dejo activa?</h3><button class="opt ${R.activar ? "on" : ""}" data-ac="1"><b>Sí, activa</b><div class="mut">Arranca a la hora programada</div></button><button class="opt ${!R.activar ? "on" : ""}" data-ac="0"><b>No, en pausa</b><div class="mut">La reviso y la prendo yo</div></button>`;
+    if (p === "resumen") h += `<h3>Resumen</h3><div class="card" style="margin-top:8px">${tipo === "intrapuja" ? `Copias del conjunto «${esc(its[0].nombre)}» (bid $${its[0].x.bid}) con +${esc(R.centavos)} centavos` : `<b>${esc(R.nombre)}</b><br>${ads.length} anuncio(s) · página ${R.pagina === "original" ? "original" : esc(pags?.find((x) => x.id === R.pagina)?.nombre ?? R.pagina)}<br>${tipo === "aislada" ? "" : `Bids: ${R.bids.map((b) => "$" + b).join(", ")}<br>`}Presupuesto: $${R.presupuesto}/día ${tipo === "aislada" ? "" : "por conjunto"}<br>Sale: ${R.fecha} ${R.hora}`}<br>${R.activar ? "Queda activa" : "Queda en pausa"}</div><div class="mut">⚠️ «Todos los públicos» (ciclo de vida) no se puede poner desde acá: queda anotado para que Claude lo ponga.</div>`;
+    h += `<div class="row" style="margin-top:14px">${i ? `<button id="qa">Atrás</button>` : ""}<span class="sp"></span><button class="pri" id="qs">${p === "resumen" ? "Crear" : "Siguiente"}</button></div>`;
+    m.firstChild.innerHTML = h;
+    m.querySelectorAll("[data-pg]").forEach((b) => b.onclick = () => { R.pagina = b.dataset.pg; pinta(); });
+    m.querySelectorAll("[data-ac]").forEach((b) => b.onclick = () => { R.activar = b.dataset.ac === "1"; pinta(); });
+    if ($("#qa")) $("#qa").onclick = () => { i--; pinta(); };
+    $("#qs").onclick = async () => {
+      const q = $("#q")?.value;
+      if (p === "bids") R.bids = q.split(/[,\s]+/).map(Number).filter((x) => x > 0);
+      if (p === "presupuesto") R.presupuesto = q ? Number(String(q).replace(",", ".")) : null;
+      if (p === "inicio") { R.fecha = $("#qf").value; R.hora = $("#qh").value; }
+      if (p === "nombre") R.nombre = q;
+      if (p === "centavos") R.centavos = q;
+      if (p !== "resumen") { i++; return pinta(); }
+      $("#qs").textContent = "Creando…"; $("#qs").classList.add("load");
+      const body = tipo === "intrapuja" ? { tipo, act, adset_id: its[0].id, centavos: R.centavos.split(/[,\s]+/).map(Number).filter((x) => x > 0), presupuesto: R.presupuesto, activar: R.activar }
+        : { tipo, act, ads: R.ads, pagina: R.pagina, nombre: R.nombre, inicio: `${R.fecha}T${R.hora}:00-0300`, presupuesto: R.presupuesto, bids: R.bids, activar: R.activar };
+      const r = await api("escalar", { body }).catch((e) => ({ error: e.message }));
+      m.remove();
+      alert(r?.ok ? `✅ Listo: ${r.adsets.length} conjunto(s) y ${r.ads.length} anuncio(s).${r.log?.length ? "\n\n" + r.log.join("\n") : ""}` : "No se pudo: " + (r?.error ?? "error"));
+      SEL.clear(); cargarC(true);
+    };
+  };
+  pinta();
+}
 async function activarPush() {
   const pm = $("#pm"); set("quien", $("#quien").value.trim());
   try {
@@ -183,23 +374,31 @@ async function activarPush() {
   } catch (e) { pm.textContent = "Error: " + e.message; }
 }
 
-function render() {
+function render(keep) {
   if (!get("clave", "")) return login();
   if (!P) { $("#m").innerHTML = `<div class="empty">Cargando…</div>`; return; }
-  const v = (location.hash || "#hoy").slice(1);
+  const v = (location.hash || "#testeos").slice(1);
   document.querySelectorAll("nav a").forEach((a) => a.classList.toggle("on", a.getAttribute("href") === "#" + v));
   const faltan = (P.errores ?? []).map((e) => e.split(":")[0]);
-  $("#m").innerHTML = (faltan.length && v !== "ajustes" ? `<div class="hint">⚠️ Meta no devolvió datos de <b>${esc(faltan.join(", "))}</b> (demasiadas consultas). Los números de esas cuentas faltan: tocá ↻ en unos minutos.</div>` : "") + (vistas[v] ?? vistas.hoy)();
+  $("#m").innerHTML = (faltan.length && v !== "ajustes" ? `<div class="hint">⚠️ Meta no devolvió datos de <b>${esc(faltan.join(", "))}</b> (demasiadas consultas). Los números de esas cuentas faltan: tocá ↻ en unos minutos.</div>` : "") + (vistas[v] ?? vistas.testeos)();
   document.querySelectorAll("[data-r]").forEach((b) => b.onclick = () => { rango = b.dataset.r; set("rango", rango); render(); });
+  document.querySelectorAll("[data-cf]").forEach((b) => b.onclick = () => { CF = { ...CF, r: b.dataset.cf }; set("cfiltro", JSON.stringify(CF)); SEL.clear(); C = null; render(); });
+  if ($("#cok")) $("#cok").onclick = () => { CF = { r: "rango", desde: $("#cd").value, hasta: $("#ch").value }; set("cfiltro", JSON.stringify(CF)); C = null; render(); };
+  document.querySelectorAll("[data-sel]").forEach((c) => c.onchange = () => { c.checked ? SEL.set(c.dataset.sel, 1) : SEL.delete(c.dataset.sel); render(true); });
+  document.querySelectorAll("[data-tg]").forEach((b) => b.onclick = () => { const k = b.dataset.tg; if (OPEN.has(k)) OPEN.delete(k); else { OPEN.add(k); if (k.startsWith("c:") && !DET.has(k.slice(2))) cargarDet(k.slice(2)); } render(true); });
+  if ($("#b-apagar")) $("#b-apagar").onclick = apagarSel;
+  if ($("#b-escalar")) $("#b-escalar").onclick = menuEscalar;
+  if ($("#b-validar")) $("#b-validar").onclick = validarSel;
+  if ($("#b-claude")) $("#b-claude").onclick = pedirClaude;
   if (v === "ajustes") {
     $("#push").onclick = activarPush;
     $("#prueba").onclick = async () => { const r = await api("probar", { body: {} }); $("#pm").textContent = `Enviado a ${r.enviados} celular${r.enviados === 1 ? "" : "es"}.`; };
     $("#salir").onclick = () => { set("clave", ""); P = null; login(); };
   }
-  scrollTo(0, 0);
+  if (!keep) scrollTo(0, 0);
 }
 addEventListener("hashchange", render);
-$("#ref").onclick = () => { R = undefined; cargar(true); };
+$("#ref").onclick = () => { R = undefined; C = null; D = null; cargar(true); if (["", "#testeos", "#validadas", "#escala"].includes(location.hash)) cargarC(true); };
 setInterval(hora, 30000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden && P && Date.now() - new Date(P.generado) > 10 * 60000) cargar(); });
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
