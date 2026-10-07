@@ -158,8 +158,12 @@ const vistas = {
   escalar() {
     $("#tit").textContent = "Para escalar";
     const intro = `<div class="mut" style="margin-bottom:10px">Anuncios de testeo o reno con <b>ROAS &gt; 2</b> en los últimos 4 días que todavía no están en ninguna estructura de escala. Avisos: miércoles CostCap, viernes BidCap.</div>`;
-    if (!P.escalar.length) return intro + `<div class="empty">Hoy no hay anuncios para escalar.</div>`;
-    return intro + P.escalar.map((o) => `<div class="card"><div class="row"><span class="t sp">${esc(o.oferta)}</span><span class="pill">${o.anuncios.length} anuncio${o.anuncios.length > 1 ? "s" : ""}</span></div>
+    const W = P.winners ?? [];
+    const win = W.length ? `<div class="card"><div class="t">🔥 Winners y listos para escala</div><div class="mut">Cualquier campaña, últimos 4 días, por Post ID, que todavía no están en CostCap/BidCap. 🔥 ROAS ≥ 3, CPA ≤ $2,5, 3+ ventas · 🚀 ROAS ≥ 2, CPA ≤ $6, 6+ ventas.</div>
+      ${W.map((a) => `<a class="ad" style="color:inherit;text-decoration:none" href="${fb(a.post) ?? "#"}" target="_blank">${img(a.thumb)}<div class="sp"><div class="row"><span class="n sp">${a.tipo === "winner" ? "🔥" : "🚀"} ${esc(a.anuncio)}</span><span class="pill">${esc(a.oferta)}</span></div><div class="mut">${esc(a.campanas[0] ?? "")}</div>
+        <div><span class="ok">ROAS ${ro(a.roas)}</span> · CPA ${usd(a.cpa)} · ${a.ventas} ventas · ${usd(a.gasto)}</div><div class="mut">BidCap ~${usd(a.bid_sugerido)} · CostCap ~${usd(a.costcap_sugerido)}</div></div></a>`).join("")}</div>` : "";
+    if (!P.escalar.length) return win + intro + `<div class="empty">Hoy no hay anuncios de testeo para escalar.</div>`;
+    return win + intro + P.escalar.map((o) => `<div class="card"><div class="row"><span class="t sp">${esc(o.oferta)}</span><span class="pill">${o.anuncios.length} anuncio${o.anuncios.length > 1 ? "s" : ""}</span></div>
       <div class="kpis" style="grid-template-columns:repeat(3,1fr)"><div class="kpi"><b>${usd(o.cpa_promedio)}</b><span>CPA prom.</span></div><div class="kpi"><b>${usd(o.bid_sugerido)}</b><span>Bid (×2)</span></div><div class="kpi"><b>${usd(o.costcap_sugerido)}</b><span>CostCap</span></div></div>
       <div style="margin-top:8px">${o.anuncios.map((a) => `<a class="ad" style="color:inherit;text-decoration:none" href="${fb(a.post) ?? "#"}" target="_blank">${img(a.thumb)}<div class="sp"><div class="n">${esc(a.anuncio)}</div><div class="mut">${esc(a.campana)}</div>
         <div><span class="ok">ROAS ${ro(a.roas)}</span> · ${a.ventas} venta${a.ventas > 1 ? "s" : ""} · CPA ${usd(a.cpa)} · gasto ${usd(a.gasto)}${a.ventas < 2 ? ` · <span class="warn">1 venta</span>` : ""}</div></div></a>`).join("")}</div></div>`).join("");
