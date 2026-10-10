@@ -134,7 +134,7 @@ async function api(accion, { q = "", body = null, escritura = false } = {}) {
 let demoP = null;
 function cargarDemo() {
   if (window.DemoAPI) return Promise.resolve();
-  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=19"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=20"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
   return demoP;
 }
 
@@ -2406,7 +2406,8 @@ function detallePedido(p) {
   const id = String(p.id);
   const pr = p.params || {};
   const prog = p.progreso || [];
-  const cancelable = ["pendiente", "trabajando", "listo_revisar", "lanzar", "error"].includes(p.estado);
+  const cancelable = ["pendiente", "trabajando", "listo_revisar", "lanzar"].includes(p.estado);
+  const eliminable = p.estado !== "lanzando";
   return `<div class="ped-det">
     ${p.error ? `<div class="err-box">${esc(p.error)}</div>` : ""}
     <div class="ped-params">${pl(+pr.iteraciones || 0, "iteración", "iteraciones")} + ${pl(+pr.renovaciones || 0, "renovación", "renovaciones")} por oferta · mezcla ${esc(pr.mezcla || "70/30")} · ${esc(destinoTx(pr.destino))}${p.quien ? ` · pidió ${esc(p.quien)}` : ""}</div>
@@ -2416,6 +2417,7 @@ function detallePedido(p) {
       ${p.drive_url ? `<a class="btn chico" href="${esc(p.drive_url)}" target="_blank" rel="noopener">Revisar videos ↗</a>` : ""}
       ${p.estado === "listo_revisar" ? `<button type="button" class="btn chico pri" data-publicar="${esc(id)}">Publicar en Meta</button>` : ""}
       ${cancelable ? `<button type="button" class="btn chico" data-cancelar="${esc(id)}">Cancelar</button>` : ""}
+      ${eliminable ? `<button type="button" class="btn chico peligro" data-eliminar="${esc(id)}">${cancelable ? "Cancelar y eliminar" : "Eliminar"}</button>` : ""}
     </div>
   </div>`;
 }
@@ -2432,6 +2434,7 @@ function clickPedidos(e) {
   if (tg) { const id = tg.dataset.pedtg; RK.abiertos.has(id) ? RK.abiertos.delete(id) : RK.abiertos.add(id); pintarPedidos(); const n = $(`[data-pedtg="${CSS.escape(id)}"]`); if (n) n.focus({ preventScroll: true }); return; }
   const pu = t.closest("[data-publicar]"); if (pu) return confirmarPublicar(pu.dataset.publicar);
   const ca = t.closest("[data-cancelar]"); if (ca) return confirmarCancelar(ca.dataset.cancelar);
+  const el = t.closest("[data-eliminar]"); if (el) return confirmarEliminar(el.dataset.eliminar);
 }
 async function confirmarPublicar(id) {
   if (!pedidoPorId(id)) await cargarFabrica();
@@ -2486,6 +2489,34 @@ function confirmarCancelar(id) {
     }
     enviando = false; m.cerrar();
     toast(`Pedido #${esc(id)} cancelado.`);
+    cargarFabrica();
+  };
+}
+// (10/10, Lorenzo) «Eliminar» / «Cancelar y eliminar»: lo saca de la pantalla (y si estaba en marcha, lo cancela)
+function confirmarEliminar(id) {
+  const p = pedidoPorId(id); if (!p) return;
+  const activo = ["pendiente", "trabajando", "listo_revisar", "lanzar"].includes(p.estado);
+  let enviando = false;
+  const m = abrirModal(`<h3>¿${activo ? "Cancelar y eliminar" : "Eliminar"} el pedido #${esc(id)}?</h3>
+    <p class="mut">${activo ? "Se cancela (la compu deja de trabajar en él) y desaparece de la lista. Lo que ya esté en Drive queda ahí." : "Desaparece de la lista de pedidos."}</p>
+    <div class="err-box" id="el-err" role="alert" hidden></div>
+    <div class="botones"><button type="button" class="btn" data-x data-foco>No</button><button type="button" class="btn peligro" data-ok>Sí, ${activo ? "cancelar y eliminar" : "eliminar"}</button></div>`, { bloqueado: () => enviando });
+  $("[data-x]", m.dlg).onclick = m.cerrar;
+  $("[data-ok]", m.dlg).onclick = async (ev) => {
+    const b = ev.currentTarget;
+    enviando = true; b.classList.add("cargando"); b.innerHTML = `<span class="gira">↻</span> Eliminando…`;
+    try { await api("fabrica_eliminar", { body: { id: p.id } }); }
+    catch (e) {
+      enviando = false;
+      if (e.code === 401) { m.cerrar(); ls.del("dash_clave"); return login("Clave incorrecta"); }
+      b.classList.remove("cargando"); b.textContent = "Reintentar";
+      const box = $("#el-err", m.dlg); box.hidden = false; box.textContent = `No se pudo: ${e.message}`;
+      return;
+    }
+    enviando = false; m.cerrar();
+    if (RK.fab?.pedidos) RK.fab.pedidos = RK.fab.pedidos.filter((x) => String(x.id) !== String(id));
+    RK.abiertos.delete(String(id)); pintarPedidos();
+    toast(`Pedido #${esc(id)} eliminado.`);
     cargarFabrica();
   };
 }

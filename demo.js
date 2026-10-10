@@ -426,7 +426,7 @@
   const limpio = (p) => { const { _t0, _l0, _ln, ...x } = p; return x; };
   function fabricaDemo(accion, body) {
     fabInit(); fabAvanzar();
-    if (accion === "fabrica_estado") return { compu: { prendida: COMPU_ON, visto: COMPU_ON ? new Date(Date.now() - 40000).toISOString() : hace(47), info: { ram_libre_pct: 41, trabajando: COMPU_ON ? (FAB.pedidos.find((p) => p.estado === "trabajando") || {}).id || null : null, version: "demo" } }, pedidos: FAB.pedidos.slice(0, 10).map(limpio) };
+    if (accion === "fabrica_estado") return { compu: { prendida: COMPU_ON, visto: COMPU_ON ? new Date(Date.now() - 40000).toISOString() : hace(47), info: { ram_libre_pct: 41, trabajando: COMPU_ON ? (FAB.pedidos.find((p) => p.estado === "trabajando") || {}).id || null : null, version: "demo" } }, pedidos: FAB.pedidos.filter((p) => !p.oculto).slice(0, 10).map(limpio) };
     if (accion === "fabrica_pedido") {
       if (!COMPU_ON) throw Object.assign(new Error("La compu está apagada"), { code: 409 });
       if (!body?.ofertas?.some((o) => (o.posts || []).length)) throw Object.assign(new Error("params inválidos: sin posts"), { code: 400 });
@@ -439,6 +439,10 @@
     if (accion === "fabrica_lanzar") {
       if (p.estado !== "listo_revisar") throw Object.assign(new Error(`El pedido está ${p.estado}`), { code: 409 });
       p.estado = "lanzar"; p._l0 = Date.now(); return { ok: true, id: p.id, estado: p.estado };
+    }
+    if (accion === "fabrica_eliminar") {
+      if (p.estado === "lanzando") throw Object.assign(new Error("se está publicando en Meta: esperá a que termine"), { code: 409 });
+      p.oculto = true; if (["pendiente", "trabajando", "listo_revisar", "lanzar"].includes(p.estado)) p.estado = "cancelado"; return { ok: true, id: p.id };
     }
     if (accion === "fabrica_cancelar") {
       if (["lanzando", "lanzado", "cancelado"].includes(p.estado)) throw Object.assign(new Error(`No se puede cancelar: está ${p.estado}`), { code: 409 });
