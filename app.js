@@ -134,7 +134,7 @@ async function api(accion, { q = "", body = null, escritura = false } = {}) {
 let demoP = null;
 function cargarDemo() {
   if (window.DemoAPI) return Promise.resolve();
-  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=21"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=22"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
   return demoP;
 }
 
@@ -1969,6 +1969,13 @@ function montarRanking({ pedido = null } = {}) {
   if (!RK.datos[RK.periodo]) cargarRanking();
   cargarFabrica();
   RK.timer = setInterval(() => { if (!document.hidden && S.vista === "ranking") cargarFabrica(); }, 60000);
+  // (10/10) mientras algo se está publicando: cada 15 s y un reloj que corre cada segundo
+  clearInterval(RK.timerSub); RK.timerSub = setInterval(() => {
+    if (document.hidden || S.vista !== "ranking") return;
+    const enMeta = (RK.fab?.pedidos || []).some((p) => ["lanzar", "lanzando"].includes(p.estado) || (p.estado === "lanzado" && !chequeoDe(p)));
+    if (enMeta && Date.now() - (RK.subT || 0) > 15000) { RK.subT = Date.now(); cargarFabrica(); }
+    $$("[data-reloj]").forEach((el) => { el.textContent = relojTx(+el.dataset.reloj); });
+  }, 1000);
 }
 async function cambiarPeriodoRk(p) {
   if (p === "rango") { const r = await elegirRango(RK.periodo); if (!r) return; p = r; }
@@ -2001,6 +2008,7 @@ async function cargarFabrica() {
   }
   RK.fabCargando = false;
   if (S.vista === "ranking") { pintarCompu(); pintarPedidos(); pintarBarra(); }
+  avisarChequeos();
   return RK.fab;
 }
 function pintarRanking() {
@@ -2382,6 +2390,49 @@ function pintarPedidos() {
     if (c) { requestAnimationFrame(() => { c.scrollIntoView({ behavior: reducido() ? "auto" : "smooth", block: "start" }); c.classList.add("destello"); setTimeout(() => c.classList.remove("destello"), 2400); }); }
   }
 }
+// (10/10, Lorenzo) Subida a Meta: una barra por oferta, ✓ y ↗ a Ads Manager al terminar, reloj de 10 min y cartel final.
+const amLink = (act, ids) => `https://adsmanager.facebook.com/adsmanager/manage/adsets?act=${encodeURIComponent(act)}&filter_set=${encodeURIComponent("SEARCH_BY_CAMPAIGN_IDS-STRING_SET\u001eANY\u001e" + JSON.stringify(ids))}`;
+const chequeoDe = (p) => (p.progreso || []).filter((x) => x.etapa === "chequeo_10min").slice(-1)[0] || null;
+const lanzadaDe = (p) => (p.progreso || []).filter((x) => x.etapa === "lanzada").slice(-1)[0] || null;
+const relojTx = (hasta) => { const ms = hasta - Date.now(); if (ms <= 0) return "revisando…"; const m = Math.floor(ms / 60000), s2 = Math.floor(ms / 1000) % 60; return `${m}:${String(s2).padStart(2, "0")}`; };
+const FLECHA_AM = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 17 C 10 14, 13 11, 16.5 7.5 M9 7.2 C 11.5 7, 14 7, 16.8 7.2 C 17 10, 17 12.5, 16.8 15" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+function subidaHTML(p) {
+  const sb = p.subida; const pr = p.params || {};
+  const ofs = pr.ofertas || [];
+  const filas = ofs.map((o) => { const x = sb?.ofertas?.[o.etiqueta] || {}; const sg = o.sugerencia || {};
+    const total = x.total || (+(sg.iteraciones ?? pr.iteraciones ?? 5) + +(sg.renovaciones ?? pr.renovaciones ?? 5)); return { o, x, total, n: Math.min(x.subidos || 0, total) }; });
+  const T = filas.reduce((a, f) => a + f.total, 0), N = filas.reduce((a, f) => a + f.n, 0);
+  const ids = sb?.adsets || [], act = sb?.act || "1950162628858779";
+  const lz = lanzadaDe(p), ch = chequeoDe(p);
+  const reloj = lz && !ch ? `<div class="sub-reloj">⏱ Chequeo de los 10 minutos en <b class="num" data-reloj="${Date.parse(lz.t) + 600000}">${relojTx(Date.parse(lz.t) + 600000)}</b></div>`
+    : ch ? `<div class="sub-reloj ${/problem|error|rechaz|issue|mal/i.test(ch.texto || "") ? "mal" : "ok"}">${/problem|error|rechaz|issue|mal/i.test(ch.texto || "") ? "⚠" : "✅"} ${esc(ch.texto || "Chequeo de los 10 minutos hecho")}</div>` : "";
+  return `<div class="sub">
+    <div class="pack-bar"><div class="pack-fill azul" style="width:${T ? Math.round(100 * N / T) : 0}%"></div></div>
+    <div class="pack-num"><b class="num">${N} / ${T}</b> anuncios en Meta · ${filas.filter((f) => f.n >= f.total).length} de ${filas.length} ofertas subidas</div>
+    ${reloj}
+    <ul class="pack-ofs sub-ofs">${filas.map((f) => { const ok = f.n >= f.total && f.total;
+      return `<li class="${ok ? "lista" : ""}"><span class="pk-of">${f.o.bandera ? esc(f.o.bandera) + " " : ""}${esc(f.o.etiqueta)}${f.x.campana ? `<small class="mut"> · ${esc(f.x.campana)}</small>` : ""}</span>
+        <span class="sub-der"><span class="sub-bar"><span style="width:${f.total ? Math.round(100 * f.n / f.total) : 0}%"></span></span><span class="num sub-n">${f.n}/${f.total}</span>
+        ${ok && f.x.adset_id ? `<a class="sub-ir" href="${esc(amLink(f.x.act || act, [f.x.adset_id]))}" target="_blank" rel="noopener" aria-label="Ver ${esc(f.o.etiqueta)} en el Administrador de anuncios">✓ ${FLECHA_AM}</a>` : ok ? `<span class="sub-ir">✓</span>` : ""}</span></li>`; }).join("")}</ul>
+    ${ids.length ? `<a class="btn chico pri sub-todos" href="${esc(amLink(act, ids))}" target="_blank" rel="noopener">Ver los ${ids.length} conjuntos nuevos en Ads Manager ${FLECHA_AM}</a>` : ""}
+  </div>`;
+}
+function avisarChequeos() {
+  let vistos = []; try { vistos = JSON.parse(ls.get("chequeos_vistos", "[]")) || []; } catch {}
+  for (const p of RK.fab?.pedidos || []) {
+    const ch = chequeoDe(p); if (!ch) continue;
+    const k = `${p.id}|${ch.t}`; if (vistos.includes(k)) continue;
+    vistos.push(k); ls.set("chequeos_vistos", JSON.stringify(vistos.slice(-30)));
+    if (Date.now() - Date.parse(ch.t) > 6 * 3600e3 || modalActual) continue;
+    const mal = /problem|error|rechaz|issue|mal/i.test(ch.texto || "");
+    const ids = p.subida?.adsets || [], act = p.subida?.act || "1950162628858779";
+    const m = abrirModal(`<div class="rk-ok">${icoEvento(mal ? "triangulo" : "fiesta")}<h3>${mal ? "Hay algo para revisar en Meta" : "¡Salió todo bien! Está todo en orden"}</h3>
+      <p>${esc(ch.texto || "")}</p></div>
+      <div class="botones">${ids.length ? `<a class="btn pri" href="${esc(amLink(act, ids))}" target="_blank" rel="noopener">Ver en Ads Manager ↗</a>` : ""}<button type="button" class="btn" data-x data-foco>Listo</button></div>`);
+    m.dlg.classList.add("dialogo-ev"); $("[data-x]", m.dlg).onclick = m.cerrar;
+    break;
+  }
+}
 // (10/10, Lorenzo) El pedido es UN pack: barra con el total de creativos hechos y una fila por oferta.
 const HECHO_RE = /empez|arranc|planead|render de|leyendo|diseñando|armando/i;
 function packDe(p) {
@@ -2431,7 +2482,8 @@ function detallePedido(p) {
   return `<div class="ped-det">
     ${p.error ? `<div class="err-box">${esc(p.error)}</div>` : ""}
     <div class="ped-params">${pl(+pr.iteraciones || 0, "iteración", "iteraciones")} + ${pl(+pr.renovaciones || 0, "renovación", "renovaciones")} por oferta · mezcla ${esc(pr.mezcla || "70/30")} · ${esc(destinoTx(pr.destino))}${p.quien ? ` · pidió ${esc(p.quien)}` : ""}</div>
-    ${(() => { const k = packDe(p); if (!k.filas.length) return "";
+    ${["lanzar", "lanzando", "lanzado"].includes(p.estado) ? subidaHTML(p) : ""}
+    ${["lanzar", "lanzando", "lanzado"].includes(p.estado) ? "" : (() => { const k = packDe(p); if (!k.filas.length) return "";
       const chip = (ok, t) => `<span class="pk ${ok ? "ok" : ""}">${ok ? "✓" : "·"} ${t}</span>`;
       return `<ul class="pack-ofs">${k.filas.map((f) => `<li class="${f.drive ? "lista" : f.err ? "mal" : ""}"><span class="pk-of">${f.o.bandera ? esc(f.o.bandera) + " " : ""}${esc(f.o.etiqueta || f.o.grupo)}</span>
         <span class="pk-chips">${f.err ? `<span class="pk mal">✕ con error</span>` : chip(f.gu, "Guiones") + chip(f.it, `${f.nIT} IT`) + chip(f.re, `${f.nRE} RE`) + chip(f.drive, "Drive")}</span></li>`).join("")}</ul>`; })()}

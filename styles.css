@@ -987,3 +987,19 @@ table.camp tbody tr.fila.sel td { background: var(--marca); }
 .ped-detalle summary { cursor: pointer; font-weight: 600; color: var(--acento); font-size: 14px; }
 .ped > .pack-bar { margin: 10px 14px 4px; }
 .ped > .pack-num { padding: 0 14px 10px; }
+
+/* ===== Subida a Meta (10/10) ===== */
+.pack-fill.azul { background: repeating-linear-gradient(-45deg, var(--acento) 0 10px, color-mix(in srgb, var(--acento) 75%, var(--tarjeta)) 10px 20px); }
+.sub { margin: 6px 0 10px; }
+.sub-reloj { margin: 8px 0 4px; padding: 7px 10px; border: 2px dashed var(--acento); border-radius: 8px; font-size: 14px; }
+.sub-reloj.ok { border-color: var(--ok); color: var(--ok); }
+.sub-reloj.mal { border-color: var(--peligro); color: var(--peligro); }
+.sub-ofs li { align-items: center; }
+.sub-der { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
+.sub-bar { width: 92px; height: 10px; border: 1.5px solid var(--tinta); border-radius: 999px; overflow: hidden; background: var(--papel-2); }
+.sub-bar span { display: block; height: 100%; background: var(--acento); transition: width .5s ease-out; }
+.sub-ofs li.lista .sub-bar span { background: var(--ok); }
+.sub-n { font-size: 12.5px; min-width: 36px; text-align: right; }
+.sub-ir { display: inline-flex; align-items: center; gap: 2px; padding: 2px 7px; border: 2px solid var(--ok); border-radius: 8px; color: var(--ok); font-weight: 700; text-decoration: none; background: color-mix(in srgb, var(--ok) 10%, var(--tarjeta)); }
+.sub-todos { margin-top: 8px; display: inline-flex; gap: 6px; align-items: center; }
+.sub-todos, .sub-todos:hover { text-decoration: none; }
