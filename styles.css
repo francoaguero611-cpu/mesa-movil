@@ -955,3 +955,13 @@ table.camp tbody tr.fila.sel td { background: var(--marca); }
   .controles .periodos, .rk-per { grid-template-columns: 0.75fr 0.75fr 1.25fr 1.35fr; gap: 6px; }
   .controles .periodos .btn, .rk-per .btn { font-size: 13.5px; padding-inline: 3px; white-space: nowrap; }
 }
+
+/* «NO RENOVARÍA» (10/10) */
+.rk-norenovar { display: flex; gap: 10px; align-items: flex-start; margin: 4px 0 10px; padding: 10px 12px; border: 2px dashed var(--peligro); border-radius: var(--r-card); background: color-mix(in srgb, var(--peligro) 7%, var(--tarjeta)); }
+.rk-norenovar b, .rk-nr-lista b { display: block; color: var(--peligro); font-family: var(--f-titulo); letter-spacing: .4px; font-size: 14px; }
+.rk-norenovar span:not(.rk-nr-ico), .rk-nr-lista span:not(.rk-nr-ico) { font-size: 13.5px; color: var(--tinta-2); }
+.rk-nr-ico { flex: none; width: 34px; height: 34px; color: var(--peligro); display: inline-flex; }
+.rk-nr-ico .ev-svg { width: 100%; height: 100%; }
+.rk-nr-ico .ev-svg path { fill: none; stroke: currentColor; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; stroke-dashoffset: 0; animation: none; }
+.rk-nr-lista { list-style: none; padding: 0; margin: 12px 0 4px; display: grid; gap: 10px; }
+.rk-nr-lista li { display: flex; gap: 10px; align-items: flex-start; padding: 10px; border: 2px dashed color-mix(in srgb, var(--peligro) 60%, transparent); border-radius: var(--r-card); }

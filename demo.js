@@ -376,6 +376,8 @@
       const fact = xs.reduce((t, a) => t + a.facturacion, 0);
       return { clave, etiqueta: `${oferta} · ${mercado}`, bandera, oferta, mercado, anuncios: xs, _f: fact };
     }).sort((a, b) => b._f - a._f).map(({ _f, ...g }) => g);
+    const ult = grupos[grupos.length - 1];
+    if (ult) { ult.anuncios.forEach((x) => { x.recomendado = false; }); ult.no_renovar = "Pérdida en los últimos 3 días (gasto US$ 84,2, ROAS 0,71) y sin conjuntos rescatables (el mejor: «8.10 Iteraciones y Renos», 2 ventas, ROAS 1,3)."; }
     return { generado: new Date().toISOString(), periodo: per, grupos };
   }
 

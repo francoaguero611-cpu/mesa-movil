@@ -134,7 +134,7 @@ async function api(accion, { q = "", body = null, escritura = false } = {}) {
 let demoP = null;
 function cargarDemo() {
   if (window.DemoAPI) return Promise.resolve();
-  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=14"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=15"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
   return demoP;
 }
 
@@ -2065,6 +2065,7 @@ function ofertaHTML(g, gi) {
       <span class="rk-flechas"><button type="button" class="btn chico flecha-rk izq" data-desl="-1" aria-label="Videos anteriores de ${esc(et)}">${svgFlecha(18)}</button><button type="button" class="btn chico flecha-rk" data-desl="1" aria-label="Más videos de ${esc(et)}">${svgFlecha(18)}</button></span>
     </div>
     <svg class="rk-garabato" viewBox="0 0 160 12" aria-hidden="true"><path d="M2 8 C 30 3, 52 11, 80 6 S 130 3, 158 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+    ${g.no_renovar ? `<div class="rk-norenovar"><span class="rk-nr-ico ev-ico-chico peligro">${icoEvento("x")}</span><div><b>NO RENOVARÍA</b><span>${esc(g.no_renovar)}</span></div></div>` : ""}
     ${xs.length ? `<div class="rk-slider" role="list" aria-label="Videos de ${esc(et)}, de mejor a peor">${xs.map((a, i) => tarjetaRk(g, a, i)).join("")}</div>` : `<div class="vacio chico">Sin videos con gasto en este período.</div>`}
   </section>`;
 }
@@ -2138,9 +2139,16 @@ function recomendar() {
     const k = claveAd(g, a); n++; ofs.add(g.clave);
     if (!RK.sel.has(k)) RK.sel.set(k, buscarRk(k));
   }
-  if (!n) return toast("En este período no hay nada para recomendar: ningún video vende con ROAS ≥ 1,3.", "error", 7000);
   sincronizarSel();
-  toast(`Te marqué ${pl(n, "creativo")} de ${pl(ofs.size, "oferta")}. Tocá un video para sacarlo o sumar otro.`);
+  // (10/10) las ofertas que no renovaría, con el porqué, en un pop-up
+  const no = gruposRk().filter((g) => g.no_renovar);
+  if (!no.length) { if (!n) return toast("No hay nada para recomendar en los últimos 3 días.", "error", 7000); return toast(`Te marqué ${pl(n, "creativo")} de ${pl(ofs.size, "oferta")}. Tocá un video para sacarlo o sumar otro.`); }
+  const m = abrirModal(`<div class="ev-cab"><span class="ev-ico ${n ? "ok" : "peligro"}">${icoEvento(n ? "tilde" : "x")}</span></div>
+    <h3>${n ? `Te marqué ${pl(n, "creativo")} de ${pl(ofs.size, "oferta")}` : "No marqué nada"}</h3>
+    <p class="mut">Winners de los últimos 3 días (los más masivos, hasta 3 por oferta) o, si no hay, los mejores de los conjuntos que dejan ganancia.</p>
+    <ul class="rk-nr-lista">${no.map((g) => `<li><span class="rk-nr-ico ev-ico-chico peligro">${icoEvento("x")}</span><div><b>NO RENOVARÍA ${esc((g.bandera ? g.bandera + " " : "") + (g.etiqueta || g.oferta))}</b><span>${esc(g.no_renovar)}</span></div></li>`).join("")}</ul>
+    <div class="botones"><button type="button" class="btn pri" data-ok>Entendido</button></div>`, { ancho: true });
+  $("[data-ok]", m.dlg).onclick = m.cerrar;
 }
 function pintarBarraRanking() {
   const b = $("#barra");
