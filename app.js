@@ -134,7 +134,7 @@ async function api(accion, { q = "", body = null, escritura = false } = {}) {
 let demoP = null;
 function cargarDemo() {
   if (window.DemoAPI) return Promise.resolve();
-  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=15"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=16"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
   return demoP;
 }
 
@@ -2065,6 +2065,7 @@ function ofertaHTML(g, gi) {
       <span class="rk-flechas"><button type="button" class="btn chico flecha-rk izq" data-desl="-1" aria-label="Videos anteriores de ${esc(et)}">${svgFlecha(18)}</button><button type="button" class="btn chico flecha-rk" data-desl="1" aria-label="Más videos de ${esc(et)}">${svgFlecha(18)}</button></span>
     </div>
     <svg class="rk-garabato" viewBox="0 0 160 12" aria-hidden="true"><path d="M2 8 C 30 3, 52 11, 80 6 S 130 3, 158 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+    ${g.sugerencia ? `<div class="rk-sug">✦ <b>Más renovaciones que iteraciones</b> — ${esc(g.sugerencia.motivo)}</div>` : ""}
     ${g.no_renovar ? `<div class="rk-norenovar"><span class="rk-nr-ico ev-ico-chico peligro">${icoEvento("x")}</span><div><b>NO RENOVARÍA</b><span>${esc(g.no_renovar)}</span></div></div>` : ""}
     ${xs.length ? `<div class="rk-slider" role="list" aria-label="Videos de ${esc(et)}, de mejor a peor">${xs.map((a, i) => tarjetaRk(g, a, i)).join("")}</div>` : `<div class="vacio chico">Sin videos con gasto en este período.</div>`}
   </section>`;
@@ -2215,7 +2216,7 @@ function ofertasSeleccionadas() {
 }
 function armarParams(P, ofertas) {
   return { iteraciones: P.iteraciones, renovaciones: P.renovaciones, mezcla: P.mezcla, destino: P.destino,
-    ofertas: ofertas.map((o) => ({ grupo: o.clave, etiqueta: o.etiqueta, bandera: o.bandera || "",
+    ofertas: ofertas.map((o) => ({ grupo: o.clave, etiqueta: o.etiqueta, bandera: o.bandera || "", ...(o.sugerencia ? { sugerencia: o.sugerencia } : {}),
       posts: o.items.map((a) => ({ post: a.post || null, ad_id: a.ad_id || null, act: a.act || null, campaign_id: (a.campanas || [])[0]?.id || null, nombre: a.nombre, ventas: a.ventas ?? 0, roas: a.roas ?? null, gasto: a.gasto ?? 0 })) })) };
 }
 function quizRenos() {
@@ -2280,7 +2281,8 @@ function quizRenos() {
     m.set(`${cab(4, "Resumen")}
       <div class="rk-res-params"><span class="chip">${esc(cant)} por oferta</span><span class="chip">mezcla ${esc(P.mezcla)}</span><span class="chip">${esc(destinoTx(P.destino))}</span></div>
       <ul class="rk-res">${ofertas.map((o) => `<li>
-        <div class="rk-res-cab">${o.bandera ? `<span class="ban" aria-hidden="true">${esc(o.bandera)}</span>` : ""}<b>${esc(o.etiqueta)}</b><small class="num">${pl(o.items.length, "creativo")} → ${pl(porOf, "video")}</small></div>
+        <div class="rk-res-cab">${o.bandera ? `<span class="ban" aria-hidden="true">${esc(o.bandera)}</span>` : ""}<b>${esc(o.etiqueta)}</b><small class="num">${pl(o.items.length, "creativo")} → ${o.sugerencia ? `${o.sugerencia.iteraciones} IT + ${o.sugerencia.renovaciones} RE` : pl(porOf, "video")}</small></div>
+        ${o.sugerencia ? `<div class="rk-sug">✦ ${esc(o.sugerencia.motivo)}</div>` : ""}
         <div class="rk-minis">${o.items.map((a) => `<span class="rk-mini" title="${esc(a.nombre)}">${a.thumb ? `<img src="${esc(a.thumb)}" alt="">` : ""}<span class="sr">${esc(a.nombre)}</span></span>`).join("")}</div>
       </li>`).join("")}</ul>
       <p class="rk-res-total"><b class="num">${pl(total, "video nuevo", "videos nuevos")}</b> en total. La compu arma guiones, iteraciones y renovaciones, los sube a Drive y te manda un aviso por cada etapa. <b>Nada se publica en Meta</b> hasta que revises y toques «Publicar».</p>

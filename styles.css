@@ -965,3 +965,6 @@ table.camp tbody tr.fila.sel td { background: var(--marca); }
 .rk-nr-ico .ev-svg path { fill: none; stroke: currentColor; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; stroke-dashoffset: 0; animation: none; }
 .rk-nr-lista { list-style: none; padding: 0; margin: 12px 0 4px; display: grid; gap: 10px; }
 .rk-nr-lista li { display: flex; gap: 10px; align-items: flex-start; padding: 10px; border: 2px dashed color-mix(in srgb, var(--peligro) 60%, transparent); border-radius: var(--r-card); }
+
+.rk-sug { margin: 4px 0 10px; padding: 8px 12px; border: 2px dashed var(--acento); border-radius: var(--r-card); background: color-mix(in srgb, var(--acento) 8%, var(--tarjeta)); font-size: 13.5px; color: var(--tinta-2); }
+.rk-sug b { color: var(--acento); }
