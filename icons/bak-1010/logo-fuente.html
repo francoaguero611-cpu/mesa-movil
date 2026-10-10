@@ -1,0 +1,23 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700&display=block" rel="stylesheet">
+<style>html,body{margin:0;background:transparent} svg{display:block}</style></head><body>
+<svg id="s" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <filter id="b" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="2" seed="7" result="r"/><feDisplacementMap in="SourceGraphic" in2="r" scale="5" xChannelSelector="R" yChannelSelector="G"/></filter>
+    <pattern id="p" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.6" fill="#1f1d19" opacity=".09"/></pattern>
+  </defs>
+  <rect id="fondo" width="512" height="512" fill="#f6f1e4"/>
+  <rect width="512" height="512" fill="url(#p)"/>
+  <g id="tarjeta" transform="translate(0,0)">
+    <g filter="url(#b)">
+      <rect x="104" y="100" width="318" height="318" rx="34" fill="#1f1d19"/>
+      <rect x="86" y="82" width="318" height="318" rx="34" fill="#ffffff" stroke="#1f1d19" stroke-width="14"/>
+    </g>
+    <path transform="translate(116,146) scale(0.9) translate(-142,-136)" fill="#1f1d19" fill-rule="evenodd" filter="url(#b)" d="M142 136 H 214 C 290 136, 324 182, 324 228 C 324 276, 290 320, 214 320 H 142 Z M 188 178 H 210 C 256 178, 276 200, 276 228 C 276 256, 256 278, 210 278 H 188 Z"/>
+    <path d="M118 346 C 150 332, 182 358, 214 342 S 262 330, 290 344" fill="none" stroke="#2f5d62" stroke-width="13" stroke-linecap="round" filter="url(#b)"/>
+    <g filter="url(#b)" stroke="#2f6b2a" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" fill="none">
+      <path d="M298 262 L 322 232 L 340 250 L 368 210"/>
+      <path d="M344 208 L 370 206 L 370 232"/>
+    </g>
+  </g>
+</svg></body></html>

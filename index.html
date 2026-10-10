@@ -12,13 +12,13 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Dashboard">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=12">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png?v=12">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=13">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png?v=13">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=12">
+<link rel="stylesheet" href="styles.css?v=13">
 <script>
   // Tema antes de pintar, para que no parpadee.
   try { var t = localStorage.getItem("dash_tema"); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
@@ -50,6 +50,10 @@
       </div>
     </div>
   </header>
+  <nav class="secciones" id="secciones" aria-label="Secciones" hidden>
+    <button type="button" class="seccion" data-sec="dash" aria-pressed="true"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 20 C 9 19.6, 15 20.2, 20.5 19.8 M6.5 17 V11.5 M11.5 17 V6.5 M16.5 17 V9.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>Dashboard</button>
+    <button type="button" class="seccion" data-sec="ranking" aria-pressed="false"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4.5 6 C 6 5.8, 7.4 5.9, 8.6 6 M4.5 12 C 6.5 11.8, 9 11.9, 11.6 12 M4.5 18 C 7.5 17.8, 11 17.9, 14.6 18 M15.5 8.5 L18.5 5.2 L21 8.4" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Ranking</button>
+  </nav>
   <main id="main"></main>
 </div>
 
@@ -57,6 +61,6 @@
 <div id="toasts" class="toasts" aria-live="polite" aria-atomic="false"></div>
 <div id="modal-raiz"></div>
 
-<script src="app.js?v=12" defer></script>
+<script src="app.js?v=13" defer></script>
 </body>
 </html>

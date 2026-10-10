@@ -320,6 +320,129 @@
     return undefined;
   }
 
+
+  // ---------- Ranking + fábrica (demo, 10/10) ----------
+  const RK_G = ["cuero-oficio|francia", "moldes-1500|latam", "glp1-kitchen|anglo", "40-dias|mexico"];
+  const RK_N = [14, 11, 9, 12];
+  const RK_NOMBRES = ["UGC Jorge — hook taller", "B-roll cinturón 70% OFF", "Viñetas 1.500 moldes", "Hook «no sabía coser»", "Reno winner + SFX", "Carrusel láminas A4", "Testimonial voz clonada", "B-roll manos cuero 2", "Iteración hook visual 4", "Avatar IA — abuela costurera", "Antes/después billetera", "Reno 60/40 — ángulo regalo", "Hook «gasté 200 USD en cursos»", "Viñetas taller nocturno", "UGC mamá emprendedora"];
+  const HOOKS = ["¿NO SABÉS COSER?", "70% OFF HOY", "1.500 MOLDES", "LO HICE EN 1 HORA", "MIRÁ ESTO", "REGALO PERFECTO", "SIN MÁQUINA", "MI ABUELA LO HACÍA", "PASO A PASO", "NADIE TE LO DICE"];
+  function thumbSVG(seed, nombre) {
+    const R = rng("th" + seed);
+    const h = Math.floor(R() * 360), h2 = (h + 40 + Math.floor(R() * 80)) % 360;
+    const hook = HOOKS[hash(seed) % HOOKS.length];
+    const persona = R() > 0.4;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400"><defs><linearGradient id="g" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="hsl(${h},45%,62%)"/><stop offset="1" stop-color="hsl(${h2},40%,30%)"/></linearGradient></defs><rect width="300" height="400" fill="url(#g)"/>` +
+      `<circle cx="${60 + R() * 180}" cy="${90 + R() * 60}" r="${40 + R() * 40}" fill="hsl(${h2},60%,80%)" opacity=".35"/>` +
+      (persona ? `<ellipse cx="150" cy="215" rx="46" ry="54" fill="hsl(25,${30 + R() * 30}%,${55 + R() * 20}%)"/><path d="M60 400 C 70 300, 110 280, 150 280 C 190 280, 230 300, 240 400 Z" fill="hsl(${h},30%,22%)"/><path d="M104 200 C 104 150, 196 140, 198 205 C 190 175, 120 170, 104 200 Z" fill="hsl(${h2},35%,15%)"/>`
+        : `<path d="M20 330 C 80 300, 120 350, 180 320 S 270 300, 290 330 L 290 400 L 20 400 Z" fill="hsl(${h},35%,20%)" opacity=".8"/><rect x="${70 + R() * 40}" y="170" width="${110 + R() * 40}" height="120" rx="10" fill="hsl(${h2},45%,72%)" transform="rotate(${R() * 16 - 8} 150 230)"/><path d="M90 230 C 120 210, 170 250, 210 225" stroke="hsl(${h},40%,25%)" stroke-width="5" fill="none" stroke-linecap="round" stroke-dasharray="10 8"/>`) +
+      `<rect x="18" y="40" width="264" height="54" rx="8" fill="#fff" opacity=".93"/><text x="150" y="76" font-family="Arial Black,Arial,sans-serif" font-size="${hook.length > 14 ? 22 : 27}" font-weight="900" text-anchor="middle" fill="#111">${hook}</text></svg>`;
+    return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+  }
+  function rankingDemo(per) {
+    const [f, s] = FACT[per] || FACT["7d"];
+    const grupos = RK_G.map((clave, gi) => {
+      const gg = G.find((x) => x[0] === clave);
+      const [, oferta, mercado, bandera, ticket, act, cuenta] = gg;
+      const camps = ESTR.filter((c) => c.grupo === clave);
+      const xs = [];
+      for (let i = 0; i < RK_N[gi]; i++) {
+        const seed = clave + i;
+        const R = rng(seed + per + s);
+        const Rb = rng(seed);
+        const base = [3.4, 2.9, 2.5, 2.2, 1.9, 1.7, 1.5, 1.35, 1.2, 1.05, 0.9, 0.7, 0.5, 0.3, 0][i % 15] * (gi === 2 ? 0.8 : 1);
+        const gasto = r2((8 + Rb() * 30) * f * (1.2 - i * 0.04));
+        const roasR = Math.max(0, base * (0.8 + R() * 0.4));
+        const ventas = base === 0 ? 0 : Math.max(0, Math.round((gasto * roasR) / ticket));
+        const facturacion = r2(ventas * ticket * (1 + R() * 0.12));
+        const roas = gasto ? r2(facturacion / gasto) : null;
+        const nc = 1 + (hash(seed) % 3 === 0 ? Math.min(2, camps.length - 1) : 0);
+        const cs = camps.slice(i % camps.length).concat(camps).slice(0, nc).map((c) => ({ id: c.id, nombre: c.nombre }));
+        const post = `78768949443588${gi}_${hash(seed) % 1e9}`;
+        const vp = Math.max(0, ventas - (R() > 0.6 ? 1 : 0));
+        xs.push({ post, ad_id: `1202${gi}${String(i).padStart(2, "0")}77${hash(seed) % 1e6}`, ad_ids: [], act: act.replace(/^act_/, ""), cuenta, nombre: RK_NOMBRES[(i * 3 + gi) % RK_NOMBRES.length] + (i > 9 ? ` v${i - 8}` : ""),
+          campanas: cs, ventas, ventas_pixel: vp, ventas_real: ventas, gasto, facturacion, roas, cpa: ventas ? r2(gasto / ventas) : null,
+          thumb: thumbSVG(seed, ""), video_id: "v" + hash(seed), tendencia: per === "7d" || per === "30d" ? (["sube", "baja", "igual", null][hash(seed + per) % 4]) : null });
+      }
+      const score = (a) => a.ventas ? (a.roas || 0) * Math.min(1, a.ventas / 3) : -1 / (1 + a.gasto);
+      xs.sort((a, b) => score(b) - score(a));
+      xs.forEach((a) => { a.winner = a.ventas > 4 && a.roas > 2; });
+      const buenos = xs.filter((a) => a.ventas > 0 && a.roas >= 1.3).sort((a, b) => (b.winner - a.winner) || (b.roas - a.roas)).slice(0, 5);
+      xs.forEach((a) => {
+        a.recomendado = buenos.includes(a);
+        a.motivo = a.recomendado ? (a.winner ? `Winner: ${a.ventas} ventas con ROAS ${String(a.roas).replace(".", ",")}.` : `Vende con ROAS ${String(a.roas).replace(".", ",")}; entra entre los 5 mejores.`)
+          : !a.ventas ? "Sin ventas en el período." : a.roas < 1.3 ? "En pérdida (ROAS < 1,3): no se renueva." : "Bien, pero hay 5 mejores en esta oferta.";
+      });
+      const fact = xs.reduce((t, a) => t + a.facturacion, 0);
+      return { clave, etiqueta: `${oferta} · ${mercado}`, bandera, oferta, mercado, anuncios: xs, _f: fact };
+    }).sort((a, b) => b._f - a._f).map(({ _f, ...g }) => g);
+    return { generado: new Date().toISOString(), periodo: per, grupos };
+  }
+
+  const COMPU_ON = new URLSearchParams(location.search).get("compu") !== "0";
+  const hace = (min) => new Date(Date.now() - min * 60000).toISOString();
+  const ofDemo = (clave, posts) => { const g = rankingDemo("7d").grupos.find((x) => x.clave === clave); return { grupo: clave, etiqueta: g.etiqueta, bandera: g.bandera, posts: g.anuncios.slice(0, posts).map((a) => ({ post: a.post, ad_id: a.ad_id, act: a.act, campaign_id: a.campanas[0]?.id, nombre: a.nombre, ventas: a.ventas, roas: a.roas, gasto: a.gasto })) }; };
+  let FAB = null;
+  function fabInit() {
+    if (FAB) return;
+    const p41 = { id: 41, creado: hace(26), actualizado: hace(2), estado: "trabajando", quien: "Lorenzo",
+      params: { iteraciones: 5, renovaciones: 5, mezcla: "70/30", destino: "original", ofertas: [ofDemo("cuero-oficio|francia", 3), ofDemo("moldes-1500|latam", 2)] },
+      progreso: [{ t: hace(25), etapa: "inicio", texto: "La compu agarró el pedido" }, { t: hace(24), etapa: "winners", texto: "5 winners leídos, guiones con sus ángulos" },
+        { t: hace(17), etapa: "guiones", oferta: "Cuero · Francia", texto: "10 guiones listos" }, { t: hace(12), etapa: "guiones", oferta: "Moldes · LATAM", texto: "10 guiones listos" },
+        { t: hace(2), etapa: "iteraciones", oferta: "Cuero · Francia", texto: "5 iteraciones renderizadas en AWS" }], drive_url: null, resultado: null, error: null };
+    const p40 = { id: 40, creado: hace(190), actualizado: hace(70), estado: "listo_revisar", quien: "Lorenzo",
+      params: { iteraciones: 5, renovaciones: 5, mezcla: "70/30", destino: "original", ofertas: [ofDemo("40-dias|mexico", 2), ofDemo("glp1-kitchen|anglo", 2)] },
+      progreso: [{ t: hace(189), etapa: "inicio", texto: "La compu agarró el pedido" }, { t: hace(186), etapa: "winners", texto: "4 winners leídos" },
+        { t: hace(170), etapa: "guiones", oferta: "40 Días · México", texto: "10 guiones" }, { t: hace(160), etapa: "guiones", oferta: "GLP-1 Kitchen · Anglo", texto: "10 guiones" },
+        { t: hace(130), etapa: "iteraciones", texto: "10 iteraciones listas" }, { t: hace(95), etapa: "renovaciones", texto: "10 renovaciones listas" },
+        { t: hace(72), etapa: "drive", texto: "20 videos subidos a Drive" }, { t: hace(70), etapa: "lista", texto: "¡Listo para revisar!" }],
+      drive_url: "https://drive.google.com/drive/folders/demo-pedido-40", resultado: null, error: null };
+    const p39 = { id: 39, creado: hace(60 * 26), actualizado: hace(60 * 22), estado: "lanzado", quien: "Franco",
+      params: { iteraciones: 10, renovaciones: 0, mezcla: "90/10", destino: "cbo_propia", ofertas: [ofDemo("cuero-oficio|francia", 2)] },
+      progreso: [{ t: hace(60 * 26), etapa: "inicio", texto: "La compu agarró el pedido" }, { t: hace(60 * 25), etapa: "lista", texto: "10 videos en Drive" }, { t: hace(60 * 23), etapa: "lanzando", texto: "Subiendo a Meta" }, { t: hace(60 * 22.9), etapa: "lanzada", texto: "10 anuncios en «9.10 CBO Iteraciones Cuero»" }, { t: hace(60 * 22.7), etapa: "chequeo_10min", texto: "Chequeo OK: 10/10 aprobados, sin errores" }],
+      drive_url: "https://drive.google.com/drive/folders/demo-pedido-39", resultado: { campaign_id: "120299000111222", anuncios: 10 }, error: null };
+    FAB = { pedidos: [p41, p40, p39], sig: 42 };
+  }
+  const SIM = [["inicio", "La compu agarró el pedido"], ["winners", "Winners leídos"], ["guiones", "Guiones listos"], ["iteraciones", "Iteraciones renderizadas"], ["renovaciones", "Renovaciones renderizadas"], ["drive", "Videos subidos a Drive"], ["lista", "¡Listo para revisar!"]];
+  const SIM_L = [["lanzando", "Subiendo a Meta"], ["lanzada", "Anuncios publicados"], ["chequeo_10min", "Chequeo de los 10 min: todo OK"]];
+  function fabAvanzar() {
+    const ahora = Date.now();
+    for (const p of FAB.pedidos) {
+      if (p._t0 && ["pendiente", "trabajando"].includes(p.estado)) {
+        const n = Math.min(SIM.length, Math.floor((ahora - p._t0) / 12000));
+        while (p.progreso.length < n) { const [e, t] = SIM[p.progreso.length]; p.progreso.push({ t: new Date().toISOString(), etapa: e, texto: t }); }
+        p.estado = n >= SIM.length ? "listo_revisar" : n >= 1 ? "trabajando" : "pendiente";
+        if (p.estado === "listo_revisar") p.drive_url = `https://drive.google.com/drive/folders/demo-pedido-${p.id}`;
+      }
+      if (p._l0 && ["lanzar", "lanzando"].includes(p.estado)) {
+        const n = Math.min(SIM_L.length, Math.floor((ahora - p._l0) / 10000));
+        while ((p._ln || 0) < n) { const [e, t] = SIM_L[p._ln || 0]; p.progreso.push({ t: new Date().toISOString(), etapa: e, texto: t }); p._ln = (p._ln || 0) + 1; }
+        p.estado = n >= 2 ? "lanzado" : n >= 1 ? "lanzando" : "lanzar";
+      }
+    }
+  }
+  const limpio = (p) => { const { _t0, _l0, _ln, ...x } = p; return x; };
+  function fabricaDemo(accion, body) {
+    fabInit(); fabAvanzar();
+    if (accion === "fabrica_estado") return { compu: { prendida: COMPU_ON, visto: COMPU_ON ? new Date(Date.now() - 40000).toISOString() : hace(47), info: { ram_libre_pct: 41, trabajando: COMPU_ON ? (FAB.pedidos.find((p) => p.estado === "trabajando") || {}).id || null : null, version: "demo" } }, pedidos: FAB.pedidos.slice(0, 10).map(limpio) };
+    if (accion === "fabrica_pedido") {
+      if (!COMPU_ON) throw Object.assign(new Error("La compu está apagada"), { code: 409 });
+      if (!body?.ofertas?.some((o) => (o.posts || []).length)) throw Object.assign(new Error("params inválidos: sin posts"), { code: 400 });
+      const p = { id: FAB.sig++, creado: new Date().toISOString(), actualizado: new Date().toISOString(), estado: "pendiente", quien: "Lorenzo", params: body, progreso: [], drive_url: null, resultado: null, error: null, _t0: Date.now() };
+      FAB.pedidos.unshift(p);
+      return { id: p.id };
+    }
+    const p = FAB.pedidos.find((x) => String(x.id) === String(body?.id));
+    if (!p) throw Object.assign(new Error("Pedido no encontrado"), { code: 404 });
+    if (accion === "fabrica_lanzar") {
+      if (p.estado !== "listo_revisar") throw Object.assign(new Error(`El pedido está ${p.estado}`), { code: 409 });
+      p.estado = "lanzar"; p._l0 = Date.now(); return { ok: true, id: p.id, estado: p.estado };
+    }
+    if (accion === "fabrica_cancelar") {
+      if (["lanzando", "lanzado", "cancelado"].includes(p.estado)) throw Object.assign(new Error(`No se puede cancelar: está ${p.estado}`), { code: 409 });
+      p.estado = "cancelado"; p.progreso.push({ t: new Date().toISOString(), etapa: "error", texto: "Cancelado desde la app" }); return { ok: true, id: p.id, estado: p.estado };
+    }
+  }
+
   const LOG = [];
   async function handle(accion, q, body) {
     const p = new URLSearchParams(q.replace(/^&/, ""));
@@ -351,6 +474,9 @@
     }
     if (accion.startsWith("reglas_")) { const r = reglasDemo(accion, p, body); if (r !== undefined) return r; }
     if (accion === "dash_log") return { log: LOG.slice(0, 50) };
+    if (accion === "ranking") return JSON.parse(JSON.stringify(rankingDemo(per === "hoy" && !p.get("periodo") ? "7d" : per)));
+    if (accion === "video") throw new Error("en el demo no hay videos de verdad (con la app real se ve el video de Meta)");
+    if (accion.startsWith("fabrica_")) return JSON.parse(JSON.stringify(fabricaDemo(accion, body)));
     throw new Error("Acción desconocida en demo: " + accion);
   }
 
@@ -415,6 +541,9 @@
     if (t === "cola") { const c = CC(0, 1), s = c.conjuntos[0]; return ev("cola", "Se aplicó a las 15:20, tarde: Meta estaba sin cupo a las 15:00.", [itS(c, s, { r: "apagado con 20 min de demora" })]); }
     if (t === "reporte") return ev("reporte", "Hoy hasta las 22:00: US$ 1.240 facturados, ROAS 1,92, 3 testeos rentables y 2 para cortar.", []);
     if (t === "prueba") return ev("prueba", "Si ves esto, los avisos llegan bien a este equipo.", []);
+    if (t === "fabrica") return { v: 1, t: "fabrica", titulo: "Guiones listos · Cuero FR", r: "10 guiones listos para Cuero · Francia (5 iteraciones + 5 renovaciones, mezcla 70/30). Ahora arrancan las iteraciones en AWS.", items: [], pedido: 41 };
+    if (t === "fabrica_lista") return { v: 1, t: "fabrica_lista", r: "20 videos nuevos en Drive: 10 de 40 Días · México y 10 de GLP-1 Kitchen · Anglo. Todos pasaron el control de calidad.", items: [], pedido: 40 };
+    if (t === "fabrica_lanzada") return { v: 1, t: "fabrica_lanzada", titulo: "¡Ya está en Meta!", r: "10 anuncios publicados en «9.10 CBO Iteraciones Cuero». A los 10 minutos se chequea solo y te aviso si algo sale mal.", items: [], pedido: 39 };
     return ev(t, "Evento de un tipo que la app no conoce: se muestra genérico.", []);
   }
   window.DemoAPI = { handle, ejemplo };

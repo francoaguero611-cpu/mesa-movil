@@ -1,6 +1,6 @@
 /* Service worker — Dashboard Lorenzo */
-const VERSION = "dash-v12";
-const SHELL = ["./", "index.html", "styles.css?v=12", "app.js?v=12", "demo.js?v=12", "manifest.webmanifest",
+const VERSION = "dash-v13";
+const SHELL = ["./", "index.html", "styles.css?v=13", "app.js?v=13", "demo.js?v=13", "manifest.webmanifest",
   "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png", "icons/apple-touch-icon.png"];
 const API_HOST = "tppcpnfzcxxusdhrlmdx.supabase.co";
 const API_CACHE = "dash-api";
@@ -20,7 +20,7 @@ self.addEventListener("fetch", (e) => {
   // API: red primero; si falla, la última respuesta guardada (solo lecturas).
   if (url.host === API_HOST) {
     const accion = url.searchParams.get("accion");
-    if (!["dash", "dash_detalle"].includes(accion) || url.searchParams.has("dry")) return;
+    if (!["dash", "dash_detalle", "ranking"].includes(accion) || url.searchParams.has("dry")) return;
     const clave = new URL(url); clave.searchParams.delete("forzar");
     e.respondWith((async () => {
       const cache = await caches.open(API_CACHE);
@@ -70,7 +70,7 @@ self.addEventListener("push", (e) => {
   try { d = e.data ? e.data.json() : {}; } catch { d = { title: "Dashboard", body: e.data ? e.data.text() : "" }; }
   e.waitUntil(self.registration.showNotification(d.title || "Dashboard", {
     body: d.body || "", tag: d.tag || undefined, icon: "icons/icon-192.png", badge: "icons/icon-192.png",
-    data: { url: d.url || "./", ev: d.ev || null },
+    data: { url: d.url || "./", ev: d.ev ? { ...d.ev, titulo: d.ev.titulo || d.title || undefined } : null },
   }));
 });
 

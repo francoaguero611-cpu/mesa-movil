@@ -51,7 +51,7 @@ const S = {
   sel: new Map(),            // "nivel:id" -> {id, act, nivel, nombre, estado}
   verApagadas: ls.get("dash_ver_apagadas") === "1",
   dir: 0,
-  vista: "dash",             // "dash" | "reglas"
+  vista: "dash",             // "dash" | "reglas" | "ranking" | "login"
 };
 const dryOn = () => DRY_URL || ls.get("dash_dry") === "1";
 const clave = () => ls.get("dash_clave", "");
@@ -83,7 +83,7 @@ async function api(accion, { q = "", body = null, escritura = false } = {}) {
 let demoP = null;
 function cargarDemo() {
   if (window.DemoAPI) return Promise.resolve();
-  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=12"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=13"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
   return demoP;
 }
 
@@ -184,7 +184,7 @@ function pintarMenu() {
   if ($("#mi-ejemplos")) $("#mi-ejemplos").onclick = () => { cerrarMenu(); avisosEjemplo(); };
   pintarEstadoAvisos();
   const s = $("#mi-salir");
-  if (s) s.onclick = () => { ls.del("dash_clave"); S.datos = {}; S.det.clear(); S.sel.clear(); cerrarMenu(); pintarBarra(); login(); };
+  if (s) s.onclick = () => { ls.del("dash_clave"); S.datos = {}; S.det.clear(); S.sel.clear(); RK.datos = {}; RK.sel.clear(); RK.fab = null; cerrarMenu(); pintarBarra(); login(); };
 }
 function abrirMenu() { pintarMenu(); $("#menu").hidden = false; $("#b-menu").setAttribute("aria-expanded", "true"); ($("#menu .item:not([disabled])") || $("#menu")).focus(); }
 function cerrarMenu() { $("#menu").hidden = true; $("#b-menu").setAttribute("aria-expanded", "false"); }
@@ -210,6 +210,9 @@ async function verRegistro() {
 
 // ---------- login ----------
 function login(msg = "") {
+  pararRanking(); S.vista = "login";
+  const nav = $("#secciones"); if (nav) nav.hidden = true;
+  pintarBarra();
   $("#main").innerHTML = `
     <form class="login boceto" id="f-login" autocomplete="on">
       <h2>Entrar</h2>
@@ -229,7 +232,7 @@ function login(msg = "") {
     try {
       const d = await api("dash", { q: "&periodo=hoy" });
       S.datos.hoy = d; S.periodo = "hoy"; S.idx = 0;
-      montar();
+      abrirInicial();
       eventoPendiente();
     } catch (err) {
       if (err.code === 401) { ls.del("dash_clave"); login("Clave incorrecta"); }
@@ -294,6 +297,9 @@ async function cargarDetalle(c, forzar = false) {
 
 // ---------- montaje ----------
 function montar() {
+  pararRanking(); S.vista = "dash"; ls.set("dash_seccion", "dash");
+  if (location.hash === "#ranking") { try { history.replaceState(null, "", location.pathname + location.search); } catch {} }
+  pintarNav();
   $("#main").innerHTML = `
     <div class="sel-grupo-caja boceto"><label class="sr" for="sel-grupo">Oferta y mercado</label><select id="sel-grupo" class="sel-grupo"></select><span class="sel-flecha" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M5.5 9.5 C 8 12, 10.5 14, 12.2 15.5 C 14 13.6, 16.4 11.6, 18.6 9.2" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
     <div class="controles">
@@ -625,6 +631,7 @@ function resumenNiveles(its) {
   return Object.entries(c).filter(([, n]) => n).map(([k, n]) => plural(n, k)).join(" · ");
 }
 function pintarBarra() {
+  if (S.vista === "ranking" && $("#rk")) return pintarBarraRanking();
   const b = $("#barra");
   const its = [...S.sel.values()];
   if (!its.length || !$("#carr")) { b.hidden = true; b.innerHTML = ""; return; }
@@ -1065,8 +1072,8 @@ async function cargarReglas() {
   if (S.vista === "reglas") pintarReglas();
 }
 function verReglas() {
-  cerrarMenu();
-  S.vista = "reglas";
+  cerrarMenu(); pararRanking();
+  S.vista = "reglas"; pintarNav();
   try { history.replaceState(null, "", location.pathname + location.search + "#reglas"); } catch {}
   $("#main").innerHTML = `
     <section class="reglas-vista" aria-labelledby="t-reglas">
@@ -1552,6 +1559,8 @@ const EV_ICO = {
   reloj: ["M32 6 C 47 6, 58 17, 58 32 C 58 47, 47 58, 32 58 C 17 58, 6 47, 6 32 C 6 17, 17 6, 34 7", "M32 15 C 32 21, 32 27, 32 32 L43 39", "M32 9 V11 M55 32 H53 M32 55 V53 M9 32 H11"],
   grafico: ["M6 57 C 24 56, 42 57, 60 56", "M14 54 V40 M26 54 V30 M38 54 V36 M50 54 V20", "M10 32 L25 19 L37 25 L54 8", "M45 8 L55 7 L54 17"],
   tilde: ["M32 7 C 47 7, 57 18, 57 32 C 57 46, 46 57, 32 57 C 18 57, 7 46, 7 32 C 7 18, 18 7, 34 8", "M18 33 C 22 37, 25 40, 28 44 C 34 35, 41 26, 48 19"],
+  fabrica: ["M4 57 C 22 56, 42 56, 60 57", "M8 56 V31 C 12 33, 16 36, 20 39 V31 C 24 33, 28 36, 32 39 V31 C 36 33, 40 36, 44 39 V13 C 47 13, 50 13, 54 13 V56", "M48 9 C 45 6, 49 3, 52 4 C 55 1, 60 3, 58 7", "M14 47 H20 M26 47 H32 M38 47 H44", "M49 22 V26 M49 31 V35"],
+  fiesta: ["M7 58 C 11 48, 15 38, 20 28 C 26 34, 31 40, 37 45 C 27 50, 17 54, 7 58 Z", "M24 25 C 22 18, 30 16, 28 9", "M40 41 C 47 39, 49 47, 57 43", "M31 33 C 37 26, 43 23, 52 20", "M40 8 V14 M37 11 H43", "M54 30 V34 M52 32 H56", "M14 18 C 15 17, 17 17, 17 19 C 17 21, 14 20, 14 18"],
   campana: ["M19 44 C 20 32, 17 15, 32 14 C 47 15, 44 32, 45 44", "M13 45 C 25 44, 39 44, 51 45", "M27 51 C 28 56, 36 56, 37 51", "M32 8 V13"],
 };
 // tipo -> [ícono, color, rótulo]
@@ -1572,6 +1581,9 @@ const EV_TIPOS = {
   cola: ["reloj", "naranja", "Cola"],
   reporte: ["grafico", "acento", "Reporte"],
   prueba: ["tilde", "ok", "Prueba"],
+  fabrica: ["fabrica", "acento", "Fábrica de creativos"],
+  fabrica_lista: ["fiesta", "ok", "Fábrica de creativos"],
+  fabrica_lanzada: ["cohete", "ok", "Fábrica de creativos"],
 };
 function icoEvento(nombre) {
   const ps = EV_ICO[nombre] || EV_ICO.campana;
@@ -1619,6 +1631,9 @@ function tituloEvento(ev) {
     case "cola": return "Quedó en cola / se aplicó tarde";
     case "reporte": return "Reporte";
     case "prueba": return "Aviso de prueba";
+    case "fabrica": return ev.titulo || "La fábrica avanzó";
+    case "fabrica_lista": return "¡Se terminó todo!";
+    case "fabrica_lanzada": return ev.titulo && !/^dashboard$/i.test(ev.titulo) ? ev.titulo : "¡Ya está en Meta!";
     default: return "Aviso";
   }
 }
@@ -1646,6 +1661,7 @@ function mostrarEvento(evRaw) {
   const ev = normalizarEvento(evRaw);
   if (!ev) return;
   const [ico, color, rotulo] = EV_TIPOS[ev.t] || ["campana", "acento", "Aviso"];
+  if (/^fabrica/.test(ev.t)) return mostrarEventoFabrica(ev, ico, color, rotulo);
   const navegables = ev.items.filter((i) => NIVEL[i.n] && (i.n === "campana" || i.c || i.s));
   // en segundo plano, mientras se lee el pop-up: traer «hoy» y abrir lo necesario
   const prep = navegables.length ? prepararEvento(ev, navegables) : null;
@@ -1667,11 +1683,51 @@ function mostrarEvento(evRaw) {
   x.onclick = m.cerrar; m.dlg.prepend(x);
   $("[data-ver]", m.dlg).onclick = m.cerrar;
 }
+function mostrarEventoFabrica(ev, ico, color, rotulo) {
+  const ped = ev.pedido != null && ev.pedido !== "" ? String(ev.pedido) : null;
+  const lista = ev.t === "fabrica_lista", lanzada = ev.t === "fabrica_lanzada";
+  let despues = null;
+  const html = `<div class="ev ev-${color} ev-${esc(ev.t)}">
+      ${lista ? fiestaHTML() : ""}
+      <div class="ev-ico boceto">${icoEvento(ico)}</div>
+      <div class="ev-rotulo">${esc(rotulo)}${ped ? ` · pedido #${esc(ped)}` : ""}</div>
+      <h3 class="ev-titulo">${esc(tituloEvento(ev))}</h3>
+      <svg class="ev-garabato" viewBox="0 0 160 12" aria-hidden="true"><path d="M2 8 C 30 3, 52 11, 80 6 S 130 3, 158 7" pathLength="1"/></svg>
+      ${ev.r ? `<div class="ev-por"><span class="ev-por-lbl">${lista ? "qué hay" : lanzada ? "qué pasó" : "en qué va"}</span><p>${esc(ev.r)}</p></div>` : ""}
+      ${lista ? `<p class="ev-sig">Mirá los videos y, si están bien, tocá <b>Publicar</b>: se suben a Meta y a los 10 minutos se chequea solo.</p>` : ""}
+    </div>
+    <div class="botones">${lista
+      ? `<a class="btn" data-drive target="_blank" rel="noopener" ${ev.drive_url ? `href="${esc(ev.drive_url)}"` : `aria-disabled="true"`}>Revisar videos ↗</a><button type="button" class="btn pri" data-publicar data-foco>Publicar</button>`
+      : `<button type="button" class="btn pri" data-ver data-foco>${lanzada ? "Ir al dashboard" : ped ? "Ver el pedido" : "Listo"}</button>`}</div>`;
+  eventoAbierto = true;
+  const m = abrirModal(html, { alCerrar: () => {
+    eventoAbierto = false;
+    if (lanzada) { irAlDash(); return; }
+    if (!irASeccion("ranking", { pedido: ped })) return;
+    if (despues === "publicar" && ped) confirmarPublicar(ped);
+  } });
+  m.dlg.classList.add("dialogo-ev");
+  m.dlg.setAttribute("aria-labelledby", "ev-t"); $(".ev-titulo", m.dlg).id = "ev-t";
+  const x = document.createElement("button");
+  x.type = "button"; x.className = "ev-cerrar"; x.setAttribute("aria-label", lanzada ? "Cerrar" : "Cerrar y ver el pedido"); x.textContent = "✕";
+  x.onclick = m.cerrar; m.dlg.prepend(x);
+  const v = $("[data-ver]", m.dlg); if (v) v.onclick = m.cerrar;
+  const pu = $("[data-publicar]", m.dlg); if (pu) pu.onclick = () => { despues = "publicar"; m.cerrar(); };
+  const dr = $("[data-drive]", m.dlg);
+  if (dr) {
+    dr.addEventListener("click", (e) => { if (!dr.getAttribute("href")) { e.preventDefault(); toast("Todavía no tengo el link de Drive de este pedido.", "error"); } });
+    if (!ev.drive_url && ped) cargarFabrica().then(() => {
+      const p = pedidoPorId(ped);
+      if (p?.drive_url && dr.isConnected) { dr.href = p.drive_url; dr.removeAttribute("aria-disabled"); }
+      else if (dr.isConnected) dr.textContent = "Sin link de Drive todavía";
+    });
+  }
+}
 function reglasSucias() { return S.vista === "reglas" && (RG.datos?.reglas || []).some(esSucia); }
 function irAlDash() {
   if (S.vista === "dash" && $("#carr")) return true;
   if (reglasSucias()) { toast("Tenés cambios sin guardar en Reglas: guardalos o descartalos y después mirá la tabla.", "error", 8000); return false; }
-  RG.draft.clear(); RG.campoMal.clear(); S.vista = "dash";
+  RG.draft.clear(); RG.campoMal.clear();
   try { history.replaceState(null, "", location.pathname + location.search); } catch {}
   montar(); window.scrollTo(0, 0);
   return true;
@@ -1758,11 +1814,620 @@ function eventoPendiente() {
   try { mostrarEvento(JSON.parse(p)); } catch {}
 }
 
+// ---------- secciones: Dashboard / Ranking (10/10) ----------
+function pintarNav() {
+  const n = $("#secciones"); if (!n) return;
+  n.hidden = false;
+  const sec = S.vista === "ranking" ? "ranking" : "dash";
+  $$("[data-sec]", n).forEach((b) => b.setAttribute("aria-pressed", b.dataset.sec === sec));
+}
+function abrirInicial() {
+  if (location.hash === "#ranking" || (location.hash !== "#dash" && ls.get("dash_seccion") === "ranking")) montarRanking();
+  else montar();
+}
+function irASeccion(sec, opts = {}) {
+  cerrarMenu();
+  if (sec === "ranking") {
+    if (reglasSucias()) { toast("Tenés cambios sin guardar en Reglas: guardalos o descartalos antes de cambiar de sección.", "error", 8000); return false; }
+    RG.draft.clear(); RG.campoMal.clear();
+    if (S.vista === "ranking" && $("#rk")) { if (opts.pedido != null) abrirPedido(opts.pedido); return true; }
+    montarRanking(opts);
+    return true;
+  }
+  if (S.vista === "reglas") { volverDeReglas(); return true; }
+  if (S.vista === "dash" && $("#carr")) { window.scrollTo({ top: 0, behavior: reducido() ? "auto" : "smooth" }); return true; }
+  return irAlDash();
+}
+
+// ---------- Ranking ----------
+const RK = {
+  periodo: ["hoy", "ayer", "7d", "30d"].includes(ls.get("rk_periodo")) ? ls.get("rk_periodo") : "7d",
+  datos: {}, cargando: false, error: null,
+  sel: new Map(),              // `${grupo}|${post}` -> { g: {clave, etiqueta, bandera}, a }
+  fab: null, fabErr: null, fabCargando: false, timer: null,
+  panel: ls.get("rk_panel", "0") === "1", abiertos: new Set(), foco: null,
+};
+const ETAPAS_FAB = [["winners", "Winners"], ["guiones", "Guiones"], ["iteraciones", "Iteraciones"], ["renovaciones", "Renovaciones"], ["drive", "Drive"], ["lista", "Lista"], ["lanzada", "En Meta"]];
+const ETAPA_TX = { inicio: "Arrancó", winners: "Winners", guiones: "Guiones", iteraciones: "Iteraciones", renovaciones: "Renovaciones", drive: "Drive", lista: "Lista para revisar", lanzando: "Lanzando", lanzada: "Lanzada", chequeo_10min: "Chequeo de los 10 min", error: "Error" };
+const ESTADO_FAB = { pendiente: ["en cola", "gris"], trabajando: ["trabajando", "amarillo"], listo_revisar: ["listo para revisar", "verde-fuerte"], lanzar: ["lanzando", "acento"], lanzando: ["lanzando", "acento"], lanzado: ["lanzado", "verde"], error: ["error", "rojo"], cancelado: ["cancelado", "gris"] };
+const MEZCLAS = [["70/30", "70/30 · lo de siempre", "70 % pegado a lo que ya funciona (mismo formato, hook parecido) y 30 % de prueba con hooks y ángulos nuevos."],
+  ["90/10", "90/10 · conservador", "Casi todo pegado al winner. Menos riesgo, pero menos chance de encontrar algo nuevo."],
+  ["50/50", "50/50 · arriesgado", "Mitad pegado al winner, mitad prueba. Más chance de otro winner, más gasto en lo que no anda."]];
+const DESTINOS = [["original", "En la campaña original", "Conjunto nuevo «fecha Iteraciones y Renos» dentro de la campaña del winner. Lo de siempre."],
+  ["cbo_propia", "En una CBO propia", "Una campaña CBO nueva solo para esta tanda, separada de la original."]];
+const destinoTx = (d) => d === "cbo_propia" ? "en una CBO propia" : "en la campaña original (conjunto nuevo)";
+const PATH_FLECHA = "M9.5 5.5 C 12 8, 14 10.5, 15.5 12.2 C 13.6 14, 11.6 16.4, 9.2 18.6";
+const svgFlecha = (s = 20) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true"><path d="${PATH_FLECHA}" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const SVG_PLAY = `<svg viewBox="0 0 48 48" aria-hidden="true"><path class="pl-c" d="M24 4 C 36 4, 44 12, 44 24 C 44 36, 36 44, 24 44 C 12 44, 4 36, 4 24 C 4 13, 12 4, 26 5"/><path class="pl-t" d="M19 15 C 19 21, 19 27, 19.5 33 C 25 30, 30 27, 34 24 C 29 21, 24 18, 19 15 Z"/></svg>`;
+const SVG_TILDE_C = `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 17 C 10 19, 12 21, 14 23.5 C 17 18, 21 13, 25 9"/></svg>`;
+const SVG_CHISPA = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M11 3 C 11.6 8, 13 9.6, 18.5 10.5 C 13 11.4, 11.6 13, 11 19 C 10.4 13, 9 11.4, 3.5 10.5 C 9 9.6, 10.4 8, 11 3 Z" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M19 3 V7 M17 5 H21 M19.5 16.5 V20.5 M17.5 18.5 H21.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`;
+const SVG_COMPU_ON = `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 C 24 3, 29 9, 29 16 C 29 24, 23 29, 16 29 C 8 29, 3 23, 3 16 C 3 9, 9 3, 17 3.5"/><path d="M9.5 16.5 C 11.5 18.5, 13 20, 14.5 22 C 17.5 17, 20 13.5, 23 10"/></svg>`;
+const SVG_COMPU_OFF = `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 8 C 13 7.6, 19 7.7, 26 8 C 26.3 13, 26.2 17, 26 21 C 19 21.3, 13 21.2, 6 21 C 5.8 16, 5.8 12, 6 8 Z"/><path d="M3 25 C 12 24.5, 20 24.5, 29 25"/><path d="M12.5 11.5 H17 L12.5 17 H17.5"/></svg>`;
+function svgTend(t) {
+  if (!t) return "";
+  const d = t === "sube" ? "M3 13 L12.5 3.5 M6 3.4 C 8.5 3.4, 10.5 3.3, 12.6 3.3 C 12.7 5.5, 12.7 7.6, 12.6 10" : t === "baja" ? "M3 3 L12.5 12.5 M6 12.6 C 8.5 12.6, 10.5 12.7, 12.6 12.7 C 12.7 10.5, 12.7 8.4, 12.6 6" : "M2 8 C 6 7.8, 9 7.9, 13 8 M9.5 4.5 L13 8 L9.5 11.5";
+  const tx = t === "sube" ? "subiendo" : t === "baja" ? "bajando" : "parejo";
+  return `<span class="tend tend-${esc(t)}" role="img" aria-label="ROAS de los últimos 3 días: ${tx}" title="ROAS de los últimos 3 días: ${tx}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="${d}"/></svg></span>`;
+}
+function hace(iso) {
+  const t = new Date(iso).getTime(); if (!isFinite(t)) return "—";
+  const s = Math.max(0, (Date.now() - t) / 1000);
+  if (s < 60) return "recién";
+  const m = Math.round(s / 60); if (m < 60) return `hace ${m} min`;
+  const h = Math.round(m / 60); if (h < 24) return `hace ${h} h`;
+  const d = Math.round(h / 24); return `hace ${d} día${d === 1 ? "" : "s"}`;
+}
+const pl = (n, s, p) => `${n} ${n === 1 ? s : (p || s + "s")}`;
+const claveAd = (g, a) => `${g.clave}|${a.post || a.ad_id}`;
+const gruposRk = () => (RK.datos[RK.periodo]?.grupos || []).filter((g) => g.clave !== "todas");
+const compuOn = () => !!RK.fab?.compu?.prendida;
+function buscarRk(k) {
+  for (const g of gruposRk()) for (const a of g.anuncios || []) if (claveAd(g, a) === k) return { g: { clave: g.clave, etiqueta: g.etiqueta || g.oferta || g.clave, bandera: g.bandera || "" }, a };
+  return RK.sel.get(k) || null;
+}
+function pararRanking() { clearInterval(RK.timer); RK.timer = null; }
+
+function montarRanking({ pedido = null } = {}) {
+  cerrarMenu(); pararRanking();
+  S.vista = "ranking"; ls.set("dash_seccion", "ranking");
+  try { history.replaceState(null, "", location.pathname + location.search + "#ranking"); } catch {}
+  if (pedido != null) { RK.panel = true; RK.abiertos.add(String(pedido)); RK.foco = String(pedido); }
+  $("#main").innerHTML = `
+    <section class="rk" id="rk" aria-labelledby="rk-t">
+      <h2 class="sr" id="rk-t">Ranking de creativos</h2>
+      <div class="rk-estado">
+        <div id="rk-compu" class="compu" role="status"></div>
+        <div class="hora" id="rk-hora"></div>
+      </div>
+      <div class="controles rk-controles">
+        <div class="periodos" role="group" aria-label="Período">${PERIODOS.map(([k, t]) => `<button type="button" class="btn chico" data-rkper="${k}" aria-pressed="${k === RK.periodo}">${t}</button>`).join("")}</div>
+        <div class="sel-grupo-caja boceto rk-salto"><label class="sr" for="rk-salto">Ir a una oferta</label><select id="rk-salto" class="sel-grupo"></select><span class="sel-flecha" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M5.5 9.5 C 8 12, 10.5 14, 12.2 15.5 C 14 13.6, 16.4 11.6, 18.6 9.2" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
+      </div>
+      <div id="rk-pedidos"></div>
+      <div id="rk-ofertas"></div>
+    </section>`;
+  $$("[data-rkper]").forEach((b) => b.onclick = () => cambiarPeriodoRk(b.dataset.rkper));
+  $("#rk-salto").onchange = (e) => { const s = $(`#rk-g-${e.target.value}`); if (s) { s.scrollIntoView({ behavior: reducido() ? "auto" : "smooth", block: "start" }); const h = $("h3", s); if (h) { h.setAttribute("tabindex", "-1"); h.focus({ preventScroll: true }); } } };
+  const of = $("#rk-ofertas");
+  of.addEventListener("click", clickOfertas);
+  of.addEventListener("scroll", (e) => { if (e.target.classList?.contains("rk-slider")) flechasSlider(e.target); }, true);
+  $("#rk-pedidos").addEventListener("click", clickPedidos);
+  pintarNav(); pintarRanking(); pintarCompu(); pintarPedidos(); pintarBarra();
+  window.scrollTo(0, 0);
+  if (!RK.datos[RK.periodo]) cargarRanking();
+  cargarFabrica();
+  RK.timer = setInterval(() => { if (!document.hidden && S.vista === "ranking") cargarFabrica(); }, 60000);
+}
+function cambiarPeriodoRk(p) {
+  if (p === RK.periodo) return;
+  RK.periodo = p; ls.set("rk_periodo", p);
+  pintarRanking();
+  if (!RK.datos[p]) cargarRanking();
+}
+async function cargarRanking(forzar = false) {
+  const per = RK.periodo;
+  RK.cargando = true; RK.error = null; pintarRkHora();
+  if (!RK.datos[per]) pintarOfertas();
+  try { RK.datos[per] = await api("ranking", { q: `&periodo=${per}${forzar ? "&forzar=1" : ""}` }); }
+  catch (e) {
+    if (e.code === 401) { ls.del("dash_clave"); return login("Clave incorrecta"); }
+    RK.error = e.message;
+    if (S.vista === "ranking") toast(`No se pudo traer el ranking: ${esc(e.message)}`, "error");
+  }
+  RK.cargando = false;
+  if (per !== RK.periodo || S.vista !== "ranking") return;
+  pintarRanking();
+}
+async function cargarFabrica() {
+  if (RK.fabCargando) return RK.fab;
+  RK.fabCargando = true;
+  try { RK.fab = await api("fabrica_estado"); RK.fabErr = null; }
+  catch (e) {
+    if (e.code === 401) { RK.fabCargando = false; ls.del("dash_clave"); login("Clave incorrecta"); return null; }
+    RK.fabErr = e.message;
+  }
+  RK.fabCargando = false;
+  if (S.vista === "ranking") { pintarCompu(); pintarPedidos(); pintarBarra(); }
+  return RK.fab;
+}
+function pintarRanking() {
+  $$("[data-rkper]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.rkper === RK.periodo));
+  pintarRkHora();
+  const sg = $("#rk-salto");
+  if (sg) {
+    const gs = gruposRk();
+    sg.innerHTML = `<option value="" disabled selected>${gs.length ? "Ir a una oferta…" : "Ofertas"}</option>` + gs.map((g, i) => `<option value="${i}">${esc((g.bandera ? g.bandera + " " : "") + (g.etiqueta || g.oferta || g.clave))}</option>`).join("");
+  }
+  pintarOfertas();
+}
+function pintarRkHora() {
+  const h = $("#rk-hora"); if (!h) return;
+  const d = RK.datos[RK.periodo];
+  h.innerHTML = d?.__offline ? `<span class="aviso">Sin conexión: datos guardados</span>`
+    : d ? `<span>Ranking de las <b class="num">${hhmm(d.generado)}</b></span>` : `<span>${RK.cargando ? "Cargando…" : ""}</span>`;
+  const br = $("#b-ref"); if (br) br.classList.toggle("cargando", !!RK.cargando);
+}
+function pintarCompu() {
+  const el = $("#rk-compu"); if (!el) return;
+  if (!RK.fab) {
+    el.className = "compu " + (RK.fabErr ? "off" : "");
+    el.innerHTML = RK.fabErr ? `<span class="compu-ico">${SVG_COMPU_OFF}</span><span class="compu-tx"><b>No sé si la compu está prendida</b><small>${esc(RK.fabErr)}</small></span>`
+      : `<span class="cargador"></span><span class="compu-tx"><b>Mirando la compu…</b></span>`;
+    return;
+  }
+  const c = RK.fab.compu || {};
+  const on = !!c.prendida;
+  const trab = c.info?.trabajando;
+  el.className = "compu " + (on ? "on" : "off");
+  el.innerHTML = `<span class="compu-ico">${on ? SVG_COMPU_ON : SVG_COMPU_OFF}</span>
+    <span class="compu-tx"><b>${on ? "Compu prendida" : "Compu apagada"}</b><small>${c.visto ? `visto ${hace(c.visto)}` : "todavía no dio señales"}${on && trab ? ` · trabajando en el pedido #${esc(trab)}` : ""}${!on ? " · sin compu no se pueden empezar renovaciones" : ""}</small></span>`;
+}
+
+function pintarOfertas() {
+  const cont = $("#rk-ofertas"); if (!cont) return;
+  const d = RK.datos[RK.periodo];
+  if (!d) {
+    cont.innerHTML = RK.error ? `<div class="hint error boceto">No se pudo traer el ranking: ${esc(RK.error)} <button type="button" class="link" data-rk-reint>Reintentar</button></div>`
+      : [0, 1].map(() => `<section class="rk-oferta" aria-hidden="true"><div class="rk-cab"><div class="esqueleto rk-esq-t"></div></div><div class="rk-slider">${[0, 1, 2, 3, 4].map(() => `<div class="rk-card esq"><div class="esqueleto rk-esq-th"></div><div class="esqueleto rk-esq-tx"></div></div>`).join("")}</div></section>`).join("");
+    return;
+  }
+  const gs = gruposRk();
+  if (!gs.some((g) => (g.anuncios || []).length)) { cont.innerHTML = `<div class="vacio">No hay videos con gasto en este período.</div>`; return; }
+  cont.innerHTML = gs.map(ofertaHTML).join("");
+  $$(".rk-slider", cont).forEach(flechasSlider);
+}
+function subOferta(g) {
+  const xs = g.anuncios || [];
+  const rec = xs.filter((a) => a.recomendado).length;
+  const n = xs.filter((a) => RK.sel.has(claveAd(g, a))).length;
+  return `${pl(xs.length, "video")}${rec ? ` · ${pl(rec, "recomendado")}` : ""}${n ? ` · <b>${pl(n, "elegido")}</b>` : ""}`;
+}
+function ofertaHTML(g, gi) {
+  const xs = g.anuncios || [];
+  const et = g.etiqueta || g.oferta || g.clave;
+  return `<section class="rk-oferta" id="rk-g-${gi}" data-g="${esc(g.clave)}" aria-labelledby="rk-h-${gi}">
+    <div class="rk-cab">
+      <div class="rk-tit">${g.bandera ? `<span class="ban" aria-hidden="true">${esc(g.bandera)}</span>` : ""}<h3 id="rk-h-${gi}">${esc(et)}</h3></div>
+      <small class="rk-sub" data-sub="${esc(g.clave)}">${subOferta(g)}</small>
+      <span class="rk-flechas"><button type="button" class="btn chico flecha-rk izq" data-desl="-1" aria-label="Videos anteriores de ${esc(et)}">${svgFlecha(18)}</button><button type="button" class="btn chico flecha-rk" data-desl="1" aria-label="Más videos de ${esc(et)}">${svgFlecha(18)}</button></span>
+    </div>
+    <svg class="rk-garabato" viewBox="0 0 160 12" aria-hidden="true"><path d="M2 8 C 30 3, 52 11, 80 6 S 130 3, 158 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+    ${xs.length ? `<div class="rk-slider" role="list" aria-label="Videos de ${esc(et)}, de mejor a peor">${xs.map((a, i) => tarjetaRk(g, a, i)).join("")}</div>` : `<div class="vacio chico">Sin videos con gasto en este período.</div>`}
+  </section>`;
+}
+function tarjetaRk(g, a, i) {
+  const k = claveAd(g, a);
+  const sel = RK.sel.has(k);
+  const camps = a.campanas || [];
+  const campTx = camps.length > 1
+    ? `<details class="rk-camps"><summary>en ${camps.length} campañas</summary><ul>${camps.map((c) => `<li>${esc(c.nombre || c.id)}</li>`).join("")}</ul></details>`
+    : camps.length ? `<div class="rk-camp" title="${esc(camps[0].nombre || camps[0].id)}">en ${esc(camps[0].nombre || camps[0].id)}</div>` : "";
+  const cpa = a.cpa !== undefined ? a.cpa : (a.ventas ? a.gasto / a.ventas : null);
+  return `<article class="rk-card${sel ? " sel" : ""}${i < 3 ? " top" + (i + 1) : ""}" role="listitem" data-k="${esc(k)}">
+    <button type="button" class="rk-selbtn" data-selk="${esc(k)}" aria-pressed="${sel}" aria-label="Elegir para renovar: puesto ${i + 1}, ${esc(a.nombre)}"></button>
+    <div class="rk-thumb">
+      ${a.thumb ? `<img src="${esc(a.thumb)}" alt="" loading="lazy" decoding="async">` : `<div class="rk-sinthumb">sin miniatura</div>`}
+      <span class="rk-pos num">#${i + 1}</span>
+      <span class="rk-sellos">${a.winner ? `<span class="sello winner">WINNER</span>` : ""}${a.recomendado ? `<span class="sello rec">RECOMENDADO</span>` : ""}</span>
+      <button type="button" class="rk-play" data-play="${esc(k)}" aria-label="Ver el video ${esc(a.nombre)}">${SVG_PLAY}</button>
+      <span class="rk-tilde" aria-hidden="true">${SVG_TILDE_C}</span>
+    </div>
+    <div class="rk-info">
+      <div class="rk-nom" title="${esc(a.nombre)}">${esc(a.nombre)}</div>
+      ${campTx}
+      ${a.cuenta ? `<div class="rk-cuenta">${esc(a.cuenta)}</div>` : ""}
+      <dl class="rk-mets">
+        <div><dt>Ventas</dt><dd class="num">${entN(a.ventas)}</dd></div>
+        <div><dt>Gasto</dt><dd class="num">${usdG(a.gasto)}</dd></div>
+        <div><dt>ROAS</dt><dd class="rk-roas">${chipRoas(a.roas)}${svgTend(a.tendencia)}</dd></div>
+        <div><dt>CPA</dt><dd class="num">${usdG(cpa)}</dd></div>
+      </dl>
+      ${a.motivo ? `<p class="rk-motivo">${esc(a.motivo)}</p>` : ""}
+    </div>
+  </article>`;
+}
+function flechasSlider(sl) {
+  const sec = sl.closest(".rk-oferta"); if (!sec) return;
+  const [p, n] = $$("[data-desl]", sec);
+  if (!p) return;
+  const max = sl.scrollWidth - sl.clientWidth;
+  p.disabled = sl.scrollLeft <= 4;
+  n.disabled = sl.scrollLeft >= max - 4;
+  $(".rk-flechas", sec).classList.toggle("nada", max <= 4);
+}
+function sincronizarSel() {
+  $$(".rk-card[data-k]").forEach((c) => {
+    const s = RK.sel.has(c.dataset.k);
+    c.classList.toggle("sel", s);
+    const b = $(".rk-selbtn", c); if (b) b.setAttribute("aria-pressed", s);
+  });
+  for (const g of gruposRk()) { const e = $(`[data-sub="${CSS.escape(g.clave)}"]`); if (e) e.innerHTML = subOferta(g); }
+  pintarBarra();
+}
+function clickOfertas(e) {
+  const t = e.target;
+  if (t.closest("[data-rk-reint]")) return cargarRanking(true);
+  const pl_ = t.closest("[data-play]"); if (pl_) return verVideo(pl_.dataset.play);
+  const ds = t.closest("[data-desl]");
+  if (ds) { const sl = $(".rk-slider", ds.closest(".rk-oferta")); if (sl) sl.scrollBy({ left: +ds.dataset.desl * Math.max(180, sl.clientWidth * 0.85), behavior: reducido() ? "auto" : "smooth" }); return; }
+  const sb = t.closest("[data-selk]");
+  if (sb) {
+    const k = sb.dataset.selk;
+    if (RK.sel.has(k)) RK.sel.delete(k); else { const it = buscarRk(k); if (it) RK.sel.set(k, it); }
+    sincronizarSel();
+  }
+}
+function recomendar() {
+  if (!RK.datos[RK.periodo]) return toast("Esperá que cargue el ranking.", "error");
+  let n = 0; const ofs = new Set();
+  for (const g of gruposRk()) for (const a of g.anuncios || []) {
+    if (!a.recomendado) continue;
+    const k = claveAd(g, a); n++; ofs.add(g.clave);
+    if (!RK.sel.has(k)) RK.sel.set(k, buscarRk(k));
+  }
+  if (!n) return toast("En este período no hay nada para recomendar: ningún video vende con ROAS ≥ 1,3.", "error", 7000);
+  sincronizarSel();
+  toast(`Te marqué ${pl(n, "creativo")} de ${pl(ofs.size, "oferta")}. Tocá un video para sacarlo o sumar otro.`);
+}
+function pintarBarraRanking() {
+  const b = $("#barra");
+  const its = [...RK.sel.values()];
+  const n = its.length;
+  const ofs = new Set(its.map((x) => x.g.clave)).size;
+  const on = compuOn();
+  const motivo = !n ? "Elegí al menos un video" : !RK.fab ? (RK.fabErr ? "No sé si la compu está prendida" : "Mirando si la compu está prendida…") : !on ? "La compu está apagada" : `${pl(n, "video")} de ${pl(ofs, "oferta")}`;
+  const ok = n && on;
+  const yaVisible = !b.hidden && b.classList.contains("rk-barra");
+  b.hidden = false;
+  b.className = "barra boceto rk-barra";
+  if (yaVisible) b.style.animation = "none"; else b.style.animation = "";
+  b.innerHTML = `
+    <button type="button" class="btn chico rk-rec" id="rk-recomendar">${SVG_CHISPA}Recomendar</button>
+    <div class="cuenta"><span class="num">${n}</span> seleccionado${n === 1 ? "" : "s"}<small>${n ? `de ${pl(ofs, "oferta")} · <button type="button" class="link rk-limpiar" id="rk-limpiar">limpiar</button>` : "tocá un video para elegirlo"}</small></div>
+    <span class="sp"></span>
+    <div class="rk-go"><button type="button" class="btn pri" id="rk-empezar" ${ok ? "" : "disabled"} aria-describedby="rk-motivo">Empezar renovaciones</button><small id="rk-motivo" class="${n && !on && RK.fab ? "mal" : ""}">${esc(motivo)}</small></div>`;
+  $("#rk-recomendar").onclick = recomendar;
+  const l = $("#rk-limpiar"); if (l) l.onclick = () => { RK.sel.clear(); sincronizarSel(); $("#rk-recomendar").focus(); };
+  $("#rk-empezar").onclick = quizRenos;
+}
+
+// --- video ---
+async function verVideo(k) {
+  const it = buscarRk(k); if (!it) return;
+  const a = it.a;
+  const m = abrirModal(`<h3 class="rk-v-tit">${esc(a.nombre)}</h3>
+    <p class="mut">${it.g.bandera ? esc(it.g.bandera) + " " : ""}${esc(it.g.etiqueta)} · ${entN(a.ventas)} ventas · ROAS ${roasTx(a.roas)} · gasto ${usd(a.gasto)}</p>
+    <div class="rk-video" id="rk-video">${a.thumb ? `<img src="${esc(a.thumb)}" alt="">` : ""}<div class="rk-v-msg"><span class="cargador"></span>Buscando el video en Meta…</div></div>
+    ${a.motivo ? `<p class="rk-v-motivo">${esc(a.motivo)}</p>` : ""}
+    <div class="botones"><button type="button" class="btn" data-elegir>${RK.sel.has(k) ? "Sacar de la selección" : "Elegir para renovar"}</button><button type="button" class="btn pri" data-x data-foco>Cerrar</button></div>`);
+  m.dlg.classList.add("dialogo-video");
+  $("[data-x]", m.dlg).onclick = m.cerrar;
+  $("[data-elegir]", m.dlg).onclick = () => { if (RK.sel.has(k)) RK.sel.delete(k); else RK.sel.set(k, it); sincronizarSel(); m.cerrar(); };
+  const box = $("#rk-video", m.dlg);
+  const fallo = (msg) => { if (modalActual !== m) return; box.innerHTML = `${a.thumb ? `<img src="${esc(a.thumb)}" alt="Miniatura de ${esc(a.nombre)}">` : ""}<div class="rk-v-msg mal">No se pudo cargar el video: ${esc(msg)}</div>`; };
+  try {
+    const r = await api("video", { q: `&ad=${encodeURIComponent(a.ad_id || "")}&act=${encodeURIComponent(a.act || "")}` });
+    if (modalActual !== m) return;
+    if (!r?.src) return fallo(r?.error || "Meta no devolvió el video");
+    box.innerHTML = `<video controls playsinline autoplay preload="metadata" ${r.poster || a.thumb ? `poster="${esc(r.poster || a.thumb)}"` : ""} src="${esc(r.src)}"></video>`;
+    const v = $("video", box);
+    v.addEventListener("error", () => fallo("el navegador no lo pudo reproducir"));
+    try { const pr = v.play(); if (pr && pr.catch) pr.catch(() => {}); } catch {}
+  } catch (e) {
+    if (e.code === 401) { m.cerrar(); ls.del("dash_clave"); return login("Clave incorrecta"); }
+    fallo(e.message);
+  }
+}
+
+// --- quiz «Empezar renovaciones» ---
+function ofertasSeleccionadas() {
+  const map = new Map();
+  for (const [k, it] of RK.sel) {
+    const fresco = buscarRk(k) || it;
+    if (!map.has(fresco.g.clave)) map.set(fresco.g.clave, { ...fresco.g, items: [] });
+    map.get(fresco.g.clave).items.push(fresco.a);
+  }
+  // mismo orden que en pantalla
+  const orden = gruposRk().map((g) => g.clave);
+  return [...map.values()].sort((x, y) => (orden.indexOf(x.clave) + 1 || 999) - (orden.indexOf(y.clave) + 1 || 999));
+}
+function armarParams(P, ofertas) {
+  return { iteraciones: P.iteraciones, renovaciones: P.renovaciones, mezcla: P.mezcla, destino: P.destino,
+    ofertas: ofertas.map((o) => ({ grupo: o.clave, etiqueta: o.etiqueta, bandera: o.bandera || "",
+      posts: o.items.map((a) => ({ post: a.post || null, ad_id: a.ad_id || null, act: a.act || null, campaign_id: (a.campanas || [])[0]?.id || null, nombre: a.nombre, ventas: a.ventas ?? 0, roas: a.roas ?? null, gasto: a.gasto ?? 0 })) })) };
+}
+function quizRenos() {
+  if (!RK.sel.size) return;
+  if (!compuOn()) return toast("La compu está apagada: prendela (o abrí la fábrica) y volvé a tocar.", "error", 7000);
+  const ofertas = ofertasSeleccionadas();
+  const P = { iteraciones: 5, renovaciones: 5, mezcla: "70/30", destino: "original", cant: "5-5" };
+  let enviando = false;
+  const m = abrirModal("", { ancho: true, bloqueado: () => enviando });
+  const PASOS = ["Cuántos", "Mezcla", "Dónde", "Resumen"];
+  const cab = (n, t) => `<h3>${t}</h3><ol class="pasos-w" aria-label="Pasos">${PASOS.map((x, i) => `<li ${i + 1 === n ? 'aria-current="step"' : ""} class="${i + 1 < n ? "hecho" : ""}">${i + 1}. ${x}</li>`).join("")}</ol>`;
+  const op = (attr, val, actual, titulo, tx, tag = "") => `<button type="button" class="opcion" ${attr}="${esc(val)}" aria-pressed="${val === actual}"${val === actual ? " data-foco" : ""}><b>${titulo}${tag ? ` <span class="op-tag">${tag}</span>` : ""}</b><span>${tx}</span></button>`;
+  const p1 = () => {
+    m.set(`${cab(1, "¿Cuántos videos por oferta?")}
+      <p class="mut">Vale para cada una de las ${pl(ofertas.length, "oferta")} que elegiste.</p>
+      <div class="opciones">
+        ${op("data-cant", "5-5", P.cant, "5 iteraciones + 5 renovaciones", "Iteraciones: el mismo video del winner con otro hook o arranque. Renovaciones: videos nuevos con el ángulo que funciona.", "lo de siempre")}
+        ${op("data-cant", "10-0", P.cant, "10 iteraciones", "Solo variaciones de los videos elegidos.")}
+        ${op("data-cant", "0-10", P.cant, "10 renovaciones", "Solo videos nuevos sobre los ángulos que venden.")}
+        ${op("data-cant", "mano", P.cant, "A mano", "Elegís cuántas iteraciones y cuántas renovaciones.")}
+      </div>
+      <div class="rk-mano" ${P.cant === "mano" ? "" : "hidden"}>
+        <label>Iteraciones<input class="campo num" id="q-it" inputmode="numeric" value="${P.iteraciones}"></label>
+        <label>Renovaciones<input class="campo num" id="q-ren" inputmode="numeric" value="${P.renovaciones}"></label>
+        <button type="button" class="btn pri" data-mano-ok>Seguir</button>
+        <div class="mut rk-mano-err" role="alert"></div>
+      </div>
+      <div class="botones"><button type="button" class="btn" data-x>Cancelar</button></div>`);
+    $("[data-x]", m.dlg).onclick = m.cerrar;
+    $$("[data-cant]", m.dlg).forEach((b) => b.onclick = () => {
+      const v = b.dataset.cant; P.cant = v;
+      if (v === "mano") { $$("[data-cant]", m.dlg).forEach((x) => x.setAttribute("aria-pressed", x === b)); const mn = $(".rk-mano", m.dlg); mn.hidden = false; mn.scrollIntoView({ block: "nearest", behavior: reducido() ? "auto" : "smooth" }); $("#q-it", m.dlg).focus({ preventScroll: true }); return; }
+      const [i, r] = v.split("-").map(Number); P.iteraciones = i; P.renovaciones = r; p2();
+    });
+    $("[data-mano-ok]", m.dlg).onclick = () => {
+      const i = Number($("#q-it", m.dlg).value.trim()), r = Number($("#q-ren", m.dlg).value.trim());
+      const err = $(".rk-mano-err", m.dlg);
+      if (![i, r].every((x) => Number.isInteger(x) && x >= 0 && x <= 30)) { err.textContent = "Poné números enteros entre 0 y 30."; return; }
+      if (i + r < 1) { err.textContent = "Tiene que haber al menos un video."; return; }
+      P.iteraciones = i; P.renovaciones = r; p2();
+    };
+  };
+  const p2 = () => {
+    m.set(`${cab(2, "¿Qué mezcla?")}
+      <p class="mut">Cuánto se pega a lo que ya funciona y cuánto se arriesga.</p>
+      <div class="opciones">${MEZCLAS.map(([k, t, tx]) => op("data-mez", k, P.mezcla, t, tx)).join("")}</div>
+      <div class="botones"><button type="button" class="btn" data-v>Volver</button></div>`);
+    $("[data-v]", m.dlg).onclick = p1;
+    $$("[data-mez]", m.dlg).forEach((b) => b.onclick = () => { P.mezcla = b.dataset.mez; p3(); });
+  };
+  const p3 = () => {
+    m.set(`${cab(3, "¿Dónde salen?")}
+      <div class="opciones">${DESTINOS.map(([k, t, tx]) => op("data-dest", k, P.destino, t, tx, k === "original" ? "lo de siempre" : "")).join("")}</div>
+      <div class="botones"><button type="button" class="btn" data-v>Volver</button></div>`);
+    $("[data-v]", m.dlg).onclick = p2;
+    $$("[data-dest]", m.dlg).forEach((b) => b.onclick = () => { P.destino = b.dataset.dest; p4(); });
+  };
+  const p4 = () => {
+    const porOf = P.iteraciones + P.renovaciones;
+    const total = porOf * ofertas.length;
+    const cant = [P.iteraciones ? pl(P.iteraciones, "iteración", "iteraciones") : "", P.renovaciones ? pl(P.renovaciones, "renovación", "renovaciones") : ""].filter(Boolean).join(" + ");
+    m.set(`${cab(4, "Resumen")}
+      <div class="rk-res-params"><span class="chip">${esc(cant)} por oferta</span><span class="chip">mezcla ${esc(P.mezcla)}</span><span class="chip">${esc(destinoTx(P.destino))}</span></div>
+      <ul class="rk-res">${ofertas.map((o) => `<li>
+        <div class="rk-res-cab">${o.bandera ? `<span class="ban" aria-hidden="true">${esc(o.bandera)}</span>` : ""}<b>${esc(o.etiqueta)}</b><small class="num">${pl(o.items.length, "creativo")} → ${pl(porOf, "video")}</small></div>
+        <div class="rk-minis">${o.items.map((a) => `<span class="rk-mini" title="${esc(a.nombre)}">${a.thumb ? `<img src="${esc(a.thumb)}" alt="">` : ""}<span class="sr">${esc(a.nombre)}</span></span>`).join("")}</div>
+      </li>`).join("")}</ul>
+      <p class="rk-res-total"><b class="num">${pl(total, "video nuevo", "videos nuevos")}</b> en total. La compu arma guiones, iteraciones y renovaciones, los sube a Drive y te manda un aviso por cada etapa. <b>Nada se publica en Meta</b> hasta que revises y toques «Publicar».</p>
+      ${DEMO ? `<p class="mut">Demo: el pedido se simula, no va a ninguna compu.</p>` : dryOn() ? `<p class="mut"><b>Modo prueba:</b> no se manda nada; te muestro lo que se mandaría.</p>` : ""}
+      <div class="err-box" id="q-err" role="alert" hidden></div>
+      <div class="botones"><button type="button" class="btn" data-v>Volver</button><button type="button" class="btn pri" data-ok data-foco>Empezar</button></div>`);
+    $("[data-v]", m.dlg).onclick = p3;
+    $("[data-ok]", m.dlg).onclick = (ev) => enviar(ev.currentTarget);
+  };
+  const enviar = async (b) => {
+    const params = armarParams(P, ofertas);
+    if (dryOn() && !DEMO) {
+      m.set(`<h3>Modo prueba: no se mandó nada</h3><p class="mut">Esto es lo que recibiría la compu (fabrica_pedido):</p><pre class="rk-pre">${esc(JSON.stringify(params, null, 2))}</pre><div class="botones"><button type="button" class="btn pri" data-x data-foco>Listo</button></div>`);
+      $("[data-x]", m.dlg).onclick = m.cerrar;
+      return;
+    }
+    enviando = true; b.classList.add("cargando"); b.innerHTML = `<span class="gira">↻</span> Mandando…`;
+    $("[data-v]", m.dlg).disabled = true;
+    let r;
+    try { r = await api("fabrica_pedido", { body: params }); }
+    catch (e) {
+      enviando = false;
+      if (e.code === 401) { m.cerrar(); ls.del("dash_clave"); return login("Clave incorrecta"); }
+      b.classList.remove("cargando"); b.textContent = "Reintentar"; $("[data-v]", m.dlg).disabled = false;
+      const box = $("#q-err", m.dlg); box.hidden = false;
+      box.textContent = e.code === 409 ? "La compu está apagada: el pedido no se mandó. Prendela y volvé a tocar." : `No se mandó: ${e.message}`;
+      if (e.code === 409) { b.disabled = true; cargarFabrica(); }
+      return;
+    }
+    enviando = false;
+    const id = r?.id != null ? String(r.id) : null;
+    RK.sel.clear(); sincronizarSel();
+    if (id) { RK.panel = true; ls.set("rk_panel", "1"); RK.abiertos.add(id); RK.foco = id; }
+    m.set(`<div class="rk-ok">${icoEvento("tilde")}<h3>${id ? `Pedido #${esc(id)} en camino` : "Pedido mandado"}</h3>
+      <p>La compu ya lo tiene. Te va a llegar <b>un aviso al celular por cada etapa</b> (guiones, iteraciones y renovaciones de cada oferta) y uno al final cuando esté todo para revisar.</p></div>
+      <div class="botones"><button type="button" class="btn pri" data-x data-foco>Ver el pedido</button></div>`);
+    m.dlg.classList.add("dialogo-ev");
+    $("[data-x]", m.dlg).onclick = () => { m.cerrar(); if (id) abrirPedido(id); };
+    toast(`${id ? `Pedido #${esc(id)}` : "Pedido"} mandado a la compu. Te aviso por cada etapa.`);
+    cargarFabrica();
+  };
+  p1();
+}
+
+// --- pedidos ---
+const pedidoPorId = (id) => (RK.fab?.pedidos || []).find((p) => String(p.id) === String(id));
+function etapasHechas(p) {
+  const hechas = new Set((p.progreso || []).map((x) => x.etapa));
+  const orden = ETAPAS_FAB.map(([k]) => k);
+  const hasta = (k) => orden.slice(0, orden.indexOf(k) + 1).forEach((x) => hechas.add(x));
+  if (p.estado === "listo_revisar" || p.estado === "lanzar" || p.estado === "lanzando") hasta("lista");
+  if (p.estado === "lanzado") hasta("lanzada");
+  if (hechas.has("lanzando") || hechas.has("chequeo_10min")) hasta(hechas.has("chequeo_10min") ? "lanzada" : "lista");
+  return hechas;
+}
+function pintarPedidos() {
+  const el = $("#rk-pedidos"); if (!el) return;
+  const ps = RK.fab?.pedidos || [];
+  if (!ps.length) { el.innerHTML = ""; return; }
+  const activos = ps.filter((p) => ["pendiente", "trabajando", "lanzar", "lanzando"].includes(p.estado)).length;
+  const listos = ps.filter((p) => p.estado === "listo_revisar").length;
+  const ult = ps[0];
+  const res = [activos ? `${activos} en marcha` : "", RK.panel || !ult ? pl(ps.length, "pedido") : `último #${ult.id}: ${(ESTADO_FAB[ult.estado] || [ult.estado])[0]}`].filter(Boolean).join(" · ");
+  el.innerHTML = `<div class="rk-ped boceto">
+    <button type="button" class="rk-ped-tg" id="rk-ped-tg" aria-expanded="${RK.panel}" aria-controls="rk-ped-lista">
+      <span class="rk-ped-t">Pedidos</span><span class="rk-ped-res">${res}</span>${listos ? `<span class="fchip verde-fuerte">${listos} para revisar</span>` : ""}
+      <span class="rk-ped-fl" aria-hidden="true">${svgFlecha(18)}</span>
+    </button>
+    <div class="rk-ped-lista" id="rk-ped-lista" ${RK.panel ? "" : "hidden"}>${ps.map(pedidoHTML).join("")}</div>
+  </div>`;
+  if (RK.foco && RK.panel) {
+    const f = RK.foco; RK.foco = null;
+    const c = $(`#ped-${CSS.escape(f)}`);
+    if (c) { requestAnimationFrame(() => { c.scrollIntoView({ behavior: reducido() ? "auto" : "smooth", block: "start" }); c.classList.add("destello"); setTimeout(() => c.classList.remove("destello"), 2400); }); }
+  }
+}
+function pedidoHTML(p) {
+  const id = String(p.id);
+  const ab = RK.abiertos.has(id);
+  const [tx, col] = ESTADO_FAB[p.estado] || [p.estado, "gris"];
+  const ofs = p.params?.ofertas || [];
+  const nVid = ((+p.params?.iteraciones || 0) + (+p.params?.renovaciones || 0)) * ofs.length;
+  const prog = p.progreso || [];
+  const ult = prog[prog.length - 1];
+  const hechas = etapasHechas(p);
+  return `<article class="ped ped-${esc(p.estado)}${ab ? " abierto" : ""}" id="ped-${esc(id)}">
+    <button type="button" class="ped-cab" data-pedtg="${esc(id)}" aria-expanded="${ab}">
+      <span class="ped-id num">#${esc(id)}</span>
+      <span class="ped-txt"><b>${ofs.map((o) => `${o.bandera ? esc(o.bandera) + " " : ""}${esc(o.etiqueta || o.grupo)}`).join(" · ") || "—"}</b>
+        <small>${nVid ? pl(nVid, "video") + " · " : ""}${hace(p.creado)}${ult?.texto ? ` · ${esc(ult.texto)}` : ""}</small></span>
+      <span class="fchip ${col}">${p.estado === "trabajando" || p.estado === "lanzando" ? `<span class="cargador mini" aria-hidden="true"></span>` : ""}${esc(tx)}</span>
+    </button>
+    ${p.estado !== "cancelado" ? `<ol class="ped-etapas" aria-label="Etapas">${ETAPAS_FAB.map(([k, t]) => `<li class="${hechas.has(k) ? "hecha" : ""}"><span class="sr">${hechas.has(k) ? "hecho: " : "falta: "}</span>${t}</li>`).join("")}</ol>` : ""}
+    ${ab ? detallePedido(p) : ""}
+  </article>`;
+}
+function detallePedido(p) {
+  const id = String(p.id);
+  const pr = p.params || {};
+  const prog = p.progreso || [];
+  const cancelable = ["pendiente", "trabajando", "listo_revisar", "lanzar", "error"].includes(p.estado);
+  return `<div class="ped-det">
+    ${p.error ? `<div class="err-box">${esc(p.error)}</div>` : ""}
+    <div class="ped-params">${pl(+pr.iteraciones || 0, "iteración", "iteraciones")} + ${pl(+pr.renovaciones || 0, "renovación", "renovaciones")} por oferta · mezcla ${esc(pr.mezcla || "70/30")} · ${esc(destinoTx(pr.destino))}${p.quien ? ` · pidió ${esc(p.quien)}` : ""}</div>
+    ${prog.length ? `<ol class="ped-tl">${prog.map((x) => `<li class="tl-${esc(x.etapa)}"><span class="ped-h num">${esc(hhmm(x.t))}</span><div><b>${esc(ETAPA_TX[x.etapa] || x.etapa)}</b>${x.oferta ? ` <span class="mut">· ${esc(x.oferta)}</span>` : ""}${x.texto ? `<div class="tl-tx">${esc(x.texto)}</div>` : ""}</div></li>`).join("")}</ol>` : `<p class="mut">Todavía sin novedades: la compu lo agarra en el próximo latido (menos de 1 min).</p>`}
+    ${p.resultado ? `<details class="log"><summary>Resultado</summary><pre>${esc(typeof p.resultado === "string" ? p.resultado : JSON.stringify(p.resultado, null, 2))}</pre></details>` : ""}
+    <div class="ped-acc">
+      ${p.drive_url ? `<a class="btn chico" href="${esc(p.drive_url)}" target="_blank" rel="noopener">Revisar videos ↗</a>` : ""}
+      ${p.estado === "listo_revisar" ? `<button type="button" class="btn chico pri" data-publicar="${esc(id)}">Publicar en Meta</button>` : ""}
+      ${cancelable ? `<button type="button" class="btn chico" data-cancelar="${esc(id)}">Cancelar</button>` : ""}
+    </div>
+  </div>`;
+}
+function abrirPedido(id) {
+  id = String(id);
+  RK.panel = true; ls.set("rk_panel", "1"); RK.abiertos.add(id); RK.foco = id;
+  pintarPedidos();
+  if (!pedidoPorId(id)) cargarFabrica();
+}
+function clickPedidos(e) {
+  const t = e.target;
+  if (t.closest("#rk-ped-tg")) { RK.panel = !RK.panel; ls.set("rk_panel", RK.panel ? "1" : "0"); pintarPedidos(); $("#rk-ped-tg").focus(); return; }
+  const tg = t.closest("[data-pedtg]");
+  if (tg) { const id = tg.dataset.pedtg; RK.abiertos.has(id) ? RK.abiertos.delete(id) : RK.abiertos.add(id); pintarPedidos(); const n = $(`[data-pedtg="${CSS.escape(id)}"]`); if (n) n.focus({ preventScroll: true }); return; }
+  const pu = t.closest("[data-publicar]"); if (pu) return confirmarPublicar(pu.dataset.publicar);
+  const ca = t.closest("[data-cancelar]"); if (ca) return confirmarCancelar(ca.dataset.cancelar);
+}
+async function confirmarPublicar(id) {
+  if (!pedidoPorId(id)) await cargarFabrica();
+  const p = pedidoPorId(id);
+  if (!p) return toast(`No encontré el pedido #${esc(id)}.`, "error");
+  if (p.estado !== "listo_revisar") return toast(`El pedido #${esc(id)} está «${esc((ESTADO_FAB[p.estado] || [p.estado])[0])}»: solo se publica cuando está listo para revisar.`, "error", 7000);
+  const ofs = p.params?.ofertas || [];
+  let enviando = false;
+  const m = abrirModal(`<h3>¿Publicar el pedido #${esc(id)} en Meta?</h3>
+    <p>Se suben los videos ${esc(destinoTx(p.params?.destino))}, como siempre, y <b>a los 10 minutos se chequea solo</b> que hayan salido bien.</p>
+    ${p.drive_url ? `<p><a class="link" href="${esc(p.drive_url)}" target="_blank" rel="noopener">Mirar los videos antes ↗</a></p>` : ""}
+    <ul class="lista-nombres">${ofs.map((o) => `<li><span class="niv">${esc(o.bandera || "")}</span><span>${esc(o.etiqueta || o.grupo)} · ${pl((o.posts || []).length, "creativo")}</span></li>`).join("")}</ul>
+    ${DEMO ? `<p class="mut">Demo: se simula, no toca Meta.</p>` : dryOn() ? `<p class="mut"><b>Modo prueba:</b> no se manda nada.</p>` : ""}
+    <div class="err-box" id="pub-err" role="alert" hidden></div>
+    <div class="botones"><button type="button" class="btn" data-x>Todavía no</button><button type="button" class="btn pri" data-ok data-foco>Sí, publicar</button></div>`, { bloqueado: () => enviando });
+  $("[data-x]", m.dlg).onclick = m.cerrar;
+  $("[data-ok]", m.dlg).onclick = async (ev) => {
+    if (dryOn() && !DEMO) { m.cerrar(); return toast(`<b>Modo prueba:</b> el pedido #${esc(id)} no se publicó.`); }
+    const b = ev.currentTarget;
+    enviando = true; b.classList.add("cargando"); b.innerHTML = `<span class="gira">↻</span> Mandando…`;
+    try { await api("fabrica_lanzar", { body: { id: p.id } }); }
+    catch (e) {
+      enviando = false;
+      if (e.code === 401) { m.cerrar(); ls.del("dash_clave"); return login("Clave incorrecta"); }
+      b.classList.remove("cargando"); b.textContent = "Reintentar";
+      const box = $("#pub-err", m.dlg); box.hidden = false; box.textContent = `No se pudo: ${e.message}`;
+      return;
+    }
+    enviando = false; m.cerrar();
+    toast(`Listo: la compu publica el pedido #${esc(id)} en su próximo latido (menos de 1 min). Te aviso cuando esté en Meta.`, "ok", 8000);
+    abrirPedido(id); cargarFabrica();
+  };
+}
+function confirmarCancelar(id) {
+  const p = pedidoPorId(id); if (!p) return;
+  let enviando = false;
+  const m = abrirModal(`<h3>¿Cancelar el pedido #${esc(id)}?</h3>
+    <p class="mut">${p.estado === "trabajando" ? "La compu deja de trabajar en él; lo que ya hizo queda en Drive." : p.estado === "listo_revisar" ? "Los videos quedan en Drive, pero no se publican." : "No se va a hacer."}</p>
+    <div class="err-box" id="can-err" role="alert" hidden></div>
+    <div class="botones"><button type="button" class="btn" data-x data-foco>No, dejarlo</button><button type="button" class="btn peligro" data-ok>Sí, cancelar</button></div>`, { bloqueado: () => enviando });
+  $("[data-x]", m.dlg).onclick = m.cerrar;
+  $("[data-ok]", m.dlg).onclick = async (ev) => {
+    const b = ev.currentTarget;
+    enviando = true; b.classList.add("cargando"); b.innerHTML = `<span class="gira">↻</span> Cancelando…`;
+    try { await api("fabrica_cancelar", { body: { id: p.id } }); }
+    catch (e) {
+      enviando = false;
+      if (e.code === 401) { m.cerrar(); ls.del("dash_clave"); return login("Clave incorrecta"); }
+      b.classList.remove("cargando"); b.textContent = "Reintentar";
+      const box = $("#can-err", m.dlg); box.hidden = false; box.textContent = `No se pudo: ${e.message}`;
+      return;
+    }
+    enviando = false; m.cerrar();
+    toast(`Pedido #${esc(id)} cancelado.`);
+    cargarFabrica();
+  };
+}
+document.addEventListener("keydown", (e) => {
+  if (S.vista !== "ranking" || modalActual || e.key !== "Escape") return;
+  if (!$("#menu").hidden) { cerrarMenu(); $("#b-menu").focus(); }
+});
+
+// --- fiesta del pop-up «¡Se terminó todo!» ---
+function fiestaHTML() {
+  const cols = ["var(--acento)", "var(--marca-borde)", "var(--peligro)", "var(--ok)", "var(--r-nar-tx)", "var(--c-ad, #c27a1a)"];
+  const R = (i, s) => { const x = Math.sin(i * 12.9898 + s * 78.233) * 43758.5453; return x - Math.floor(x); };
+  const piezas = Array.from({ length: 30 }, (_, i) => {
+    const forma = i % 3;
+    const st = `--x:${(R(i, 1) * 96 + 2).toFixed(1)}%;--d:${(R(i, 2) * 1.6).toFixed(2)}s;--t:${(2.4 + R(i, 3) * 1.8).toFixed(2)}s;--r:${Math.round(R(i, 4) * 720 - 360)}deg;--c:${cols[i % cols.length]};--y0:${(R(i, 5) * 40).toFixed(0)}%`;
+    if (forma === 0) return `<i class="cf cf-r" style="${st}"></i>`;
+    if (forma === 1) return `<i class="cf cf-c" style="${st}"></i>`;
+    return `<svg class="cf cf-s" style="${st}" viewBox="0 0 12 20"><path d="M6 1 C 1 5, 11 8, 6 11 C 1 14, 11 16, 6 19"/></svg>`;
+  }).join("");
+  const fuego = (cl, c) => `<svg class="fw ${cl}" style="--c:${c}" viewBox="0 0 80 80">${Array.from({ length: 10 }, (_, i) => { const a = (i / 10) * Math.PI * 2, x1 = 40 + Math.cos(a) * 12, y1 = 40 + Math.sin(a) * 12, x2 = 40 + Math.cos(a) * 34, y2 = 40 + Math.sin(a) * 34; return `<path pathLength="1" d="M${x1.toFixed(1)} ${y1.toFixed(1)} L${x2.toFixed(1)} ${y2.toFixed(1)}"/>`; }).join("")}</svg>`;
+  return `<div class="ev-fiesta" aria-hidden="true">${fuego("fw1", "var(--r-nar-tx)")}${fuego("fw2", "var(--acento)")}${fuego("fw3", "var(--peligro)")}${piezas}</div>`;
+}
+
 // ---------- arranque ----------
 function iniciar() {
   pintarTema();
   pintarBadges();
-  $("#b-ref").onclick = () => { if ($("#carr")) cargar(true); };
+  $("#b-ref").onclick = () => { if (S.vista === "ranking" && $("#rk")) { cargarRanking(true); cargarFabrica(); } else if ($("#carr")) cargar(true); };
+  $("#secciones").addEventListener("click", (e) => { const b = e.target.closest("[data-sec]"); if (b) irASeccion(b.dataset.sec); });
   matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", pintarTema);
   $("#b-menu").onclick = (e) => { e.stopPropagation(); $("#menu").hidden ? abrirMenu() : cerrarMenu(); };
   document.addEventListener("click", (e) => { if (!$("#menu").hidden && !e.target.closest(".menu-wrap")) cerrarMenu(); });
@@ -1776,15 +2441,23 @@ function iniciar() {
     });
     try { navigator.serviceWorker.startMessages(); } catch {}
   }
-  window.addEventListener("hashchange", () => { const ev = leerHashEv(); if (ev) recibirEvento(ev); });
+  window.addEventListener("hashchange", () => {
+    if (location.hash === "#ranking") { if (S.vista !== "ranking" && (DEMO || clave())) irASeccion("ranking"); return; }
+    const ev = leerHashEv(); if (ev) recibirEvento(ev);
+  });
   document.addEventListener("visibilitychange", () => {
     const d = S.datos[S.periodo];
     if (!document.hidden && d && $("#carr") && Date.now() - new Date(d.generado || 0) > 5 * 60000) cargar();
+    if (!document.hidden && S.vista === "ranking" && $("#rk")) {
+      cargarFabrica();
+      const r = RK.datos[RK.periodo];
+      if (r && Date.now() - new Date(r.generado || 0) > 15 * 60000) cargarRanking();
+    }
   });
   const ev = leerHashEv();
   if (ev && !DEMO && !clave()) ls.set("dash_ev_pend", JSON.stringify(ev));
   if (DEMO || clave()) {
-    if (location.hash === "#reglas") verReglas(); else montar();
+    if (location.hash === "#reglas") verReglas(); else abrirInicial();
     if (ev) recibirEvento(ev); else eventoPendiente();
   } else login();
 }
