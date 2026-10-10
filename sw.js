@@ -1,6 +1,6 @@
 /* Service worker — Dashboard Lorenzo */
-const VERSION = "dash-v8";
-const SHELL = ["./", "index.html", "styles.css?v=8", "app.js?v=8", "demo.js?v=8", "manifest.webmanifest",
+const VERSION = "dash-v9";
+const SHELL = ["./", "index.html", "styles.css?v=9", "app.js?v=9", "demo.js?v=9", "manifest.webmanifest",
   "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png", "icons/apple-touch-icon.png"];
 const API_HOST = "tppcpnfzcxxusdhrlmdx.supabase.co";
 const API_CACHE = "dash-api";
