@@ -675,7 +675,13 @@ table.camp tbody tr.fila.sel td { background: var(--marca); }
 
 /* celda del nombre en el celular: nombre arriba a la izquierda, punto de estado arriba a la derecha, flecha de desplegar abajo a la izquierda */
 @media (max-width: 720px) {
-  .camp td.nom, .camp th.nom { width: 196px; min-width: 186px; max-width: 196px; }
+  .camp td.nom, .camp th.nom { width: 150px; min-width: 144px; max-width: 150px; }
+  .camp td.nom .nomwrap .n { font-size: 12px; line-height: 1.2; }
+  .camp td.nom .nomwrap .sub { font-size: 10px; }
+  .niv-tag { font-size: 8px; padding: 1px 4px; }
+  .camp td { font-size: 12px; padding: 5px 6px; }
+  .camp th { font-size: 10.5px; padding: 6px 6px; }
+  .roas { font-size: 11.5px; min-width: 38px; }
   .camp td.nom { vertical-align: top; }
   .camp td.nom .nomwrap { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "txt dot" "tg tg"; align-items: start; gap: 6px 6px; }
   .camp td.nom .nomwrap > .txt { grid-area: txt; }
