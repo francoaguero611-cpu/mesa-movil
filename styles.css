@@ -968,3 +968,22 @@ table.camp tbody tr.fila.sel td { background: var(--marca); }
 
 .rk-sug { margin: 4px 0 10px; padding: 8px 12px; border: 2px dashed var(--acento); border-radius: var(--r-card); background: color-mix(in srgb, var(--acento) 8%, var(--tarjeta)); font-size: 13.5px; color: var(--tinta-2); }
 .rk-sug b { color: var(--acento); }
+
+/* ===== Pedido como pack (10/10) ===== */
+.pack-bar { height: 14px; margin: 10px 0 4px; border: 2px solid var(--tinta); border-radius: 999px; background: var(--papel-2); overflow: hidden; }
+.pack-fill { height: 100%; background: repeating-linear-gradient(-45deg, var(--ok) 0 10px, color-mix(in srgb, var(--ok) 80%, var(--tarjeta)) 10px 20px); transition: width .5s ease-out; }
+.pack-num { font-size: 13px; color: var(--mut); }
+.pack-num b { color: var(--tinta); }
+.pack-ofs { list-style: none; margin: 10px 0; padding: 0; display: grid; gap: 6px; }
+.pack-ofs li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 10px; padding: 7px 10px; border: 1.5px solid var(--linea); border-radius: 8px; background: var(--tarjeta); }
+.pack-ofs li.lista { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 8%, var(--tarjeta)); }
+.pack-ofs li.mal { border-color: var(--peligro); }
+.pk-of { font-weight: 600; font-size: 14px; }
+.pk-chips { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.pk { font-size: 11.5px; font-weight: 600; padding: 1px 7px; border-radius: 6px; border: 1.5px solid var(--linea); color: var(--mut); white-space: nowrap; }
+.pk.ok { border-color: var(--ok); color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, var(--tarjeta)); }
+.pk.mal { border-color: var(--peligro); color: var(--peligro); }
+.ped-detalle { margin: 6px 0 8px; }
+.ped-detalle summary { cursor: pointer; font-weight: 600; color: var(--acento); font-size: 14px; }
+.ped > .pack-bar { margin: 10px 14px 4px; }
+.ped > .pack-num { padding: 0 14px 10px; }

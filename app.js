@@ -134,7 +134,7 @@ async function api(accion, { q = "", body = null, escritura = false } = {}) {
 let demoP = null;
 function cargarDemo() {
   if (window.DemoAPI) return Promise.resolve();
-  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=20"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=21"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
   return demoP;
 }
 
@@ -2382,6 +2382,23 @@ function pintarPedidos() {
     if (c) { requestAnimationFrame(() => { c.scrollIntoView({ behavior: reducido() ? "auto" : "smooth", block: "start" }); c.classList.add("destello"); setTimeout(() => c.classList.remove("destello"), 2400); }); }
   }
 }
+// (10/10, Lorenzo) El pedido es UN pack: barra con el total de creativos hechos y una fila por oferta.
+const HECHO_RE = /empez|arranc|planead|render de|leyendo|diseñando|armando/i;
+function packDe(p) {
+  const pr = p.params || {}, ofs = pr.ofertas || [], prog = p.progreso || [];
+  const fin = ["listo_revisar", "lanzar", "lanzando", "lanzado"].includes(p.estado);
+  let total = 0, hechos = 0, listas = 0;
+  const filas = ofs.map((o) => {
+    const sg = o.sugerencia || {}; const nIT = +(sg.iteraciones ?? pr.iteraciones ?? 5), nRE = +(sg.renovaciones ?? pr.renovaciones ?? 5);
+    const de = prog.filter((x) => x.oferta === o.etiqueta);
+    const ok = (et) => fin || de.some((x) => x.etapa === et && !HECHO_RE.test(x.texto || ""));
+    const drive = ok("drive"), err = !drive && de.some((x) => x.etapa === "error") && !de.some((x) => x.etapa !== "error" && Date.parse(x.t) > Date.parse(de.filter((y) => y.etapa === "error").slice(-1)[0].t));
+    const it = drive || ok("iteraciones"), re = drive || ok("renovaciones"), gu = it || re || ok("guiones");
+    total += nIT + nRE; hechos += (it ? nIT : 0) + (re ? nRE : 0); if (drive) listas++;
+    return { o, nIT, nRE, gu, it, re, drive, err };
+  });
+  return { filas, total, hechos: fin ? total : hechos, listas: fin ? ofs.length : listas, fin };
+}
 function pedidoHTML(p) {
   const id = String(p.id);
   const ab = RK.abiertos.has(id);
@@ -2398,7 +2415,10 @@ function pedidoHTML(p) {
         <small>${nVid ? pl(nVid, "video") + " · " : ""}${hace(p.creado)}${ult?.texto ? ` · ${esc(ult.texto)}` : ""}</small></span>
       <span class="fchip ${col}">${p.estado === "trabajando" || p.estado === "lanzando" ? `<span class="cargador mini" aria-hidden="true"></span>` : ""}${esc(tx)}</span>
     </button>
-    ${p.estado !== "cancelado" ? `<ol class="ped-etapas" aria-label="Etapas">${ETAPAS_FAB.map(([k, t]) => `<li class="${hechas.has(k) ? "hecha" : ""}"><span class="sr">${hechas.has(k) ? "hecho: " : "falta: "}</span>${t}</li>`).join("")}</ol>` : ""}
+    ${p.estado !== "cancelado" && p.estado !== "error" ? (() => { const k = packDe(p); const pct = k.total ? Math.round(100 * k.hechos / k.total) : 0;
+      return `<div class="pack-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${k.total}" aria-valuenow="${k.hechos}" aria-label="Creativos hechos">
+        <div class="pack-fill" style="width:${pct}%"></div></div>
+        <div class="pack-num"><b class="num">${k.hechos} / ${k.total}</b> creativos · ${k.listas} de ${k.filas.length} ofertas listas${["lanzando", "lanzado"].includes(p.estado) ? "" : k.fin ? " · <b>¡Todo listo para revisar!</b>" : ""}</div>`; })() : ""}
     ${ab ? detallePedido(p) : ""}
   </article>`;
 }
@@ -2411,10 +2431,14 @@ function detallePedido(p) {
   return `<div class="ped-det">
     ${p.error ? `<div class="err-box">${esc(p.error)}</div>` : ""}
     <div class="ped-params">${pl(+pr.iteraciones || 0, "iteración", "iteraciones")} + ${pl(+pr.renovaciones || 0, "renovación", "renovaciones")} por oferta · mezcla ${esc(pr.mezcla || "70/30")} · ${esc(destinoTx(pr.destino))}${p.quien ? ` · pidió ${esc(p.quien)}` : ""}</div>
-    ${prog.length ? `<ol class="ped-tl">${prog.map((x) => `<li class="tl-${esc(x.etapa)}"><span class="ped-h num">${esc(hhmm(x.t))}</span><div><b>${esc(ETAPA_TX[x.etapa] || x.etapa)}</b>${x.oferta ? ` <span class="mut">· ${esc(x.oferta)}</span>` : ""}${x.texto ? `<div class="tl-tx">${esc(x.texto)}</div>` : ""}</div></li>`).join("")}</ol>` : `<p class="mut">Todavía sin novedades: la compu lo agarra en el próximo latido (menos de 1 min).</p>`}
+    ${(() => { const k = packDe(p); if (!k.filas.length) return "";
+      const chip = (ok, t) => `<span class="pk ${ok ? "ok" : ""}">${ok ? "✓" : "·"} ${t}</span>`;
+      return `<ul class="pack-ofs">${k.filas.map((f) => `<li class="${f.drive ? "lista" : f.err ? "mal" : ""}"><span class="pk-of">${f.o.bandera ? esc(f.o.bandera) + " " : ""}${esc(f.o.etiqueta || f.o.grupo)}</span>
+        <span class="pk-chips">${f.err ? `<span class="pk mal">✕ con error</span>` : chip(f.gu, "Guiones") + chip(f.it, `${f.nIT} IT`) + chip(f.re, `${f.nRE} RE`) + chip(f.drive, "Drive")}</span></li>`).join("")}</ul>`; })()}
+    ${prog.length ? `<details class="ped-detalle"><summary>Ver el paso a paso</summary><ol class="ped-tl">${prog.map((x) => `<li class="tl-${esc(x.etapa)}"><span class="ped-h num">${esc(hhmm(x.t))}</span><div><b>${esc(ETAPA_TX[x.etapa] || x.etapa)}</b>${x.oferta ? ` <span class="mut">· ${esc(x.oferta)}</span>` : ""}${x.texto ? `<div class="tl-tx">${esc(x.texto)}</div>` : ""}</div></li>`).join("")}</ol></details>` : `<p class="mut">Todavía sin novedades: la compu lo agarra en el próximo latido (menos de 1 min).</p>`}
     ${p.resultado ? `<details class="log"><summary>Resultado</summary><pre>${esc(typeof p.resultado === "string" ? p.resultado : JSON.stringify(p.resultado, null, 2))}</pre></details>` : ""}
     <div class="ped-acc">
-      ${p.drive_url ? `<a class="btn chico" href="${esc(p.drive_url)}" target="_blank" rel="noopener">Revisar videos ↗</a>` : ""}
+      ${p.drive_url && ["listo_revisar", "lanzar", "lanzando", "lanzado"].includes(p.estado) ? `<a class="btn chico" href="${esc(p.drive_url)}" target="_blank" rel="noopener">Revisar todos los videos ↗</a>` : ""}
       ${p.estado === "listo_revisar" ? `<button type="button" class="btn chico pri" data-publicar="${esc(id)}">Publicar en Meta</button>` : ""}
       ${cancelable ? `<button type="button" class="btn chico" data-cancelar="${esc(id)}">Cancelar</button>` : ""}
       ${eliminable ? `<button type="button" class="btn chico peligro" data-eliminar="${esc(id)}">${cancelable ? "Cancelar y eliminar" : "Eliminar"}</button>` : ""}
