@@ -351,7 +351,6 @@ details.log pre, .pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12
   .carr .etiqueta h2 { font-size: 22px; max-width: 100%; }
   .carr .flecha { width: 42px; height: 42px; }
   .carr .tarjetas { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-  .carr .tarjetas .met:last-child { grid-column: 1 / -1; }
   .met { padding: 11px 12px 12px; box-shadow: 4px 4px 0 var(--sombra); }
   .met .lbl { font-size: 15px; }
   .met .val { font-size: 21px; }
@@ -666,3 +665,22 @@ textarea.campo { resize: vertical; font-size: 16px; }
 }
 /* lo seleccionado manda también sobre filas abiertas (campaña/conjunto expandidos) */
 table.camp tbody tr.fila.sel td { background: var(--marca); }
+
+/* ===== Celular y cabecera (10/10, pedido de Lorenzo) ===== */
+/* desplegable de oferta y mercado, ancho completo, arriba de los períodos */
+.sel-grupo-caja { position: relative; display: block; width: 100%; margin: 0 0 14px; border: 2px solid var(--tinta); border-radius: var(--r-btn); background: var(--tarjeta); box-shadow: 3px 3px 0 var(--sombra); }
+.sel-grupo { appearance: none; -webkit-appearance: none; display: block; width: 100%; padding: 11px 44px 11px 14px; border: 0; border-radius: var(--r-btn); background: transparent; color: var(--tinta); font-family: var(--f-titulo); font-size: 17px; font-weight: 700; cursor: pointer; }
+.sel-grupo:focus-visible { outline: 3px solid var(--foco); outline-offset: 2px; }
+.sel-flecha { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--tinta); display: inline-flex; }
+
+/* celda del nombre en el celular: nombre arriba a la izquierda, punto de estado arriba a la derecha, flecha de desplegar abajo a la izquierda */
+@media (max-width: 720px) {
+  .camp td.nom, .camp th.nom { width: 196px; min-width: 186px; max-width: 196px; }
+  .camp td.nom { vertical-align: top; }
+  .camp td.nom .nomwrap { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "txt dot" "tg tg"; align-items: start; gap: 6px 6px; }
+  .camp td.nom .nomwrap > .txt { grid-area: txt; }
+  .camp td.nom .nomwrap > .dot { grid-area: dot; margin-top: 2px; }
+  .camp td.nom .nomwrap > .tg { grid-area: tg; justify-self: start; }
+  .camp td.nom .nomwrap > .tg-hueco { display: none; }
+  .niv-tag { margin-bottom: 4px; }
+}

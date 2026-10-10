@@ -83,7 +83,7 @@ async function api(accion, { q = "", body = null, escritura = false } = {}) {
 let demoP = null;
 function cargarDemo() {
   if (window.DemoAPI) return Promise.resolve();
-  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=10"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=11"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
   return demoP;
 }
 
@@ -135,9 +135,6 @@ function temaEfectivo() {
 }
 function pintarTema() {
   const osc = temaEfectivo() === "dark";
-  const b = $("#b-tema");
-  b.textContent = osc ? "☀" : "☾";
-  b.setAttribute("aria-label", osc ? "Cambiar a modo claro" : "Cambiar a modo oscuro");
   $$('meta[name="theme-color"]').forEach((m) => m.setAttribute("content", osc ? "#1b1a17" : "#f4efe2"));
 }
 function alternarTema() {
@@ -165,6 +162,10 @@ function pintarMenu() {
       <span>Modo prueba<br><small>${DRY_URL ? "forzado por ?dry=1 en la dirección" : "las escrituras no tocan Meta"}</small></span>
       <span class="toggle-chico" aria-hidden="true" ${dry ? 'aria-checked="true"' : ""}><span class="mini"></span></span>
     </button>
+    <button class="item" role="menuitemcheckbox" aria-checked="${temaEfectivo() === "dark"}" id="mi-oscuro">
+      <span>Modo oscuro<br><small>${document.documentElement.getAttribute("data-theme") ? "elegido a mano" : "sigue al sistema"}</small></span>
+      <span class="toggle-chico" aria-hidden="true" ${temaEfectivo() === "dark" ? 'aria-checked="true"' : ""}><span class="mini"></span></span>
+    </button>
     <button class="item" role="menuitem" id="mi-reglas"><span>Reglas<br><small>ver y editar las automáticas</small></span><span aria-hidden="true">⚙</span></button>
     <button class="item" role="menuitem" id="mi-log"><span>Registro de acciones<br><small>últimas 50</small></span><span aria-hidden="true">📜</span></button>
     <button class="item" role="menuitem" id="mi-avisos"><span>Activar avisos<br><small id="mi-avisos-tx">…</small></span><span aria-hidden="true">🔔</span></button>
@@ -177,6 +178,7 @@ function pintarMenu() {
   $("#mi-log").onclick = () => { cerrarMenu(); verRegistro(); };
   $("#mi-reglas").onclick = () => { cerrarMenu(); verReglas(); };
   $("#mi-sistema").onclick = () => { temaSistema(); cerrarMenu(); };
+  $("#mi-oscuro").onclick = () => { alternarTema(); pintarMenu(); $("#mi-oscuro").focus(); };
   $("#mi-avisos").onclick = () => { cerrarMenu(); activarAvisos(); };
   $("#mi-probar").onclick = () => { cerrarMenu(); probarAviso(); };
   if ($("#mi-ejemplos")) $("#mi-ejemplos").onclick = () => { cerrarMenu(); avisosEjemplo(); };
@@ -293,6 +295,7 @@ async function cargarDetalle(c, forzar = false) {
 // ---------- montaje ----------
 function montar() {
   $("#main").innerHTML = `
+    <div class="sel-grupo-caja boceto"><label class="sr" for="sel-grupo">Oferta y mercado</label><select id="sel-grupo" class="sel-grupo"></select><span class="sel-flecha" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M5.5 9.5 C 8 12, 10.5 14, 12.2 15.5 C 14 13.6, 16.4 11.6, 18.6 9.2" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
     <div class="controles">
       <div class="periodos" role="group" aria-label="Período">${PERIODOS.map(([k, t]) => `<button type="button" class="btn chico" data-per="${k}" aria-pressed="${k === S.periodo}">${t}</button>`).join("")}</div>
       <div class="hora" id="hora"></div>
@@ -313,6 +316,7 @@ function montar() {
       <div class="tabla-caja boceto"><div class="tabla-scroll" id="tabla-scroll"></div></div>
     </section>`;
   $$("[data-per]").forEach((b) => b.onclick = () => cambiarPeriodo(b.dataset.per));
+  $("#sel-grupo").onchange = (e) => irA(+e.target.value);
   $("#b-prev").onclick = () => paso(-1);
   $("#b-next").onclick = () => paso(1);
   $("#b-cols").onclick = elegirColumnas; pintarBotonCols();
@@ -335,8 +339,8 @@ function pintarControles() {
   else if (d?.cache?.de_cache) tx = `<span class="aviso" title="${esc(d.cache.aviso || "")}">Datos de las ${hora} (Meta sin cupo)</span>`;
   else if (d) tx = `<span>Datos de las <b class="num">${hora}</b></span>`;
   else tx = `<span>${S.cargando ? "Cargando…" : ""}</span>`;
-  h.innerHTML = `${tx}<button type="button" class="btn icono${S.cargando ? " cargando" : ""}" id="b-ref" aria-label="Refrescar datos (pide datos nuevos a Meta)"><span class="gira">↻</span></button>`;
-  $("#b-ref").onclick = () => cargar(true);
+  h.innerHTML = tx;
+  const br = $("#b-ref"); if (br) br.classList.toggle("cargando", !!S.cargando);
 }
 function pintarAvisos() {
   const a = $("#avisos"); if (!a) return;
@@ -376,6 +380,8 @@ function pintarCarrusel() {
   $("#b-next").disabled = S.idx >= n - 1;
   $("#pos").innerHTML = (n > 1 && n <= 16 ? `<div class="puntos">${gs.map((x, i) => `<button type="button" class="punto" data-ir="${i}" aria-label="Ir a ${esc(x.etiqueta)}" ${i === S.idx ? 'aria-current="true"' : ""}></button>`).join("")}</div>` : "") + `<span class="contador num">${S.idx + 1} / ${n}</span>`;
   $$("[data-ir]").forEach((b) => b.onclick = () => irA(+b.dataset.ir));
+  const sg = $("#sel-grupo");
+  if (sg) sg.innerHTML = gs.map((x, i) => `<option value="${i}"${i === S.idx ? " selected" : ""}>${esc((x.bandera ? x.bandera + " " : "") + (x.etiqueta || x.oferta || "Todas"))}</option>`).join("");
 }
 function irA(i) {
   const n = grupos().length;
@@ -1756,7 +1762,7 @@ function eventoPendiente() {
 function iniciar() {
   pintarTema();
   pintarBadges();
-  $("#b-tema").onclick = alternarTema;
+  $("#b-ref").onclick = () => { if ($("#carr")) cargar(true); };
   matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", pintarTema);
   $("#b-menu").onclick = (e) => { e.stopPropagation(); $("#menu").hidden ? abrirMenu() : cerrarMenu(); };
   document.addEventListener("click", (e) => { if (!$("#menu").hidden && !e.target.closest(".menu-wrap")) cerrarMenu(); });
