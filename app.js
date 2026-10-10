@@ -134,7 +134,7 @@ async function api(accion, { q = "", body = null, escritura = false } = {}) {
 let demoP = null;
 function cargarDemo() {
   if (window.DemoAPI) return Promise.resolve();
-  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=16"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=17"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
   return demoP;
 }
 
@@ -2316,6 +2316,29 @@ function quizRenos() {
     const id = r?.id != null ? String(r.id) : null;
     RK.sel.clear(); sincronizarSel();
     if (id) { RK.panel = true; ls.set("rk_panel", "1"); RK.abiertos.add(id); RK.foco = id; }
+    // (10/10, Lorenzo) antes de arrancar, la compu estima los créditos con lo que costaron las últimas tandas.
+    // Si alcanzan, arranca sin decir nada; si no, cartel «Te faltan créditos» y no arranca.
+    if (id) {
+      m.set(`<div class="rk-ok">${icoEvento("cola")}<h3>Revisando los créditos…</h3><p class="mut">La compu calcula cuánto va a gastar esta tanda (con lo que costaron las anteriores) y mira el saldo de cada app. Tarda hasta un minuto.</p></div>`);
+      m.dlg.classList.add("dialogo-ev");
+      let ped = null;
+      for (let i = 0; i < 30; i++) {
+        await new Promise((ok) => setTimeout(ok, 5000));
+        if (!modalActual || modalActual.dlg !== m.dlg) break;
+        try { const f = await api("fabrica_estado"); RK.fab = f; ped = (f.pedidos || []).find((x) => String(x.id) === id); } catch { /* reintenta */ }
+        if (ped && ped.estado !== "pendiente") break;
+      }
+      if (ped && ped.estado === "error") {
+        const ult = (ped.progreso || []).slice(-1)[0];
+        const det = String(ult?.texto || ped.error || "").replace(/^No arranqué: te faltan créditos para hacer todas las renovaciones\.\s*/, "");
+        const falta = /falta/i.test(ped.error || "") || /créditos/i.test(ult?.texto || "");
+        m.set(`<div class="rk-ok">${icoEvento("x")}<h3>${falta ? "Te faltan créditos para hacer todas las renovaciones" : "La compu no pudo arrancar"}</h3>
+          <ul class="rk-nr-lista">${det.split(/;\s*/).filter(Boolean).map((t) => `<li><span class="rk-nr-ico ev-ico-chico peligro">${icoEvento("x")}</span><div><span>${esc(t)}</span></div></li>`).join("")}</ul>
+          <p class="mut">${falta ? "No arranqué nada. Cargá crédito y volvé a tocar «Empezar renovaciones»." : "Mirá el pedido para ver qué pasó."}</p></div>
+          <div class="botones"><button type="button" class="btn pri" data-x data-foco>Entendido</button></div>`);
+        $("[data-x]", m.dlg).onclick = m.cerrar; cargarFabrica(); return;
+      }
+    }
     m.set(`<div class="rk-ok">${icoEvento("tilde")}<h3>${id ? `Pedido #${esc(id)} en camino` : "Pedido mandado"}</h3>
       <p>La compu ya lo tiene. Te va a llegar <b>un aviso al celular por cada etapa</b> (guiones, iteraciones y renovaciones de cada oferta) y uno al final cuando esté todo para revisar.</p></div>
       <div class="botones"><button type="button" class="btn pri" data-x data-foco>Ver el pedido</button></div>`);
