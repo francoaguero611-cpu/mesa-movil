@@ -134,7 +134,7 @@ async function api(accion, { q = "", body = null, escritura = false } = {}) {
 let demoP = null;
 function cargarDemo() {
   if (window.DemoAPI) return Promise.resolve();
-  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=17"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=18"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
   return demoP;
 }
 
@@ -1905,9 +1905,9 @@ const ESTADO_FAB = { pendiente: ["en cola", "gris"], trabajando: ["trabajando", 
 const MEZCLAS = [["70/30", "70/30 · lo de siempre", "70 % pegado a lo que ya funciona (mismo formato, hook parecido) y 30 % de prueba con hooks y ángulos nuevos."],
   ["90/10", "90/10 · conservador", "Casi todo pegado al winner. Menos riesgo, pero menos chance de encontrar algo nuevo."],
   ["50/50", "50/50 · arriesgado", "Mitad pegado al winner, mitad prueba. Más chance de otro winner, más gasto en lo que no anda."]];
-const DESTINOS = [["original", "En la campaña original", "Conjunto nuevo «fecha Iteraciones y Renos» dentro de la campaña del winner. Lo de siempre."],
+const DESTINOS = [["original", "En la CBO madre del winner", "Conjunto nuevo «fecha Iteraciones y Renos» dentro de la CBO madre de donde salió el winner. Aunque lo elijas de una CostCap, BidCap o aislada, sale en la madre de donde se escaló, nunca adentro de la CostCap. Lo de siempre."],
   ["cbo_propia", "En una CBO propia", "Una campaña CBO nueva solo para esta tanda, separada de la original."]];
-const destinoTx = (d) => d === "cbo_propia" ? "en una CBO propia" : "en la campaña original (conjunto nuevo)";
+const destinoTx = (d) => d === "cbo_propia" ? "en una CBO propia" : "en la CBO madre del winner (conjunto nuevo)";
 const PATH_FLECHA = "M9.5 5.5 C 12 8, 14 10.5, 15.5 12.2 C 13.6 14, 11.6 16.4, 9.2 18.6";
 const svgFlecha = (s = 20) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true"><path d="${PATH_FLECHA}" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const SVG_PLAY = `<svg viewBox="0 0 48 48" aria-hidden="true"><path class="pl-c" d="M24 4 C 36 4, 44 12, 44 24 C 44 36, 36 44, 24 44 C 12 44, 4 36, 4 24 C 4 13, 12 4, 26 5"/><path class="pl-t" d="M19 15 C 19 21, 19 27, 19.5 33 C 25 30, 30 27, 34 24 C 29 21, 24 18, 19 15 Z"/></svg>`;
