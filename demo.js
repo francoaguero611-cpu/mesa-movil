@@ -25,7 +25,8 @@
     ["Testeo CBO", null, ["Testeo 5 creativos"]],
   ];
   const ADS = ["UGC Jorge — hook taller", "B-roll cinturón 70% OFF", "Viñetas 1.500 moldes", "Avatar IA cocina — reno 3", "Hook «no sabía coser»", "Reno winner + SFX", "Carrusel láminas A4", "Testimonial voz clonada", "B-roll manos cuero 2", "Iteración hook visual 4"];
-  const FACT = { hoy: [1, 1], ayer: [1.05, 2], "7d": [6.2, 3], "30d": [24, 4] };
+  const FACT = { hoy: [1, 1], ayer: [1.05, 2], "3d": [2.9, 5], "7d": [6.2, 3], "30d": [24, 4] };
+  const factDe = (per) => FACT[per] || (String(per).startsWith("r:") ? [4.4, 6] : null);
 
   const ESTR = [];   // estructura fija (ids, nombres, estados); métricas por período
   const ESTADOS = new Map();
@@ -56,7 +57,7 @@
 
   const VACIO = { gasto: 0, ventas: 0, facturacion: 0, ganancia: 0, impresiones: 0, alcance: 0, clics: 0, visitas: 0, carritos: 0, pagos_iniciados: 0 };
   function metricasAd(c, a, per) {
-    const [f, s] = FACT[per] || FACT.hoy;
+    const [f, s] = factDe(per) || FACT.hoy;
     const R = rng(a.id + per + s);
     if (c.roas == null) return derivadas({ ...VACIO });
     const gasto = r2((6 + R() * 26) * f);
@@ -109,7 +110,7 @@
     const deCache = per === "30d";
     const hora = deCache ? new Date(hoy.getTime() - 47 * 60000) : hoy;
     const d = (n) => new Date(hoy.getTime() - n * 864e5).toISOString().slice(0, 10);
-    const rango = { hoy: [0, 0], ayer: [1, 1], "7d": [6, 0], "30d": [29, 0] }[per];
+    const rango = { hoy: [0, 0], ayer: [1, 1], "3d": [2, 0], "7d": [6, 0], "30d": [29, 0] }[per] || [4, 0];
     return { generado: hoy.toISOString(), periodo: per, desde: d(rango[0]), hasta: d(rango[1]),
       cache: { de_cache: deCache, hora: hora.toISOString(), aviso: deCache ? `Meta sin cupo de llamadas (TESTEOS): datos de las ${hora.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}` : null },
       errores: per === "ayer" ? ["GALILEO SHOPS: Meta no devolvió conjuntos (límite de llamadas)"] : [],
@@ -339,7 +340,7 @@
     return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
   }
   function rankingDemo(per) {
-    const [f, s] = FACT[per] || FACT["7d"];
+    const [f, s] = factDe(per) || FACT["7d"];
     const grupos = RK_G.map((clave, gi) => {
       const gg = G.find((x) => x[0] === clave);
       const [, oferta, mercado, bandera, ticket, act, cuenta] = gg;

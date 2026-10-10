@@ -35,7 +35,58 @@ function colorRoas(r) {
   return "verde-fuerte";
 }
 const chipRoas = (r) => `<span class="roas ${colorRoas(r)} num">${roasTx(r)}</span>`;
-const PERIODOS = [["hoy", "Hoy"], ["ayer", "Ayer"], ["7d", "7 días"], ["30d", "30 días"]];
+// (10/10, Lorenzo) Hoy · Ayer · Últimos 3 días (con hoy) · Elegir fechas (calendario). 7 y 30 días casi no se usan.
+const PERIODOS = [["hoy", "Hoy"], ["ayer", "Ayer"], ["3d", "Últimos 3 días"], ["rango", "Personalizado"]];
+const esRango = (p) => /^r:\d{4}-\d{2}-\d{2}:\d{4}-\d{2}-\d{2}$/.test(p || "");
+const periodoValido = (p) => ["hoy", "ayer", "3d"].includes(p) || esRango(p);
+const dm = (iso) => { const [, m, d] = iso.split("-"); return `${+d}/${+m}`; };
+const etiquetaPer = (k, t, actual) => k === "rango" && esRango(actual) ? (() => { const [, a, b] = actual.split(":"); return a === b ? dm(a) : `${dm(a)}–${dm(b)}`; })() : t;
+const botonesPer = (attr, actual) => PERIODOS.map(([k, t]) => `<button type="button" class="btn chico${k === "rango" ? " per-rango" : ""}" ${attr}="${k}" aria-pressed="${k === actual || (k === "rango" && esRango(actual))}">${k === "rango" ? `<svg class="cal-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M4.5 6.5 C 9 6, 15 6.3, 19.5 6.2 L 19.6 19 C 14 19.4, 9 19.2, 4.4 19.3 Z M4.6 10.4 C 10 10.2, 14 10.3, 19.4 10.2 M8.4 4 L 8.5 8 M15.6 4 L 15.5 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>` : ""}${esc(etiquetaPer(k, t, actual))}</button>`).join("");
+
+// Calendario de rango, con la estética de la app. Devuelve «r:desde:hasta» o null.
+const isoAR = (d) => new Date(d.getTime() - 3 * 3600e3).toISOString().slice(0, 10);
+function elegirRango(actual) {
+  return new Promise((ok) => {
+    const hoy = isoAR(new Date());
+    let [a, b] = esRango(actual) ? actual.split(":").slice(1) : [null, null];
+    let mes = (b || hoy).slice(0, 7);
+    let listo = false;
+    const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+    const m = abrirModal("", { alCerrar: () => { if (!listo) ok(null); } });
+    const dias = (x, y) => Math.round((Date.parse(y + "T12:00:00Z") - Date.parse(x + "T12:00:00Z")) / 86400e3) + 1;
+    const pintar = () => {
+      const [Y, M] = mes.split("-").map(Number);
+      const primero = new Date(Date.UTC(Y, M - 1, 1)), n = new Date(Date.UTC(Y, M, 0)).getUTCDate();
+      const off = (primero.getUTCDay() + 6) % 7; // lunes primero
+      let celdas = "";
+      for (let i = 0; i < off; i++) celdas += `<span class="cal-v"></span>`;
+      for (let d = 1; d <= n; d++) {
+        const iso = `${mes}-${String(d).padStart(2, "0")}`, fut = iso > hoy;
+        const ini = iso === a, fin = iso === (b || a), dentro = a && b && iso > a && iso < b;
+        celdas += `<button type="button" class="cal-d${ini || fin ? " sel" : ""}${dentro ? " en" : ""}${iso === hoy ? " hoy" : ""}" data-d="${iso}" ${fut ? "disabled" : ""} aria-pressed="${!!(ini || fin || dentro)}">${d}</button>`;
+      }
+      const largo = a ? dias(a, b || a) : 0, mucho = largo > 92;
+      const prevOk = true, nextOk = mes < hoy.slice(0, 7);
+      m.set(`<h3>Elegí las fechas</h3>
+        <p class="mut cal-ayuda">${!a ? "Tocá el primer día." : !b ? "Ahora tocá el último día (o el mismo, para un solo día)." : `${dm(a)} → ${dm(b)} · ${largo} día${largo === 1 ? "" : "s"}${mucho ? " · máximo 92" : ""}`}</p>
+        <div class="cal boceto">
+          <div class="cal-cab"><button type="button" class="btn icono cal-nav" data-mes="-1" aria-label="Mes anterior" ${prevOk ? "" : "disabled"}>‹</button><b>${MESES[M - 1]} ${Y}</b><button type="button" class="btn icono cal-nav" data-mes="1" aria-label="Mes siguiente" ${nextOk ? "" : "disabled"}>›</button></div>
+          <div class="cal-sem">${["lu", "ma", "mi", "ju", "vi", "sá", "do"].map((x) => `<span>${x}</span>`).join("")}</div>
+          <div class="cal-grilla">${celdas}</div>
+          <svg class="cal-garabato" viewBox="0 0 160 12" aria-hidden="true"><path d="M2 8 C 30 3, 52 11, 80 6 S 130 3, 158 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+        </div>
+        <div class="cal-atajos"><button type="button" class="btn chico" data-ult="7">Últimos 7</button><button type="button" class="btn chico" data-ult="14">Últimos 14</button><button type="button" class="btn chico" data-ult="30">Últimos 30</button></div>
+        <div class="botones"><button type="button" class="btn" data-x>Cancelar</button><button type="button" class="btn pri" data-ok ${a && !mucho ? "" : "disabled"}>Ver estas fechas</button></div>`);
+      const dlg = m.dlg;
+      $$("[data-d]", dlg).forEach((x) => x.onclick = () => { const d = x.dataset.d; if (!a || b) { a = d; b = null; } else if (d < a) { b = a; a = d; } else b = d; pintar(); });
+      $$("[data-mes]", dlg).forEach((x) => x.onclick = () => { const [y, mm] = mes.split("-").map(Number); const t = new Date(Date.UTC(y, mm - 1 + Number(x.dataset.mes), 1)); mes = t.toISOString().slice(0, 7); pintar(); });
+      $$("[data-ult]", dlg).forEach((x) => x.onclick = () => { b = hoy; a = isoAR(new Date(Date.now() - (Number(x.dataset.ult) - 1) * 86400e3)); mes = hoy.slice(0, 7); pintar(); });
+      $("[data-x]", dlg).onclick = m.cerrar;
+      $("[data-ok]", dlg).onclick = () => { listo = true; m.cerrar(); ok(`r:${a}:${b || a}`); };
+    };
+    pintar();
+  });
+}
 const NIVEL = { campana: ["campaña", "campañas"], conjunto: ["conjunto", "conjuntos"], anuncio: ["anuncio", "anuncios"] };
 const plural = (n, nivel) => `${n} ${NIVEL[nivel][n === 1 ? 0 : 1]}`;
 
@@ -83,7 +134,7 @@ async function api(accion, { q = "", body = null, escritura = false } = {}) {
 let demoP = null;
 function cargarDemo() {
   if (window.DemoAPI) return Promise.resolve();
-  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=13"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=14"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
   return demoP;
 }
 
@@ -303,7 +354,7 @@ function montar() {
   $("#main").innerHTML = `
     <div class="sel-grupo-caja boceto"><label class="sr" for="sel-grupo">Oferta y mercado</label><select id="sel-grupo" class="sel-grupo"></select><span class="sel-flecha" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M5.5 9.5 C 8 12, 10.5 14, 12.2 15.5 C 14 13.6, 16.4 11.6, 18.6 9.2" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
     <div class="controles">
-      <div class="periodos" role="group" aria-label="Período">${PERIODOS.map(([k, t]) => `<button type="button" class="btn chico" data-per="${k}" aria-pressed="${k === S.periodo}">${t}</button>`).join("")}</div>
+      <div class="periodos" role="group" aria-label="Período">${botonesPer("data-per", S.periodo)}</div>
       <div class="hora" id="hora"></div>
     </div>
     <div id="avisos"></div>
@@ -337,7 +388,7 @@ function pintarTodo() { pintarControles(); pintarAvisos(); pintarCarrusel(); pin
 
 function pintarControles() {
   const h = $("#hora"); if (!h) return;
-  $$("[data-per]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.per === S.periodo));
+  const pp = $(".controles .periodos"); if (pp) { pp.innerHTML = botonesPer("data-per", S.periodo); $$("[data-per]", pp).forEach((b) => b.onclick = () => cambiarPeriodo(b.dataset.per)); }
   const d = S.datos[S.periodo];
   const hora = d ? hhmm(d.cache?.hora || d.generado) : null;
   let tx = "";
@@ -439,7 +490,8 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "ArrowRight") { e.preventDefault(); paso(1); }
 });
 
-function cambiarPeriodo(p) {
+async function cambiarPeriodo(p) {
+  if (p === "rango") { const r = await elegirRango(S.periodo); if (!r) return; p = r; }
   if (p === S.periodo) return;
   S.periodo = p; S.sel.clear();
   if (S.datos[p]) { ajustarIdx(); pintarTodo(); }
@@ -1841,7 +1893,7 @@ function irASeccion(sec, opts = {}) {
 
 // ---------- Ranking ----------
 const RK = {
-  periodo: ["hoy", "ayer", "7d", "30d"].includes(ls.get("rk_periodo")) ? ls.get("rk_periodo") : "7d",
+  periodo: periodoValido(ls.get("rk_periodo")) ? ls.get("rk_periodo") : "3d",
   datos: {}, cargando: false, error: null,
   sel: new Map(),              // `${grupo}|${post}` -> { g: {clave, etiqueta, bandera}, a }
   fab: null, fabErr: null, fabCargando: false, timer: null,
@@ -1900,7 +1952,7 @@ function montarRanking({ pedido = null } = {}) {
         <div class="hora" id="rk-hora"></div>
       </div>
       <div class="controles rk-controles">
-        <div class="periodos" role="group" aria-label="Período">${PERIODOS.map(([k, t]) => `<button type="button" class="btn chico" data-rkper="${k}" aria-pressed="${k === RK.periodo}">${t}</button>`).join("")}</div>
+        <div class="periodos rk-per" role="group" aria-label="Período">${botonesPer("data-rkper", RK.periodo)}</div>
         <div class="sel-grupo-caja boceto rk-salto"><label class="sr" for="rk-salto">Ir a una oferta</label><select id="rk-salto" class="sel-grupo"></select><span class="sel-flecha" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M5.5 9.5 C 8 12, 10.5 14, 12.2 15.5 C 14 13.6, 16.4 11.6, 18.6 9.2" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
       </div>
       <div id="rk-pedidos"></div>
@@ -1918,7 +1970,8 @@ function montarRanking({ pedido = null } = {}) {
   cargarFabrica();
   RK.timer = setInterval(() => { if (!document.hidden && S.vista === "ranking") cargarFabrica(); }, 60000);
 }
-function cambiarPeriodoRk(p) {
+async function cambiarPeriodoRk(p) {
+  if (p === "rango") { const r = await elegirRango(RK.periodo); if (!r) return; p = r; }
   if (p === RK.periodo) return;
   RK.periodo = p; ls.set("rk_periodo", p);
   pintarRanking();
@@ -1951,7 +2004,7 @@ async function cargarFabrica() {
   return RK.fab;
 }
 function pintarRanking() {
-  $$("[data-rkper]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.rkper === RK.periodo));
+  const rp = $(".rk-per"); if (rp) { rp.innerHTML = botonesPer("data-rkper", RK.periodo); $$("[data-rkper]", rp).forEach((b) => b.onclick = () => cambiarPeriodoRk(b.dataset.rkper)); }
   pintarRkHora();
   const sg = $("#rk-salto");
   if (sg) {
@@ -2103,7 +2156,8 @@ function pintarBarraRanking() {
   if (yaVisible) b.style.animation = "none"; else b.style.animation = "";
   b.innerHTML = `
     <button type="button" class="btn chico rk-rec" id="rk-recomendar">${SVG_CHISPA}Recomendar</button>
-    <div class="cuenta"><span class="num">${n}</span> seleccionado${n === 1 ? "" : "s"}<small>${n ? `de ${pl(ofs, "oferta")} · <button type="button" class="link rk-limpiar" id="rk-limpiar">limpiar</button>` : "tocá un video para elegirlo"}</small></div>
+    <div class="cuenta"><span class="num">${n}</span> seleccionado${n === 1 ? "" : "s"}<small>${n ? `de ${pl(ofs, "oferta")}` : "tocá un video para elegirlo"}</small></div>
+    ${n ? `<button type="button" class="btn chico rk-limpiar" id="rk-limpiar" aria-label="Limpiar la selección">✕ limpiar</button>` : ""}
     <span class="sp"></span>
     <div class="rk-go"><button type="button" class="btn pri" id="rk-empezar" ${ok ? "" : "disabled"} aria-describedby="rk-motivo">Empezar renovaciones</button><small id="rk-motivo" class="${n && !on && RK.fab ? "mal" : ""}">${esc(motivo)}</small></div>`;
   $("#rk-recomendar").onclick = recomendar;

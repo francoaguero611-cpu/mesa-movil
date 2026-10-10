@@ -924,3 +924,34 @@ table.camp tbody tr.fila.sel td { background: var(--marca); }
 .rk-barra .cuenta { white-space: nowrap; }
 .rk-limpiar { font-size: 12.5px; padding: 0 2px; vertical-align: baseline; }
 @media (max-width: 720px) { .rk-estado { flex-direction: column; align-items: stretch; gap: 6px; } .rk-estado .compu { flex: none; } .rk-estado .hora { justify-content: flex-end; } }
+
+/* ===== Filtros nuevos y calendario (10/10) ===== */
+.per-rango { gap: 5px; white-space: nowrap; }
+.per-rango .cal-ico { flex: none; }
+.cal { padding: 12px 12px 8px; border: 2px solid var(--tinta); border-radius: var(--r-card); background: var(--tarjeta); box-shadow: 4px 4px 0 var(--sombra); margin-top: 6px; }
+.cal-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.cal-cab b { font-family: var(--f-titulo); font-size: 19px; text-transform: capitalize; }
+.cal-nav { width: 38px; height: 38px; font-size: 20px; }
+.cal-sem, .cal-grilla { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.cal-sem span { text-align: center; font-size: 12px; font-weight: 700; color: var(--mut); text-transform: uppercase; padding-bottom: 2px; }
+.cal-d { aspect-ratio: 1; min-height: 36px; border: 1.5px solid transparent; border-radius: 8px; background: transparent; color: var(--tinta); font: 600 15px var(--f-texto); cursor: pointer; }
+.cal-d:hover:not(:disabled) { border-color: var(--linea); }
+.cal-d:disabled { color: var(--linea); cursor: default; }
+.cal-d.hoy { border-color: var(--acento); }
+.cal-d.en { background: var(--marca); border-radius: 4px; }
+.cal-d.sel { background: var(--tinta); color: var(--papel); border-color: var(--tinta); box-shadow: 2px 2px 0 var(--sombra); }
+.cal-garabato { display: block; width: 120px; height: 10px; margin: 8px auto 0; color: var(--acento); }
+.cal-atajos { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.cal-ayuda { min-height: 1.3em; margin: 2px 0 4px; }
+/* «✕ limpiar» lejos de «Empezar renovaciones»: arriba a la derecha de la barra */
+.rk-barra { position: fixed; }
+.rk-limpiar { flex: none; background: var(--tarjeta); }
+@media (max-width: 720px) {
+  .rk-barra .rk-limpiar { position: absolute; top: -18px; right: 10px; padding: 4px 10px; font-size: 13px; min-height: 0; box-shadow: 2px 2px 0 var(--sombra); }
+  .periodos { grid-template-columns: repeat(4, 1fr); }
+  .per-rango { padding-inline: 4px; font-size: 14px; }
+}
+@media (max-width: 720px) {
+  .controles .periodos, .rk-per { grid-template-columns: 0.75fr 0.75fr 1.25fr 1.35fr; gap: 6px; }
+  .controles .periodos .btn, .rk-per .btn { font-size: 13.5px; padding-inline: 3px; white-space: nowrap; }
+}
