@@ -83,7 +83,7 @@ async function api(accion, { q = "", body = null, escritura = false } = {}) {
 let demoP = null;
 function cargarDemo() {
   if (window.DemoAPI) return Promise.resolve();
-  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=7"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=8"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
   return demoP;
 }
 
@@ -167,6 +167,9 @@ function pintarMenu() {
     </button>
     <button class="item" role="menuitem" id="mi-reglas"><span>Reglas<br><small>ver y editar las automáticas</small></span><span aria-hidden="true">⚙</span></button>
     <button class="item" role="menuitem" id="mi-log"><span>Registro de acciones<br><small>últimas 50</small></span><span aria-hidden="true">📜</span></button>
+    <button class="item" role="menuitem" id="mi-avisos"><span>Activar avisos<br><small id="mi-avisos-tx">…</small></span><span aria-hidden="true">🔔</span></button>
+    <button class="item" role="menuitem" id="mi-probar"><span>Probar aviso<br><small>${DEMO ? "muestra uno de ejemplo" : "manda uno a tus equipos"}</small></span><span aria-hidden="true">✉</span></button>
+    ${DEMO ? `<button class="item" role="menuitem" id="mi-ejemplos"><span>Avisos de ejemplo<br><small>uno de cada tipo</small></span><span aria-hidden="true">✦</span></button>` : ""}
     <button class="item" role="menuitem" id="mi-sistema"><span>Tema del sistema<br><small>volver a claro/oscuro automático</small></span><span aria-hidden="true">◐</span></button>
     <hr>
     ${DEMO ? `<a class="item" role="menuitem" href="${location.pathname}"><span>Salir del demo</span><span aria-hidden="true">↩</span></a>` : `<button class="item" role="menuitem" id="mi-salir"><span>Salir</span><span aria-hidden="true">↩</span></button>`}`;
@@ -174,6 +177,10 @@ function pintarMenu() {
   $("#mi-log").onclick = () => { cerrarMenu(); verRegistro(); };
   $("#mi-reglas").onclick = () => { cerrarMenu(); verReglas(); };
   $("#mi-sistema").onclick = () => { temaSistema(); cerrarMenu(); };
+  $("#mi-avisos").onclick = () => { cerrarMenu(); activarAvisos(); };
+  $("#mi-probar").onclick = () => { cerrarMenu(); probarAviso(); };
+  if ($("#mi-ejemplos")) $("#mi-ejemplos").onclick = () => { cerrarMenu(); avisosEjemplo(); };
+  pintarEstadoAvisos();
   const s = $("#mi-salir");
   if (s) s.onclick = () => { ls.del("dash_clave"); S.datos = {}; S.det.clear(); S.sel.clear(); cerrarMenu(); pintarBarra(); login(); };
 }
@@ -221,6 +228,7 @@ function login(msg = "") {
       const d = await api("dash", { q: "&periodo=hoy" });
       S.datos.hoy = d; S.periodo = "hoy"; S.idx = 0;
       montar();
+      eventoPendiente();
     } catch (err) {
       if (err.code === 401) { ls.del("dash_clave"); login("Clave incorrecta"); }
       else { login(err.message || "No se pudo conectar"); ls.set("dash_clave", v); }
@@ -1449,6 +1457,301 @@ function armador(base) {
   pintar();
 }
 
+// ---------- avisos push: suscripción ----------
+const esIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const esInstalada = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const pushSoportado = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window && window.isSecureContext;
+async function estadoAvisos() {
+  if (!pushSoportado()) return esIOS() && !esInstalada() ? "instalar" : "no";
+  if (Notification.permission === "denied") return "bloqueados";
+  if (Notification.permission !== "granted") return "apagados";
+  try { const reg = await navigator.serviceWorker.getRegistration(); const sub = reg && await reg.pushManager.getSubscription(); return sub ? "activados" : "apagados"; } catch { return "apagados"; }
+}
+const AVISO_TX = {
+  activados: "✓ activados en este equipo",
+  apagados: "pide permiso y te suscribe",
+  bloqueados: "bloqueados: habilitalos en Ajustes",
+  instalar: "en iPhone: primero agregá la app a inicio",
+  no: "este navegador no los soporta",
+};
+async function pintarEstadoAvisos() {
+  const s = $("#mi-avisos-tx"); if (!s) return;
+  const e = await estadoAvisos();
+  if (!$("#mi-avisos-tx")) return;
+  s.textContent = AVISO_TX[e];
+  const b = $("#mi-avisos"); if (b) b.dataset.estado = e;
+}
+function claveVapid(k) {
+  const b = k.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (k.length % 4)) % 4);
+  return Uint8Array.from(atob(b), (c) => c.charCodeAt(0));
+}
+async function activarAvisos() {
+  if (DEMO) return toast("Demo: los avisos no se activan de verdad. Probá «Avisos de ejemplo».");
+  const e = await estadoAvisos();
+  if (e === "instalar") return toast("En iPhone los avisos solo andan con la app en la pantalla de inicio: en Safari tocá <b>Compartir → Agregar a inicio</b> y abrila desde el ícono (iOS 16.4 o más).", "error", 11000);
+  if (e === "no") return toast("Este navegador no soporta avisos push.", "error");
+  if (e === "bloqueados") return toast("Los avisos están bloqueados para esta app. Habilitalos en los ajustes del navegador / del celular y volvé a tocar.", "error", 9000);
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") { toast("No diste permiso para avisos.", "error"); return pintarEstadoAvisos(); }
+    const reg = await navigator.serviceWorker.ready;
+    const { clave: k } = await api("vapid");
+    if (!k) throw new Error("el servidor no devolvió la clave de avisos");
+    const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: claveVapid(k) }));
+    await api("suscribir", { body: { suscripcion: sub.toJSON(), quien: ls.get("dash_quien", "Lorenzo") } });
+    toast("✓ Avisos activados. Este equipo va a recibir los avisos de las reglas.");
+  } catch (err) {
+    if (err.code === 401) { ls.del("dash_clave"); return login("Clave incorrecta"); }
+    toast(`No se pudieron activar los avisos: ${esc(err.message)}`, "error", 8000);
+  }
+  pintarEstadoAvisos();
+}
+async function probarAviso() {
+  if (DEMO) { await cargarDemo(); return mostrarEvento(window.DemoAPI.ejemplo("surf_sube")); }
+  try {
+    const r = await api("probar", { body: {} });
+    const n = r?.enviados ?? 0;
+    toast(n ? `Aviso de prueba enviado a ${n} equipo${n === 1 ? "" : "s"}.` : "No hay equipos suscriptos todavía: tocá «Activar avisos».", n ? "ok" : "error");
+  } catch (err) {
+    if (err.code === 401) { ls.del("dash_clave"); return login("Clave incorrecta"); }
+    toast(`No se pudo mandar la prueba: ${esc(err.message)}`, "error");
+  }
+}
+async function avisosEjemplo() {
+  await cargarDemo();
+  const tipos = ["apagar", "varios", "campana_apagada", ...Object.keys(EV_TIPOS).filter((t) => t !== "apagar")];
+  const m = abrirModal(`<h3>Avisos de ejemplo</h3><p class="mut">Tocá uno para ver cómo llega: primero el pop-up, después la tabla con lo que tocó la regla.</p>
+    <div class="ev-ejemplos">${tipos.map((t) => `<button type="button" class="btn chico" data-ej="${t}">${({ varios: "apagar · varios", campana_apagada: "apagar · campaña" })[t] || esc(t)}</button>`).join("")}</div>
+    <div class="botones"><button type="button" class="btn pri" data-x>Cerrar</button></div>`);
+  $("[data-x]", m.dlg).onclick = m.cerrar;
+  $$("[data-ej]", m.dlg).forEach((b) => b.onclick = () => { m.cerrar(); mostrarEvento(window.DemoAPI.ejemplo(b.dataset.ej)); });
+}
+
+// ---------- avisos: el pop-up al abrir uno ----------
+// Trazos a mano (viewBox 64): cada string es un path; se dibujan en orden.
+const EV_ICO = {
+  x: ["M33 7 C 48 6, 58 17, 57 32 C 57 47, 46 57, 31 57 C 16 57, 7 46, 7 31 C 8 18, 18 8, 35 8", "M21 20 C 28 28, 36 37, 44 45", "M44 19 C 37 27, 29 36, 20 46"],
+  sube: ["M4 58 C 22 57, 42 58, 60 57", "M7 57 V48 H19 V39 H31 V30 H43 V21 H57 V57", "M9 36 C 19 28, 31 18, 46 8", "M35 8 C 39 8, 43 7, 47 7 C 47 11, 46 15, 46 19"],
+  baja: ["M4 58 C 22 57, 42 58, 60 57", "M7 57 V21 H21 V30 H33 V39 H45 V48 H57 V57", "M24 7 C 34 15, 45 25, 56 33", "M56 21 C 56 25, 57 29, 57 34 C 53 34, 49 35, 45 35"],
+  balanza: ["M32 11 C 32 25, 33 40, 32 53", "M20 56 C 27 54, 37 54, 44 56", "M9 18 C 22 15, 42 15, 55 18", "M12 18 L6 34 M12 18 L18 34", "M3 34 C 7 41, 16 41, 21 34", "M52 18 L46 34 M52 18 L58 34", "M43 34 C 47 41, 56 41, 61 34", "M29 8 C 30 5, 35 5, 35 8 C 35 11, 30 12, 29 8"],
+  vuelve: ["M17 19 C 25 9, 42 8, 51 19 C 59 30, 55 47, 42 54 C 30 60, 15 54, 10 42", "M7 10 C 10 14, 13 17, 17 20 C 20 16, 22 12, 24 8"],
+  latido: ["M32 54 C 18 44, 6 34, 7 22 C 8 12, 20 7, 28 14 C 30 16, 31 18, 32 20 C 34 15, 40 9, 48 10 C 58 12, 60 24, 55 33 C 50 42, 42 48, 32 54", "M3 33 H17 L22 23 L29 43 L35 26 L39 34 H61"],
+  salvavidas: ["M32 7 C 46 7, 57 18, 57 32 C 57 46, 46 57, 32 57 C 18 57, 7 46, 7 32 C 7 18, 18 7, 34 8", "M32 21 C 38 21, 43 26, 43 32 C 43 38, 38 43, 32 43 C 26 43, 21 38, 21 32 C 21 26, 26 21, 33 21", "M24 24 L14 14 M40 24 L50 14", "M40 40 L50 50 M24 40 L14 50"],
+  estrella: ["M32 9 L38 25 C 44 25, 50 24, 55 25 L42 35 L47 52 L32 42 L17 52 L22 35 L9 25 C 14 24, 20 25, 26 25 Z", "M54 4 V14 M49 9 H59", "M9 46 V56 M4 51 H14"],
+  trofeo: ["M18 9 C 27 8, 37 8, 46 9 C 47 26, 42 36, 32 38 C 22 36, 17 26, 18 9", "M18 14 C 8 13, 7 26, 20 28", "M46 14 C 56 13, 57 26, 44 28", "M32 38 V47", "M22 47 C 29 46, 35 46, 42 47 L45 56 C 36 55, 28 55, 19 56 Z", "M25 20 L30 26 L40 15"],
+  copa: ["M18 9 C 27 8, 37 8, 46 9 C 47 26, 42 36, 32 38 C 22 36, 17 26, 18 9", "M18 14 C 8 13, 7 26, 20 28", "M46 14 C 56 13, 57 26, 44 28", "M32 38 V47", "M22 47 C 29 46, 35 46, 42 47 L45 56 C 36 55, 28 55, 19 56 Z", "M32 15 L34 21 L40 21 L35 25 L37 31 L32 27 L27 31 L29 25 L24 21 L30 21 Z", "M56 4 V12 M52 8 H60", "M7 4 V10 M4 7 H10"],
+  cohete: ["M32 5 C 43 13, 45 28, 40 43 C 35 42, 29 42, 24 43 C 19 28, 21 13, 32 5", "M28 21 C 28 17, 36 17, 36 21 C 36 25, 28 26, 28 21", "M24 33 L15 45 L24 44 M40 33 L49 45 L40 44", "M28 47 C 28 52, 30 56, 32 61 C 34 56, 36 52, 36 47"],
+  etiqueta: ["M34 7 C 41 7, 48 7, 55 8 C 56 15, 56 23, 56 30 L31 56 L8 33 Z", "M43 18 C 43 15, 48 15, 48 18 C 48 21, 43 22, 43 18", "M22 33 L32 43"],
+  triangulo: ["M32 6 C 41 22, 50 38, 59 54 C 41 55, 23 55, 5 54 C 14 38, 23 22, 33 7", "M32 23 C 32 28, 32 33, 32 38", "M32 46 L32 47.5"],
+  reloj: ["M32 6 C 47 6, 58 17, 58 32 C 58 47, 47 58, 32 58 C 17 58, 6 47, 6 32 C 6 17, 17 6, 34 7", "M32 15 C 32 21, 32 27, 32 32 L43 39", "M32 9 V11 M55 32 H53 M32 55 V53 M9 32 H11"],
+  grafico: ["M6 57 C 24 56, 42 57, 60 56", "M14 54 V40 M26 54 V30 M38 54 V36 M50 54 V20", "M10 32 L25 19 L37 25 L54 8", "M45 8 L55 7 L54 17"],
+  tilde: ["M32 7 C 47 7, 57 18, 57 32 C 57 46, 46 57, 32 57 C 18 57, 7 46, 7 32 C 7 18, 18 7, 34 8", "M18 33 C 22 37, 25 40, 28 44 C 34 35, 41 26, 48 19"],
+  campana: ["M19 44 C 20 32, 17 15, 32 14 C 47 15, 44 32, 45 44", "M13 45 C 25 44, 39 44, 51 45", "M27 51 C 28 56, 36 56, 37 51", "M32 8 V13"],
+};
+// tipo -> [ícono, color, rótulo]
+const EV_TIPOS = {
+  apagar: ["x", "peligro", "Cortes"],
+  surf_sube: ["sube", "ok", "Surfeo"],
+  surf_baja: ["baja", "naranja", "Surfeo"],
+  base: ["balanza", "acento", "Base de madres"],
+  reset: ["vuelve", "acento", "Reset a la base"],
+  revivir: ["latido", "ok", "Revivir"],
+  rescate: ["salvavidas", "ok", "Rescate"],
+  venta: ["estrella", "ok", "Primera venta"],
+  validacion: ["trofeo", "ok", "Validación"],
+  winner: ["copa", "ok", "Winner"],
+  escala: ["cohete", "ok", "Escala"],
+  categoria: ["etiqueta", "acento", "Categoría de testeo"],
+  alerta: ["triangulo", "peligro", "Alerta"],
+  cola: ["reloj", "naranja", "Cola"],
+  reporte: ["grafico", "acento", "Reporte"],
+  prueba: ["tilde", "ok", "Prueba"],
+};
+function icoEvento(nombre) {
+  const ps = EV_ICO[nombre] || EV_ICO.campana;
+  return `<svg class="ev-svg" viewBox="0 0 64 64" aria-hidden="true" focusable="false">${ps.map((d, i) => `<path d="${d}" pathLength="1" style="--i:${i}"/>`).join("")}</svg>`;
+}
+const ART = { campana: "la campaña", conjunto: "el conjunto", anuncio: "el anuncio" };
+const NIV_DE = { campana: "de la campaña", conjunto: "del conjunto", anuncio: "del anuncio" };
+const numOk = (n) => typeof n === "number" && isFinite(n);
+function cambioTx(it, sube) {
+  if (!it || !numOk(it.antes) || !numOk(it.despues) || !it.antes) return "";
+  const f = it.despues / it.antes;
+  if (sube && Math.abs(f - Math.round(f)) < 0.04 && Math.round(f) >= 2) return `×${Math.round(f)}`;
+  const p = Math.round((f - 1) * 100);
+  return p ? `${p > 0 ? "+" : "−"}${Math.abs(p)} %` : "";
+}
+function cuantas(its) {
+  const nivs = new Set(its.map((i) => i.n));
+  return nivs.size === 1 && NIVEL[its[0].n] ? plural(its.length, its[0].n) : `${its.length} cosas`;
+}
+function tituloEvento(ev) {
+  const its = ev.items, n = its.length, i0 = its[0] || {}, art = ART[i0.n] || "eso";
+  const varios = n > 1 ? cuantas(its) : null;
+  switch (ev.t) {
+    case "apagar": return n ? `Apagué ${varios || art}` : "Apagué cosas";
+    case "revivir": return n ? `Reviví ${varios || art}` : "Reviví cosas";
+    case "rescate": {
+      const salva = its.find((i) => i.n === "campana") || its.find((i) => i.n === "conjunto");
+      const malos = its.filter((i) => i.n === "anuncio").length;
+      return salva ? `Salvé ${ART[salva.n]}${malos ? ` y apagué ${plural(malos, "anuncio")}` : ""}` : `Apagué ${malos ? plural(malos, "anuncio") : "los malos"} y la campaña sigue`;
+    }
+    case "surf_sube": { const c = cambioTx(i0, true); return n > 1 ? `Surfeé ${varios}${c ? " " + c : ""}` : `Surfeé ${art}${c ? " " + c : ""}`; }
+    case "surf_baja": { const c = cambioTx(i0, false) || "−30 %"; return n > 1 ? `Bajé el presupuesto de ${varios} ${c}` : `Bajé el presupuesto ${NIV_DE[i0.n] || ""} ${c}`.replace(/\s+/g, " "); }
+    case "base": {
+      const c = cambioTx(i0, false);
+      const v = c.startsWith("+") ? "Subí" : c.startsWith("−") ? "Bajé" : "Cambié";
+      return n > 1 ? `${v} la base de ${varios}${c ? " " + c : ""}` : `${v} la base ${NIV_DE[i0.n] || ""}${c ? " " + c : ""}`.replace(/\s+/g, " ");
+    }
+    case "reset": return n > 1 ? `Volví ${varios} a su base` : `Volví ${art} a su base`;
+    case "venta": return "¡Primera venta!";
+    case "validacion": return n > 1 ? `Validé ${varios}` : "Testeo validado";
+    case "winner": return n > 1 ? `${varios} winners` : "¡Hay winner!";
+    case "escala": return n ? `${cuantas(its)} ${n === 1 ? "listo" : "listos"} para escalar` : "Hay para escalar";
+    case "categoria": return "Nueva categoría de testeo";
+    case "alerta": return "Ojo con esto";
+    case "cola": return "Quedó en cola / se aplicó tarde";
+    case "reporte": return "Reporte";
+    case "prueba": return "Aviso de prueba";
+    default: return "Aviso";
+  }
+}
+function itemEventoHTML(it) {
+  const nv = NIVEL[it.n] ? it.n : null;
+  const datos = [];
+  if (numOk(it.antes) || numOk(it.despues)) datos.push(`<span class="ev-presu num">${numOk(it.antes) ? usd(it.antes) : "—"} <span class="ev-flecha" aria-label="pasó a">→</span> <b>${numOk(it.despues) ? usd(it.despues) : "—"}</b></span>`);
+  if (numOk(it.roas)) datos.push(`<span class="ev-dato">ROAS ${chipRoas(it.roas)}</span>`);
+  if (numOk(it.ventas)) datos.push(`<span class="ev-dato num">${ent(it.ventas)} venta${it.ventas === 1 ? "" : "s"}</span>`);
+  if (numOk(it.gasto)) datos.push(`<span class="ev-dato num">gastó ${usd(it.gasto)}</span>`);
+  return `<li>
+    <div class="ev-it-cab">${nv ? `<span class="niv-tag niv-${nv}">${NIVEL[nv][0]}</span>` : ""}<span class="ev-it-nom">${esc(it.nom || it.id || "—")}</span></div>
+    ${it.cn && it.n !== "campana" ? `<div class="ev-it-cn">en <b>${esc(it.cn)}</b></div>` : ""}
+    ${datos.length ? `<div class="ev-it-datos">${datos.join("")}</div>` : ""}
+    ${it.r ? `<div class="ev-it-r">${esc(it.r)}</div>` : ""}
+  </li>`;
+}
+function normalizarEvento(ev) {
+  if (!ev || typeof ev !== "object") return null;
+  const items = (Array.isArray(ev.items) ? ev.items : []).filter((i) => i && typeof i === "object" && i.id).map((i) => ({ ...i, id: String(i.id), c: i.c != null ? String(i.c) : undefined, s: i.s != null ? String(i.s) : undefined }));
+  return { ...ev, t: String(ev.t || ""), r: ev.r ? String(ev.r) : "", items };
+}
+let eventoAbierto = false;
+function mostrarEvento(evRaw) {
+  const ev = normalizarEvento(evRaw);
+  if (!ev) return;
+  const [ico, color, rotulo] = EV_TIPOS[ev.t] || ["campana", "acento", "Aviso"];
+  const navegables = ev.items.filter((i) => NIVEL[i.n] && (i.n === "campana" || i.c || i.s));
+  // en segundo plano, mientras se lee el pop-up: traer «hoy» y abrir lo necesario
+  const prep = navegables.length ? prepararEvento(ev, navegables) : null;
+  const html = `<div class="ev ev-${color}">
+      <div class="ev-ico boceto">${icoEvento(ico)}</div>
+      <div class="ev-rotulo">${esc(rotulo)}</div>
+      <h3 class="ev-titulo">${esc(tituloEvento(ev))}</h3>
+      <svg class="ev-garabato" viewBox="0 0 160 12" aria-hidden="true"><path d="M2 8 C 30 3, 52 11, 80 6 S 130 3, 158 7" pathLength="1"/></svg>
+      ${ev.r ? `<div class="ev-por"><span class="ev-por-lbl">por qué</span><p>${esc(ev.r)}</p></div>` : ""}
+      ${ev.items.length ? `<ul class="ev-items">${ev.items.map(itemEventoHTML).join("")}</ul>` : ""}
+    </div>
+    <div class="botones"><button type="button" class="btn pri" data-ver data-foco>${navegables.length ? "Ver en la tabla" : "Listo"}</button></div>`;
+  eventoAbierto = true;
+  const m = abrirModal(html, { alCerrar: () => { eventoAbierto = false; if (prep) mostrarEnTabla(prep); else irAlDash(); } });
+  m.dlg.classList.add("dialogo-ev");
+  m.dlg.setAttribute("aria-labelledby", "ev-t"); $(".ev-titulo", m.dlg).id = "ev-t";
+  const x = document.createElement("button");
+  x.type = "button"; x.className = "ev-cerrar"; x.setAttribute("aria-label", "Cerrar y ver en la tabla"); x.textContent = "✕";
+  x.onclick = m.cerrar; m.dlg.prepend(x);
+  $("[data-ver]", m.dlg).onclick = m.cerrar;
+}
+function reglasSucias() { return S.vista === "reglas" && (RG.datos?.reglas || []).some(esSucia); }
+function irAlDash() {
+  if (S.vista === "dash" && $("#carr")) return true;
+  if (reglasSucias()) { toast("Tenés cambios sin guardar en Reglas: guardalos o descartalos y después mirá la tabla.", "error", 8000); return false; }
+  RG.draft.clear(); RG.campoMal.clear(); S.vista = "dash";
+  try { history.replaceState(null, "", location.pathname + location.search); } catch {}
+  montar(); window.scrollTo(0, 0);
+  return true;
+}
+async function esperarDetalle(c) {
+  cargarDetalle(c);
+  const k = `${S.periodo}|${c.id}`;
+  for (let i = 0; i < 200 && S.det.get(k)?.st === "cargando"; i++) await new Promise((ok) => setTimeout(ok, 120));
+  return S.det.get(k);
+}
+async function prepararEvento(ev, its) {
+  if (!irAlDash()) return { fallo: true };
+  if (S.periodo !== "hoy") { S.periodo = "hoy"; S.sel.clear(); ajustarIdx(); pintarTodo(); }
+  await cargar();   // siempre fresco: el aviso es más nuevo que lo que hubiera en pantalla
+  if (!S.datos.hoy) return { fallo: true, msg: "No pude traer los datos de hoy." };
+  // campañas
+  const cid = (i) => i.n === "campana" ? i.id : i.c;
+  const camps = new Map();
+  for (const i of its) { const c = cid(i) && campanaPorId(cid(i)); if (c) camps.set(c.id, c); }
+  // el grupo que las contiene (si son de grupos distintos, «Todas»)
+  const gs = new Set([...camps.values()].map((c) => c.grupo));
+  S.grupoClave = gs.size === 1 ? [...gs][0] : "todas";
+  ajustarIdx();
+  if ([...camps.values()].some((c) => !prendido(c.estado)) && !S.verApagadas) {
+    S.verApagadas = true;
+    const t = $("#t-apagadas"); if (t) t.setAttribute("aria-checked", "true");
+  }
+  for (const c of camps.values()) { S.open.add("c:" + c.id); S.det.delete(`hoy|${c.id}`); }
+  pintarTodo();
+  await Promise.all([...camps.values()].map(esperarDetalle));
+  // conjuntos y anuncios
+  S.sel.clear();
+  const faltan = [], claves = [];
+  for (const i of its) {
+    const c = camps.get(cid(i));
+    if (!c) { faltan.push(i); continue; }
+    if (i.n === "campana") { claves.push("campana:" + c.id); continue; }
+    const cjs = S.det.get(`hoy|${c.id}`)?.data?.conjuntos || [];
+    let sid = i.n === "conjunto" ? i.id : i.s;
+    if (i.n === "anuncio" && !cjs.some((s) => s.id === sid)) sid = (cjs.find((s) => (s.anuncios || []).some((a) => a.id === i.id)) || {}).id;
+    if (!sid || !cjs.some((s) => s.id === sid)) { faltan.push(i); continue; }
+    S.open.add("s:" + sid);
+    claves.push(i.n === "conjunto" ? "conjunto:" + sid : "anuncio:" + i.id);
+  }
+  for (const k of claves) { const it = buscarItem(k); if (it) S.sel.set(k, { id: it.id, act: it.act, nivel: it.nivel, nombre: it.nombre, estado: it.estado }); else faltan.push({ nom: k }); }
+  if (!eventoAbierto) pintarTodo(); else { pintarCarrusel(); pintarTabla(); }
+  return { claves: claves.filter((k) => S.sel.has(k)), faltan };
+}
+async function mostrarEnTabla(prep) {
+  const r = await prep;
+  if (!r || r.fallo) { if (r?.msg) toast(r.msg, "error"); return; }
+  if (S.vista !== "dash") return;
+  pintarTodo();
+  if (r.faltan.length) {
+    const ns = r.faltan.map((i) => `<b>${esc(i.nom || i.id)}</b>`).join(", ");
+    toast(`No encontré ${ns} en la tabla de hoy. Puede ser de otra cuenta, estar borrado o no tener datos hoy.`, "error", 9000);
+  }
+  const trs = r.claves.map((k) => $(`tr.fila[data-k="${CSS.escape(k)}"]`)).filter(Boolean);
+  if (!trs.length) return;
+  trs[0].scrollIntoView({ behavior: reducido() ? "auto" : "smooth", block: "center", inline: "nearest" });
+  const sc = $("#tabla-scroll"); if (sc) sc.scrollLeft = 0;
+  trs.forEach((tr) => { tr.classList.remove("destello"); void tr.offsetWidth; tr.classList.add("destello"); });
+  setTimeout(() => trs.forEach((tr) => tr.classList.remove("destello")), 2600);
+  trs[0].focus({ preventScroll: true });
+}
+// #ev=<json> en la dirección (lo arma el service worker al tocar el aviso)
+function leerHashEv() {
+  const h = location.hash || "";
+  if (!h.startsWith("#ev=")) return null;
+  try { history.replaceState(null, "", location.pathname + location.search); } catch {}
+  const crudo = decodeURIComponent(h.slice(4));
+  if (DEMO && /^demo:/.test(crudo)) return { demo: crudo.slice(5) };
+  try { return JSON.parse(crudo); } catch { toast("El aviso llegó roto: no lo pude leer.", "error"); return null; }
+}
+async function recibirEvento(ev) {
+  if (!ev) return;
+  if (ev.demo) { await cargarDemo(); ev = window.DemoAPI.ejemplo(ev.demo); }
+  if (!DEMO && !clave()) { ls.set("dash_ev_pend", JSON.stringify(ev)); return; }
+  mostrarEvento(ev);
+}
+function eventoPendiente() {
+  const p = ls.get("dash_ev_pend"); if (!p) return;
+  ls.del("dash_ev_pend");
+  try { mostrarEvento(JSON.parse(p)); } catch {}
+}
+
 // ---------- arranque ----------
 function iniciar() {
   pintarTema();
@@ -1457,11 +1760,26 @@ function iniciar() {
   matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", pintarTema);
   $("#b-menu").onclick = (e) => { e.stopPropagation(); $("#menu").hidden ? abrirMenu() : cerrarMenu(); };
   document.addEventListener("click", (e) => { if (!$("#menu").hidden && !e.target.closest(".menu-wrap")) cerrarMenu(); });
-  if ("serviceWorker" in navigator && window.isSecureContext) navigator.serviceWorker.register("sw.js").catch(() => {});
+  if ("serviceWorker" in navigator && window.isSecureContext) {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+    // aviso tocado con la app ya abierta: el service worker manda el evento acá
+    navigator.serviceWorker.addEventListener("message", (e) => {
+      if (e.data?.tipo !== "ev") return;
+      try { e.ports?.[0]?.postMessage("ok"); } catch {}
+      recibirEvento(e.data.ev);
+    });
+    try { navigator.serviceWorker.startMessages(); } catch {}
+  }
+  window.addEventListener("hashchange", () => { const ev = leerHashEv(); if (ev) recibirEvento(ev); });
   document.addEventListener("visibilitychange", () => {
     const d = S.datos[S.periodo];
     if (!document.hidden && d && $("#carr") && Date.now() - new Date(d.generado || 0) > 5 * 60000) cargar();
   });
-  if (DEMO || clave()) { if (location.hash === "#reglas") verReglas(); else montar(); } else login();
+  const ev = leerHashEv();
+  if (ev && !DEMO && !clave()) ls.set("dash_ev_pend", JSON.stringify(ev));
+  if (DEMO || clave()) {
+    if (location.hash === "#reglas") verReglas(); else montar();
+    if (ev) recibirEvento(ev); else eventoPendiente();
+  } else login();
 }
 iniciar();

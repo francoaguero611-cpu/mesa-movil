@@ -353,5 +353,69 @@
     if (accion === "dash_log") return { log: LOG.slice(0, 50) };
     throw new Error("Acción desconocida en demo: " + accion);
   }
-  window.DemoAPI = { handle };
+
+  // ---------- avisos de ejemplo (mismo contrato que mandan las funciones del servidor) ----------
+  const CC = (gi, ci) => ESTR.filter((c) => c.grupo === G[gi][0])[ci];
+  const sinAct = (c) => c.act.replace(/^act_/, "");
+  const mAd = (c, a) => { const m = metricasAd(c, a, "hoy"); return { roas: m.roas, ventas: m.ventas, gasto: m.gasto }; };
+  const mS = (c, s) => { const m = suma(s.anuncios.map((a) => metricasAd(c, a, "hoy"))); return { roas: m.roas, ventas: m.ventas, gasto: m.gasto }; };
+  const mC = (c) => { const m = suma(c.conjuntos.flatMap((s) => s.anuncios.map((a) => metricasAd(c, a, "hoy")))); return { roas: m.roas, ventas: m.ventas, gasto: m.gasto }; };
+  const itC = (c, x = {}) => ({ n: "campana", id: c.id, c: c.id, a: sinAct(c), nom: c.nombre, ...mC(c), ...x });
+  const itS = (c, s, x = {}) => ({ n: "conjunto", id: s.id, c: c.id, a: sinAct(c), nom: s.nombre, cn: c.nombre, ...mS(c, s), ...x });
+  const itA = (c, s, a, x = {}, conS = true) => ({ n: "anuncio", id: a.id, c: c.id, ...(conS ? { s: s.id } : {}), a: sinAct(c), nom: a.nombre, cn: c.nombre, ...mAd(c, a), ...x });
+  function ejemplo(t) {
+    const ev = (tt, r, items) => ({ t: tt, r, items, v: 1 });
+    if (t === "apagar") {
+      const c = CC(2, 2), s = c.conjuntos[1]; ESTADOS.set(s.id, "PAUSED");
+      return ev("apagar", "Gastó más de ¾ del ticket sin ventas reales en la ventana de la regla y el conjunto viene con ROAS < 1,3.", [itS(c, s, { r: "¾ ticket sin ventas (US$ 18,74)" })]);
+    }
+    if (t === "varios") {
+      const a1 = CC(2, 1), a2 = CC(4, 0), a3 = CC(0, 2);
+      const xs = [[a1, a1.conjuntos[0], a1.conjuntos[0].anuncios[0], true], [a2, a2.conjuntos[0], a2.conjuntos[0].anuncios[1], false], [a3, a3.conjuntos[0], a3.conjuntos[0].anuncios[0], true]];
+      xs.forEach(([, , a]) => ESTADOS.set(a.id, "PAUSED"));
+      return ev("apagar", "Corte de las 14:00: anuncios con 6 USD gastados y ningún pago iniciado.", xs.map(([c, s, a, conS], i) => itA(c, s, a, { r: "6 USD sin pagos iniciados", roas: 0, ventas: 0, gasto: [6.12, 6.4, 6.05][i] }, conS)));
+    }
+    if (t === "campana_apagada") {
+      const c = CC(4, 1); ESTADOS.set(c.id, "PAUSED");
+      return ev("apagar", "D3: viene con ROAS < 1,3 ayer y hoy, y no tiene anuncios para rescatar.", [itC(c)]);
+    }
+    if (t === "surf_sube") {
+      const c = CC(0, 0); const antes = c.presupuesto; c.presupuesto = r2(antes * 2);
+      return ev("surf_sube", "ROAS real por encima de 2,5 en la última lectura: duplico el presupuesto.", [itC(c, { antes, despues: c.presupuesto, roas: 3.12 })]);
+    }
+    if (t === "surf_baja") {
+      const c = CC(0, 1), s = c.conjuntos[1]; const antes = s.presupuesto; s.presupuesto = r2(antes * 0.7);
+      return ev("surf_baja", "ROAS real ≤ 1,5 en la lectura de las 16:00: bajo el presupuesto 30 %.", [itS(c, s, { antes, despues: s.presupuesto, roas: 1.31 })]);
+    }
+    if (t === "base") {
+      const c = CC(3, 1); const antes = c.presupuesto; c.presupuesto = r2(antes * 1.3);
+      return ev("base", "Cierre del día de la madre: ROAS ≥ 1,5 con más del 30 % de la base gastado. Mañana arranca con +30 %.", [itC(c, { antes, despues: c.presupuesto })]);
+    }
+    if (t === "reset") {
+      const c = CC(4, 0);
+      return ev("reset", "Reset de las 23:50: lo surfeado hoy vuelve a su presupuesto base para mañana.", [itC(c, { antes: 39.72, despues: c.presupuesto })]);
+    }
+    if (t === "revivir") {
+      const c = CC(0, 0); let s = c.conjuntos[0], a = s.anuncios[0];
+      for (const ss of c.conjuntos) for (const aa of ss.anuncios) if (ESTADOS.get(aa.id) === "PAUSED") { s = ss; a = aa; }
+      ESTADOS.set(a.id, "ACTIVE");
+      return ev("revivir", "Estaba apagado pero vendió hoy con ROAS ≥ 1,5: lo vuelvo a prender.", [itA(c, s, a)]);
+    }
+    if (t === "rescate") {
+      const c = CC(1, 1), x1 = c.conjuntos[0].anuncios[1], x2 = c.conjuntos[1].anuncios[0];
+      ESTADOS.set(x1.id, "PAUSED"); ESTADOS.set(x2.id, "PAUSED");
+      return ev("rescate", "La campaña venía para cortarse, pero tiene anuncios con venta y ROAS ≥ 1,5: la salvo y apago solo los malos.", [itC(c, { r: "queda con sus anuncios buenos" }), itA(c, c.conjuntos[0], x1, { r: "sin ventas, ¾ ticket gastado", roas: 0, ventas: 0, gasto: 7.6 }), itA(c, c.conjuntos[1], x2, { r: "ROAS 0,6 con 1 venta", roas: 0.6, ventas: 1, gasto: 16.4 })]);
+    }
+    if (t === "venta") { const c = CC(5, 0), s = c.conjuntos[0], a = s.anuncios[0]; return ev("venta", "Primera venta real del testeo de Moldes Italia.", [itA(c, s, a, { ventas: 1 })]); }
+    if (t === "validacion") { const c = CC(5, 0); return ev("validacion", "ROAS 2,4 con 6 ventas: pasa el criterio de validación (≥ 2 sin postventa).", [itC(c)]); }
+    if (t === "winner") { const c = CC(0, 0), s = c.conjuntos[0], a = s.anuncios[0]; return ev("winner", "Más de 4 ventas y ROAS mayor a 2.", [itA(c, s, a, { roas: 3.4, ventas: 7 })]); }
+    if (t === "escala") { const c = CC(0, 0), d = CC(3, 1); return ev("escala", "ROAS > 2 en los últimos 4 días y todavía no están en ninguna estructura de escala.", [itA(c, c.conjuntos[0], c.conjuntos[0].anuncios[0]), itA(c, c.conjuntos[1], c.conjuntos[1].anuncios[0]), itA(d, d.conjuntos[0], d.conjuntos[0].anuncios[0])]); }
+    if (t === "categoria") { const c = CC(2, 0); return ev("categoria", "Con 4 días de datos, el testeo queda como rentable.", [itC(c, { r: "categoría: rentable" })]); }
+    if (t === "alerta") return ev("alerta", "Meta frenó las consultas de TESTEOS (límite de llamadas). Los cortes de las 15:00 quedan en cola y se reintentan cada 5 minutos.", []);
+    if (t === "cola") { const c = CC(0, 1), s = c.conjuntos[0]; return ev("cola", "Se aplicó a las 15:20, tarde: Meta estaba sin cupo a las 15:00.", [itS(c, s, { r: "apagado con 20 min de demora" })]); }
+    if (t === "reporte") return ev("reporte", "Hoy hasta las 22:00: US$ 1.240 facturados, ROAS 1,92, 3 testeos rentables y 2 para cortar.", []);
+    if (t === "prueba") return ev("prueba", "Si ves esto, los avisos llegan bien a este equipo.", []);
+    return ev(t, "Evento de un tipo que la app no conoce: se muestra genérico.", []);
+  }
+  window.DemoAPI = { handle, ejemplo };
 })();

@@ -1,6 +1,6 @@
 /* Service worker — Dashboard Lorenzo */
-const VERSION = "dash-v7";
-const SHELL = ["./", "index.html", "styles.css?v=7", "app.js?v=7", "demo.js?v=7", "manifest.webmanifest",
+const VERSION = "dash-v8";
+const SHELL = ["./", "index.html", "styles.css?v=8", "app.js?v=8", "demo.js?v=8", "manifest.webmanifest",
   "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png", "icons/apple-touch-icon.png"];
 const API_HOST = "tppcpnfzcxxusdhrlmdx.supabase.co";
 const API_CACHE = "dash-api";
@@ -61,4 +61,40 @@ self.addEventListener("fetch", (e) => {
     if (r.ok) { const c = r.clone(); caches.open(VERSION).then((x) => x.put(req, c)); }
     return r;
   })));
+});
+
+// ---------- avisos push ----------
+// payload: {title, body, tag, url, ev}. ev = qué hizo la regla (ver app.js, mostrarEvento).
+self.addEventListener("push", (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = { title: "Dashboard", body: e.data ? e.data.text() : "" }; }
+  e.waitUntil(self.registration.showNotification(d.title || "Dashboard", {
+    body: d.body || "", tag: d.tag || undefined, icon: "icons/icon-192.png", badge: "icons/icon-192.png",
+    data: { url: d.url || "./", ev: d.ev || null },
+  }));
+});
+
+// Al tocar el aviso: si la app está abierta, le paso el evento por mensaje; si no contesta, la navego; si no hay, la abro.
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const d = e.notification.data || {};
+  const destino = new URL(d.url || "./", self.registration.scope);
+  destino.hash = d.ev ? "ev=" + encodeURIComponent(JSON.stringify(d.ev)) : "";
+  const url = destino.href;
+  const avisar = (c) => new Promise((ok) => {
+    const ch = new MessageChannel();
+    const t = setTimeout(() => ok(false), 1500);
+    ch.port1.onmessage = () => { clearTimeout(t); ok(true); };
+    try { c.postMessage({ tipo: "ev", ev: d.ev }, [ch.port2]); } catch { clearTimeout(t); ok(false); }
+  });
+  e.waitUntil((async () => {
+    const cs = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    const c = cs.find((x) => x.url.startsWith(self.registration.scope)) || null;
+    if (c) {
+      try { await c.focus(); } catch {}
+      if (!d.ev || await avisar(c)) return;
+      try { const n = await c.navigate(url); if (n) return; } catch {}
+    }
+    return self.clients.openWindow(url);
+  })());
 });
