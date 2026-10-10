@@ -134,7 +134,7 @@ async function api(accion, { q = "", body = null, escritura = false } = {}) {
 let demoP = null;
 function cargarDemo() {
   if (window.DemoAPI) return Promise.resolve();
-  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=18"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=19"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
   return demoP;
 }
 
@@ -2330,11 +2330,11 @@ function quizRenos() {
       }
       if (ped && ped.estado === "error") {
         const ult = (ped.progreso || []).slice(-1)[0];
-        const det = String(ult?.texto || ped.error || "").replace(/^No arranqué: te faltan créditos para hacer todas las renovaciones\.\s*/, "");
-        const falta = /falta/i.test(ped.error || "") || /créditos/i.test(ult?.texto || "");
+        const det = String(ult?.texto || ped.error || "").replace(/^No arranqué: te faltan créditos para hacer todas las renovaciones\.\s*/, "").replace(/^Pedido rechazado por la compu:\s*/, "Motivo: ");
+        const falta = (ped.error || "") === "falta saldo"; // solo el chequeo de créditos usa este código; lo demás muestra su motivo real
         m.set(`<div class="rk-ok">${icoEvento("x")}<h3>${falta ? "Te faltan créditos para hacer todas las renovaciones" : "La compu no pudo arrancar"}</h3>
           <ul class="rk-nr-lista">${det.split(/;\s*/).filter(Boolean).map((t) => `<li><span class="rk-nr-ico ev-ico-chico peligro">${icoEvento("x")}</span><div><span>${esc(t)}</span></div></li>`).join("")}</ul>
-          <p class="mut">${falta ? "No arranqué nada. Cargá crédito y volvé a tocar «Empezar renovaciones»." : "Mirá el pedido para ver qué pasó."}</p></div>
+          <p class="mut">${falta ? "No arranqué nada. Cargá crédito y volvé a tocar «Empezar renovaciones»." : "No arranqué nada. No es un problema de créditos: corregí eso y volvé a tocar «Empezar renovaciones»."}</p></div>
           <div class="botones"><button type="button" class="btn pri" data-x data-foco>Entendido</button></div>`);
         $("[data-x]", m.dlg).onclick = m.cerrar; cargarFabrica(); return;
       }
