@@ -134,7 +134,7 @@ async function api(accion, { q = "", body = null, escritura = false } = {}) {
 let demoP = null;
 function cargarDemo() {
   if (window.DemoAPI) return Promise.resolve();
-  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=22"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=23"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
   return demoP;
 }
 
@@ -593,6 +593,37 @@ function subConjunto(s) {
   if (s.estrategia) p.push(estrat(s.estrategia));
   return p.join(" · ");
 }
+// (10/10, Lorenzo) Encabezado de columnas pegado arriba al bajar por las campañas (y vuelve a su lugar al subir).
+// Es una copia del <thead> en un div fijo: mismos anchos que la tabla real y se mueve con su scroll horizontal.
+function armarCabFlotante() {
+  const sc = $("#tabla-scroll"), tb = $("table.camp", sc || document);
+  let f = $("#cab-flotante");
+  if (!sc || !tb) { if (f) f.hidden = true; return; }
+  if (!f) { f = document.createElement("div"); f.id = "cab-flotante"; f.className = "cab-flotante"; f.setAttribute("aria-hidden", "true"); document.body.appendChild(f); }
+  const th = $$("thead th", tb);
+  f.innerHTML = `<table class="camp"><thead><tr>${th.map((x) => `<th class="${x.className}">${x.innerHTML}</th>`).join("")}</tr></thead></table>`;
+  if (!sc.dataset.cabFlot) {
+    sc.dataset.cabFlot = "1";
+    sc.addEventListener("scroll", ubicarCabFlotante, { passive: true });
+  }
+  ubicarCabFlotante();
+}
+function ubicarCabFlotante() {
+  const f = $("#cab-flotante"), sc = $("#tabla-scroll"), tb = sc && $("table.camp", sc);
+  if (!f || !tb || S.vista !== "dash") { if (f) f.hidden = true; return; }
+  const th = $$("thead th", tb), tr = $("thead", tb).getBoundingClientRect(), r = sc.getBoundingClientRect();
+  const top = parseFloat(getComputedStyle(document.documentElement).paddingTop) || 0; // zona segura del iPhone
+  const visible = tr.top < top && tb.getBoundingClientRect().bottom > top + tr.height + 40;
+  f.hidden = !visible; if (!visible) return;
+  f.style.top = top + "px"; f.style.left = r.left + "px"; f.style.width = sc.clientWidth + "px";
+  const ft = $("table", f), fth = $$("th", f);
+  ft.style.width = tb.getBoundingClientRect().width + "px";
+  th.forEach((x, i) => { if (fth[i]) { const w = x.getBoundingClientRect().width + "px"; fth[i].style.width = w; fth[i].style.minWidth = w; fth[i].style.maxWidth = w; } });
+  ft.style.transform = `translateX(${-sc.scrollLeft}px)`;
+  if (fth[0]) fth[0].style.transform = `translateX(${sc.scrollLeft}px)`; // la columna «Campaña» queda fija a la izquierda
+}
+window.addEventListener("scroll", () => ubicarCabFlotante(), { passive: true });
+window.addEventListener("resize", () => ubicarCabFlotante());
 function pintarTabla() {
   const cont = $("#tabla-scroll"); if (!cont) return;
   const d = S.datos[S.periodo];
@@ -625,6 +656,7 @@ function pintarTabla() {
     }
   }
   cont.innerHTML = h + `</tbody></table>`;
+  armarCabFlotante();
 }
 function buscarItem(k) {
   const [nivel, id] = [k.slice(0, k.indexOf(":")), k.slice(k.indexOf(":") + 1)];

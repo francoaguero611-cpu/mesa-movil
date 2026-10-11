@@ -1003,3 +1003,9 @@ table.camp tbody tr.fila.sel td { background: var(--marca); }
 .sub-ir { display: inline-flex; align-items: center; gap: 2px; padding: 2px 7px; border: 2px solid var(--ok); border-radius: 8px; color: var(--ok); font-weight: 700; text-decoration: none; background: color-mix(in srgb, var(--ok) 10%, var(--tarjeta)); }
 .sub-todos { margin-top: 8px; display: inline-flex; gap: 6px; align-items: center; }
 .sub-todos, .sub-todos:hover { text-decoration: none; }
+
+/* Encabezado de columnas flotante (10/10) */
+.cab-flotante { position: fixed; z-index: 30; overflow: hidden; background: var(--tarjeta); border-bottom: 2px solid var(--tinta); box-shadow: 0 6px 10px -8px color-mix(in srgb, var(--tinta) 45%, transparent); pointer-events: none; }
+.cab-flotante table.camp { border-collapse: collapse; table-layout: fixed; }
+.cab-flotante th { background: var(--tarjeta); border-bottom: 0; position: relative; }
+.cab-flotante th.nom { z-index: 2; box-shadow: 6px 0 6px -6px color-mix(in srgb, var(--tinta) 30%, transparent); }
