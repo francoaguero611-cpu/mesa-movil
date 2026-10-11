@@ -1009,3 +1009,18 @@ table.camp tbody tr.fila.sel td { background: var(--marca); }
 .cab-flotante table.camp { border-collapse: collapse; table-layout: fixed; }
 .cab-flotante th { background: var(--tarjeta); border-bottom: 0; position: relative; }
 .cab-flotante th.nom { z-index: 2; box-shadow: 6px 0 6px -6px color-mix(in srgb, var(--tinta) 30%, transparent); }
+
+/* Barra de selección del dashboard en el celular: que nada se salga de la pantalla (10/10) */
+@media (max-width: 720px) {
+  .barra:not(.rk-barra) .acciones-sel { flex-wrap: wrap; gap: 8px; min-width: 0; }
+  .barra:not(.rk-barra) .caps { display: flex; gap: 6px; flex-wrap: wrap; min-width: 0; }
+  .barra:not(.rk-barra) .caps .btn { padding-inline: 10px; }
+  .barra:not(.rk-barra) .grupo-sw { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; flex: none; }
+}
+/* Solo el switch, sin el texto «Prendido/Apagado» (10/10, Lorenzo): queda para lectores de pantalla */
+.barra .sw-lbl { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-width: 720px) {
+  .barra:not(.rk-barra) .acciones-sel { flex-wrap: nowrap; align-items: center; }
+  .barra:not(.rk-barra) .caps { flex-wrap: nowrap; gap: 5px; }
+  .barra:not(.rk-barra) .caps .btn { padding: 6px 8px; font-size: 14px; }
+}
