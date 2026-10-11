@@ -583,7 +583,9 @@ function videoHTML(o) {
   const usos = v?.usos ? `<span class="bo-uso num" title="Anuncios que usan este video">×${ent(v.usos)}</span>` : "";
   const fo = `<span class="bo-fo fo-${esc(o.formato)}">${esc(FORMATO_TX[o.formato])}</span>`;
   if (!v || (!v.src && !v.poster)) return `<div class="bo-vid">${fo}<div class="bo-sinvid">Sin video</div>${caja(o)}</div>`;
-  const media = v.poster ? `<img src="${esc(v.poster)}" alt="" loading="lazy" decoding="async">` : `<div class="bo-sinvid bo-sinmini">Video sin miniatura</div>`;
+  // sin miniatura: el primer cuadro del video, cargado recién cuando la tarjeta entra en pantalla (ver mirarCuadros)
+  const media = v.poster ? `<img src="${esc(v.poster)}" alt="" loading="lazy" decoding="async">`
+    : v.src ? `<video class="bo-cuadro" muted playsinline preload="none" data-cuadro="${esc(v.src)}" aria-hidden="true" tabindex="-1"></video>` : `<div class="bo-sinvid">Sin video</div>`;
   const play = v.src ? `<button type="button" class="bo-play" data-play="${esc(o.id)}" aria-label="Reproducir el video más escalado de ${esc(o.nombre)}">${SVG_PLAY}</button>` : `<span class="bo-img-tag">imagen</span>`;
   return `<div class="bo-vid" data-vid="${esc(o.id)}">${media}${play}${fo}${usos}${caja(o)}</div>`;
 }
@@ -646,7 +648,17 @@ function detalleOferta(id) {
   $("[data-x]", m.dlg).onclick = m.cerrar;
   $$("[data-elegir-mk]", m.dlg).forEach((b) => b.onclick = () => { elegir(o.id, true, destinoDe(o, b.dataset.elegirMk)); m.cerrar(); toast(`${esc(o.nombre)}: elegida para ${esc(nombreDestino(B.sel.get(o.id)))}.`); });
 }
+let obsCuadros = null;
+function mirarCuadros(raiz) {
+  const vs = $$("video[data-cuadro]", raiz);
+  if (!vs.length) return;
+  const cargar = (v) => { v.preload = "metadata"; v.src = v.dataset.cuadro + "#t=0.5"; v.removeAttribute("data-cuadro"); };
+  if (!("IntersectionObserver" in window)) return vs.forEach(cargar);
+  if (!obsCuadros) obsCuadros = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { obsCuadros.unobserve(e.target); cargar(e.target); } }), { rootMargin: "300px" });
+  vs.forEach((v) => obsCuadros.observe(v));
+}
 function bindTarjetas(raiz) {
+  mirarCuadros(raiz);
   $$("[data-sel]", raiz).forEach((c) => c.onchange = () => elegir(c.dataset.sel, c.checked));
   $$("[data-det]", raiz).forEach((b) => b.onclick = () => detalleOferta(b.dataset.det));
   $$("[data-play]", raiz).forEach((b) => b.onclick = () => {
@@ -656,7 +668,7 @@ function bindTarjetas(raiz) {
     v.src = o.video.src; v.controls = true; v.playsInline = true; v.setAttribute("playsinline", ""); v.autoplay = true;
     if (o.video.poster) v.poster = o.video.poster;
     v.setAttribute("aria-label", `Video más escalado de ${o.nombre}`);
-    $$("img, .bo-sinvid, .bo-play", box).forEach((x) => x.remove());
+    $$("img, .bo-sinvid, .bo-play, .bo-cuadro", box).forEach((x) => x.remove());
     box.prepend(v); box.classList.add("jugando");
     v.play().catch(() => {});
   });
