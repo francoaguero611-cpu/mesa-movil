@@ -467,6 +467,17 @@
       LOG.unshift({ creado: new Date().toISOString(), accion: "estado", dry, resumen: `${body.estado === "ACTIVE" ? "Prender" : "Apagar"} ${resultados.length}: ${(body.items || []).map((i) => i.nombre).join(", ")}` });
       return { dry, resultados };
     }
+    if (accion === "metricas") { // (11/10) hoy y ayer de los items de un aviso
+      const de = (n, id, per) => {
+        let xs = [];
+        for (const c of ESTR) {
+          if (n === "campana" && c.id === id) xs = c.conjuntos.flatMap((s) => s.anuncios.map((a) => metricasAd(c, a, per)));
+          for (const s of c.conjuntos) { if (n === "conjunto" && s.id === id) xs = s.anuncios.map((a) => metricasAd(c, a, per)); for (const a of s.anuncios) if (n === "anuncio" && a.id === id) xs = [metricasAd(c, a, per)]; }
+        }
+        const t = suma(xs); return { gasto: t.gasto, ventas: t.ventas, roas: t.roas, ic: t.pagos_iniciados, cpa: t.cpa };
+      };
+      return { items: (body?.items || []).filter((i) => ESTADOS.has(i.id)).map((i) => ({ id: i.id, n: i.n, a: i.a, estado: ESTADOS.get(i.id), hoy: de(i.n, i.id, "hoy"), ayer: de(i.n, i.id, "ayer") })), errores: [] };
+    }
     if (accion === "cap_plan") return capPlan(body);
     if (accion === "cap_crear") {
       const plan = capPlan(body);
@@ -542,6 +553,24 @@
     if (t === "venta") { const c = CC(5, 0), s = c.conjuntos[0], a = s.anuncios[0]; return ev("venta", "Primera venta real del testeo de Moldes Italia.", [itA(c, s, a, { ventas: 1 })]); }
     if (t === "validacion") { const c = CC(5, 0); return ev("validacion", "ROAS 2,4 con 6 ventas: pasa el criterio de validación (≥ 2 sin postventa).", [itC(c)]); }
     if (t === "winner") { const c = CC(0, 0), s = c.conjuntos[0], a = s.anuncios[0]; return ev("winner", "Más de 4 ventas y ROAS mayor a 2.", [itA(c, s, a, { roas: 3.4, ventas: 7 })]); }
+    // (11/10) avisos de escala y de margen de app-movil: h / y = [gasto, ventas, roas, pagos iniciados], sg = escalas sugeridas, e = estado
+    if (t === "winner_hoy") { const c = CC(0, 0), s = c.conjuntos[0], a = s.anuncios[0];
+      return ev("winner_hoy", "Este anuncio salió hoy y ya hizo 3+ ventas con ROAS > 2. Podés escalarlo con CostCap, BidCap o Aislada (cada item trae las pujas sugeridas).",
+        [itA(c, s, a, { gasto: 18.4, ventas: 4, roas: 3.9, h: [18.4, 4, 3.9, 7], sg: "cba", e: "A", r: "Hoy: 4v, ROAS 3,9, CPA 4,6 → CostCap 4 a 9 · BidCap 9 a 14 · Aislada 30,55 (3 conj.)" })]); }
+    if (t === "reno_hoy") { const c = CC(3, 1), s = c.conjuntos[1] || c.conjuntos[0], a = s.anuncios[0];
+      return ev("reno_hoy", "Este anuncio salió hoy y ya hizo 3+ ventas con ROAS > 2. Podés escalarlo con CostCap, BidCap o Aislada (cada item trae las pujas sugeridas).",
+        [itA(c, s, a, { gasto: 12.1, ventas: 4, roas: 4, h: [12.1, 4, 4, 6], sg: "cba", e: "A", r: "Hoy: 4v, ROAS 4, CPA 3,03 → CostCap 3 a 8 · BidCap 6 a 11 · Aislada 30,55 (3 conj.)" })]); }
+    if (t === "winner_2d") { const c = CC(1, 0), s = c.conjuntos[0];
+      return ev("winner_2d", "Estos anuncios hicieron 3+ ventas con ROAS > 2 sumando ayer y hoy. Podés escalarlos con CostCap, BidCap o Aislada (cada item trae las pujas sugeridas).",
+        s.anuncios.slice(0, 2).map((a, i) => itA(c, s, a, { gasto: [22.3, 15.8][i], ventas: [7, 3][i], roas: [3.1, 2.2][i], h: [[9.1, 3, 3.3, 5], [7.2, 1, 1.4, 3]][i], y: [[13.2, 4, 3, 6], [8.6, 2, 2.9, 4]][i], sg: "cba", e: "A",
+          r: ["Ayer + hoy: 7v, ROAS 3,1, CPA 3,19 (muy ganador) → CostCap 3 a 8 y 19 a 14 · BidCap 6 a 11", "Ayer + hoy: 3v, ROAS 2,2, CPA 5,27 → CostCap 5 a 10 · BidCap 10 a 15"][i] }))); }
+    if (t === "costcap_campana") { const c = CC(0, 0);
+      return ev("costcap_campana", "3 anuncios de esta campaña son winner (ayer + hoy: 13 ventas, ROAS 2,8, CPA 4,9). Sugerido: CostCap 4 a 9 · BidCap 9 a 14; 50,55 por conjunto, todo por Post ID.",
+        c.conjuntos.slice(0, 3).map((s) => itA(c, s, s.anuncios[0], { sg: "cb", e: "A" }))); }
+    if (t === "margen") { const c = CC(2, 1), s = c.conjuntos[0], a = s.anuncios[0], d = CC(4, 0), s2 = d.conjuntos[0], a2 = s2.anuncios[0];
+      return ev("margen", "Anuncios prendidos con ROAS < 1 y 10+ USD gastados hoy (o 15+ en ayer + hoy) que las reglas no apagaron. Pérdida total 31,40 USD. Fijate si los apagás.", [
+        itA(c, s, a, { gasto: 21.7, ventas: 0, roas: 0, h: [21.7, 0, 0, 4], y: [9.3, 1, 2.1, 3], e: "A", r: "perdió 21,7 USD hoy (ROAS 0). Sigue prendido: lo volvieron a prender el 11/10 (RV-M: reactivado a pedido de Lorenzo); 7 días sin A1 ni gasto hormiga" }),
+        itA(d, s2, a2, { gasto: 32.5, ventas: 1, roas: 0.7, h: [14.1, 0, 0, 2], y: [18.4, 1, 1.24, 5], e: "A", r: "perdió 9,7 USD ayer + hoy (ROAS 0,7). Sigue prendido: es el último anuncio prendido del conjunto y las reglas nunca apagan el último" })]); }
     if (t === "escala") { const c = CC(0, 0), d = CC(3, 1); return ev("escala", "ROAS > 2 en los últimos 4 días y todavía no están en ninguna estructura de escala.", [itA(c, c.conjuntos[0], c.conjuntos[0].anuncios[0]), itA(c, c.conjuntos[1], c.conjuntos[1].anuncios[0]), itA(d, d.conjuntos[0], d.conjuntos[0].anuncios[0])]); }
     if (t === "categoria") { const c = CC(2, 0); return ev("categoria", "Con 4 días de datos, el testeo queda como rentable.", [itC(c, { r: "categoría: rentable" })]); }
     if (t === "alerta") return ev("alerta", "Meta frenó las consultas de TESTEOS (límite de llamadas). Los cortes de las 15:00 quedan en cola y se reintentan cada 5 minutos.", []);

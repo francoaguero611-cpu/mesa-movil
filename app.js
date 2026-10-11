@@ -134,7 +134,7 @@ async function api(accion, { q = "", body = null, escritura = false } = {}) {
 let demoP = null;
 function cargarDemo() {
   if (window.DemoAPI) return Promise.resolve();
-  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=24"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=25"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
   return demoP;
 }
 
@@ -1660,6 +1660,11 @@ const EV_TIPOS = {
   venta: ["estrella", "ok", "Primera venta"],
   validacion: ["trofeo", "ok", "Validación"],
   winner: ["copa", "ok", "Winner"],
+  winner_hoy: ["copa", "ok", "Winner de hoy"],          // (11/10) avisos de escala de app-movil
+  reno_hoy: ["copa", "ok", "Renovación de hoy"],
+  winner_2d: ["trofeo", "ok", "Winner de 2 días"],
+  costcap_campana: ["cohete", "ok", "Para CostCap"],
+  margen: ["triangulo", "peligro", "Margen"],
   escala: ["cohete", "ok", "Escala"],
   categoria: ["etiqueta", "acento", "Categoría de testeo"],
   alerta: ["triangulo", "peligro", "Alerta"],
@@ -1710,6 +1715,11 @@ function tituloEvento(ev) {
     case "venta": return "¡Primera venta!";
     case "validacion": return n > 1 ? `Validé ${varios}` : "Testeo validado";
     case "winner": return n > 1 ? `${varios} winners` : "¡Hay winner!";
+    case "winner_hoy": return n > 1 ? `¡${n} winners de hoy!` : "¡Winner de hoy!";
+    case "reno_hoy": return n > 1 ? `${n} renovaciones de hoy son winner` : `Renovación de hoy: ${ent(i0.ventas)} venta${i0.ventas === 1 ? "" : "s"}, ROAS ${numOk(i0.roas) ? NF2.format(i0.roas) : "—"}`;
+    case "winner_2d": return n > 1 ? `${n} winners de 2 días` : "Winner de 2 días";
+    case "costcap_campana": return "Varios winners: meté una CostCap";
+    case "margen": return "Te está comiendo margen";
     case "escala": return n ? `${cuantas(its)} ${n === 1 ? "listo" : "listos"} para escalar` : "Hay para escalar";
     case "categoria": return "Nueva categoría de testeo";
     case "alerta": return "Ojo con esto";
@@ -1722,18 +1732,42 @@ function tituloEvento(ev) {
     default: return "Aviso";
   }
 }
-function itemEventoHTML(it) {
+// (11/10) Métricas de HOY y AYER en cada item: vienen en el push (h / y = [gasto, ventas, roas, pagos iniciados])
+// o se piden a app-movil?accion=metricas al abrir el pop-up (que además trae el estado para Apagar / Prender).
+const EV_ESCALA = new Set(["winner", "winner_hoy", "reno_hoy", "winner_2d", "costcap_campana", "escala"]);
+const metDeSerie = (x) => Array.isArray(x) && x.length >= 3 ? { gasto: x[0], ventas: x[1], roas: x[2], ic: x[3], cpa: x[1] ? x[0] / x[1] : null } : null;
+function tablaMetHTML(h, y, cargando) {
+  if (!h && !y) return cargando ? `<div class="ev-met-carga mut"><span class="cargador"></span>Trayendo hoy y ayer…</div>` : "";
+  const v = (m, k, fmt) => m && numOk(m[k]) ? fmt(m[k]) : "—";
+  const fila = (lbl, f) => `<tr><th scope="row">${lbl}</th><td>${f(h)}</td><td>${f(y)}</td></tr>`;
+  return `<table class="ev-met num"><thead><tr><th></th><th scope="col">Hoy</th><th scope="col">Ayer</th></tr></thead><tbody>
+    ${fila("Gasto", (m) => v(m, "gasto", usd))}${fila("Ventas", (m) => v(m, "ventas", ent))}
+    ${fila("ROAS", (m) => m && numOk(m.roas) && m.gasto ? chipRoas(m.roas) : "—")}${fila("CPA", (m) => v(m, "cpa", usd))}
+    ${fila("Pagos inic.", (m) => v(m, "ic", ent))}</tbody></table>`;
+}
+function botonEstadoHTML(it) {
+  if (!NIVEL[it.n] || !it.a) return "";
+  const e = it.estado || (it.e === "A" ? "ACTIVE" : it.e === "P" ? "PAUSED" : "");
+  if (e === "ACTIVE") return `<button type="button" class="btn chico peligro" data-estado="PAUSED">Apagar</button>`;
+  if (e === "PAUSED") return `<button type="button" class="btn chico" data-estado="ACTIVE">Prender</button>`;
+  if (e === "ADSET_PAUSED") return `<span class="mut">apagado por su conjunto</span>`;
+  if (e === "CAMPAIGN_PAUSED") return `<span class="mut">apagado por su campaña</span>`;
+  return "";
+}
+function itemEventoHTML(it, i, pedir) {
   const nv = NIVEL[it.n] ? it.n : null;
   const datos = [];
   if (numOk(it.antes) || numOk(it.despues)) datos.push(`<span class="ev-presu num">${numOk(it.antes) ? usd(it.antes) : "—"} <span class="ev-flecha" aria-label="pasó a">→</span> <b>${numOk(it.despues) ? usd(it.despues) : "—"}</b></span>`);
   if (numOk(it.roas)) datos.push(`<span class="ev-dato">ROAS ${chipRoas(it.roas)}</span>`);
   if (numOk(it.ventas)) datos.push(`<span class="ev-dato num">${ent(it.ventas)} venta${it.ventas === 1 ? "" : "s"}</span>`);
   if (numOk(it.gasto)) datos.push(`<span class="ev-dato num">gastó ${usd(it.gasto)}</span>`);
-  return `<li>
+  const conMet = nv && it.a;
+  return `<li data-i="${i ?? ""}">
     <div class="ev-it-cab">${nv ? `<span class="niv-tag niv-${nv}">${NIVEL[nv][0]}</span>` : ""}<span class="ev-it-nom">${esc(it.nom || it.id || "—")}</span></div>
     ${it.cn && it.n !== "campana" ? `<div class="ev-it-cn">en <b>${esc(it.cn)}</b></div>` : ""}
     ${datos.length ? `<div class="ev-it-datos">${datos.join("")}</div>` : ""}
     ${it.r ? `<div class="ev-it-r">${esc(it.r)}</div>` : ""}
+    ${conMet ? `<div class="ev-met-caja" data-met>${tablaMetHTML(metDeSerie(it.h), metDeSerie(it.y), pedir)}</div><div class="ev-it-acc" data-acc>${botonEstadoHTML(it)}</div>` : ""}
   </li>`;
 }
 function normalizarEvento(ev) {
@@ -1750,23 +1784,82 @@ function mostrarEvento(evRaw) {
   const navegables = ev.items.filter((i) => NIVEL[i.n] && (i.n === "campana" || i.c || i.s));
   // en segundo plano, mientras se lee el pop-up: traer «hoy» y abrir lo necesario
   const prep = navegables.length ? prepararEvento(ev, navegables) : null;
+  // (11/10) métricas hoy/ayer + estado (para Apagar / Prender) de cada item, y escalas sugeridas en los avisos de winner
+  const pedibles = ev.items.map((it, i) => [it, i]).filter(([it]) => NIVEL[it.n] && it.a);
+  const pedir = pedibles.length > 0 && (DEMO || !!clave());
+  const adsEsc = EV_ESCALA.has(ev.t) ? ev.items.filter((i) => i.n === "anuncio" && i.a) : [];
+  let caps = adsEsc.length ? [...new Set(adsEsc.flatMap((i) => [...(i.sg || "cb" + (adsEsc.length === 1 ? "a" : ""))]))] : [];
+  if (adsEsc.length !== 1) caps = caps.filter((c) => c !== "a"); // la aislada es de 1 solo anuncio
+  const CAP = { c: ["costcap", "CostCap"], b: ["bidcap", "BidCap"], a: ["aislada", "Aislada"] };
+  let escalarCon = null;
   const html = `<div class="ev ev-${color}">
       <div class="ev-ico boceto">${icoEvento(ico)}</div>
       <div class="ev-rotulo">${esc(rotulo)}</div>
       <h3 class="ev-titulo">${esc(tituloEvento(ev))}</h3>
       <svg class="ev-garabato" viewBox="0 0 160 12" aria-hidden="true"><path d="M2 8 C 30 3, 52 11, 80 6 S 130 3, 158 7" pathLength="1"/></svg>
       ${ev.r ? `<div class="ev-por"><span class="ev-por-lbl">por qué</span><p>${esc(ev.r)}</p></div>` : ""}
-      ${ev.items.length ? `<ul class="ev-items">${ev.items.map(itemEventoHTML).join("")}</ul>` : ""}
+      ${ev.items.length ? `<ul class="ev-items">${ev.items.map((it, i) => itemEventoHTML(it, i, pedir)).join("")}</ul>` : ""}
+      ${caps.length ? `<p class="ev-sig">Escalá ${adsEsc.length === 1 ? "este anuncio" : `estos ${adsEsc.length} anuncios`} por Post ID: elegís la estructura, te muestro el cálculo y confirmás antes de crear.</p>` : ""}
     </div>
-    <div class="botones"><button type="button" class="btn pri" data-ver data-foco>${navegables.length ? "Ver en la tabla" : "Listo"}</button></div>`;
+    <div class="botones">${["c", "b", "a"].filter((c) => caps.includes(c)).map((c) => `<button type="button" class="btn" data-cap="${CAP[c][0]}">${CAP[c][1]}</button>`).join("")}<button type="button" class="btn pri" data-ver data-foco>${navegables.length ? "Ver en la tabla" : "Listo"}</button></div>`;
   eventoAbierto = true;
-  const m = abrirModal(html, { alCerrar: () => { eventoAbierto = false; if (prep) mostrarEnTabla(prep); else irAlDash(); } });
+  const m = abrirModal(html, { alCerrar: () => {
+    eventoAbierto = false;
+    if (escalarCon) return escalarDesdeAviso(escalarCon, adsEsc);
+    if (prep) mostrarEnTabla(prep); else irAlDash();
+  } });
   m.dlg.classList.add("dialogo-ev");
   m.dlg.setAttribute("aria-labelledby", "ev-t"); $(".ev-titulo", m.dlg).id = "ev-t";
   const x = document.createElement("button");
   x.type = "button"; x.className = "ev-cerrar"; x.setAttribute("aria-label", "Cerrar y ver en la tabla"); x.textContent = "✕";
   x.onclick = m.cerrar; m.dlg.prepend(x);
   $("[data-ver]", m.dlg).onclick = m.cerrar;
+  $$("[data-cap]", m.dlg).forEach((b) => b.onclick = () => { escalarCon = b.dataset.cap; m.cerrar(); });
+  // Apagar / Prender por item, con confirmación de doble toque (el primero pregunta, el segundo hace)
+  m.dlg.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-estado]"); if (!b || b.disabled) return;
+    const li = b.closest("li[data-i]"), it = ev.items[+li.dataset.i]; if (!it) return;
+    const est = b.dataset.estado, verbo = est === "PAUSED" ? "Apagar" : "Prender";
+    const volver = () => { b.disabled = false; b.classList.remove("confirmar"); b.textContent = verbo; };
+    if (!b.classList.contains("confirmar")) {
+      b.classList.add("confirmar"); b.textContent = `¿${verbo} en Meta? Tocá de nuevo`;
+      clearTimeout(b._t); b._t = setTimeout(() => { if (b.isConnected && !b.disabled) volver(); }, 4000);
+      return;
+    }
+    clearTimeout(b._t); b.disabled = true; b.innerHTML = `<span class="gira">↻</span> ${est === "PAUSED" ? "Apagando" : "Prendiendo"}…`;
+    try {
+      const r = await api("estado", { body: { estado: est, items: [{ id: it.id, act: it.a, nivel: it.n, nombre: it.nom || it.id }] }, escritura: true });
+      const res = (r.resultados || [])[0] || {};
+      if (!res.ok) throw new Error(res.error || "Meta no confirmó el cambio");
+      if (r.dry || res.simulado) { toast(`<b>Modo prueba${DEMO ? " (demo)" : ""}:</b> Meta no se tocó. Se habría ${est === "PAUSED" ? "apagado" : "prendido"} ${esc(it.nom || it.id)}.`, "ok", 7000); volver(); return; }
+      it.estado = est; actualizarEstadoLocal(it.id, est);
+      $("[data-acc]", li).innerHTML = botonEstadoHTML(it);
+      toast(`✓ ${esc(it.nom || it.id)}: ${est === "PAUSED" ? "apagado" : "prendido"} en Meta${DEMO ? " (demo)" : ""}.`);
+    } catch (err) {
+      if (err.code === 401) { ls.del("dash_clave"); m.cerrar(); return login("Clave incorrecta"); }
+      toast(`No se pudo ${verbo.toLowerCase()}: ${esc(err.message)}`, "error", 8000); volver();
+    }
+  });
+  if (pedir) api("metricas", { body: { items: pedibles.map(([it]) => ({ n: it.n, id: it.id, a: it.a })) } }).then((r) => {
+    const by = new Map((r?.items || []).map((x) => [x.n + ":" + x.id, x]));
+    const conv = (d) => d ? { gasto: d.gasto, ventas: d.ventas, roas: d.roas, cpa: d.cpa, ic: d.ic } : null;
+    for (const [it, i] of pedibles) {
+      const li = $(`li[data-i="${i}"]`, m.dlg); if (!li) continue;
+      const x = by.get(it.n + ":" + it.id), caja = $("[data-met]", li);
+      if (!x) { if (caja && !it.h && !it.y) caja.innerHTML = `<div class="mut">Sin datos de hoy ni de ayer.</div>`; continue; }
+      if (caja) caja.innerHTML = tablaMetHTML(conv(x.hoy), conv(x.ayer), false);
+      if (x.estado && !$("[data-estado].confirmar, [data-estado]:disabled", li)) { it.estado = x.estado; $("[data-acc]", li).innerHTML = botonEstadoHTML(it); }
+    }
+  }).catch((err) => {
+    for (const [it, i] of pedibles) { const caja = $(`li[data-i="${i}"] [data-met]`, m.dlg); if (caja && !it.h && !it.y) caja.innerHTML = `<div class="mut">No pude traer hoy y ayer: ${esc(err.message)}</div>`; }
+  });
+}
+// (11/10) Desde un aviso de winner: selecciona esos anuncios y abre el mismo quiz de CostCap / BidCap / Aislada de la barra.
+function escalarDesdeAviso(tipo, ads) {
+  if (!ads.length || !irAlDash()) return;
+  S.sel.clear();
+  for (const a of ads) S.sel.set("anuncio:" + a.id, { id: a.id, act: a.a, nivel: "anuncio", nombre: a.nom || a.id, estado: a.estado || (a.e === "P" ? "PAUSED" : "ACTIVE") });
+  quizCap(tipo);
 }
 function mostrarEventoFabrica(ev, ico, color, rotulo) {
   const ped = ev.pedido != null && ev.pedido !== "" ? String(ev.pedido) : null;

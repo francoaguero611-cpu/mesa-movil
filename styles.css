@@ -1036,3 +1036,18 @@ table.camp tbody tr.fila.sel td { background: var(--marca); }
   .barra:not(.rk-barra) .caps { flex-wrap: nowrap; gap: 5px; }
   .barra:not(.rk-barra) .caps .btn { padding: 6px 8px; font-size: 14px; }
 }
+
+/* (11/10) Pop-up de avisos: tabla Hoy | Ayer, Apagar / Prender por item y botones de escala */
+.ev-met-caja { margin-top: 8px; }
+.ev-met { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.ev-met th, .ev-met td { padding: 3px 6px; text-align: right; border-bottom: 1px dashed var(--linea); }
+.ev-met thead th { font-family: var(--f-titulo); font-weight: 700; color: var(--tinta-2); border-bottom: 1.5px solid var(--linea); }
+.ev-met tbody th { text-align: left; font-weight: 400; color: var(--mut); white-space: nowrap; }
+.ev-met tr:last-child th, .ev-met tr:last-child td { border-bottom: 0; }
+.ev-met-carga { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.ev-it-acc { margin-top: 8px; display: flex; justify-content: flex-end; font-size: 13px; }
+.ev-it-acc .btn.confirmar { background: var(--tinta); color: var(--papel); }
+.ev-it-acc .btn.peligro.confirmar { background: var(--peligro); outline: 2px dashed var(--tinta); outline-offset: 2px; }
+.dialogo-ev .botones { flex-wrap: wrap; gap: 8px; }
+.dialogo-ev .botones .btn[data-cap] { min-width: 0; flex: 1 1 0; }
+@media (max-width: 520px) { .dialogo-ev .botones .btn[data-cap] { width: auto; } }
