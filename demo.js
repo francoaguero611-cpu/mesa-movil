@@ -571,6 +571,16 @@
       return ev("margen", "Anuncios prendidos con ROAS < 1 y 10+ USD gastados hoy (o 15+ en ayer + hoy) que las reglas no apagaron. Pérdida total 31,40 USD. Fijate si los apagás.", [
         itA(c, s, a, { gasto: 21.7, ventas: 0, roas: 0, h: [21.7, 0, 0, 4], y: [9.3, 1, 2.1, 3], e: "A", r: "perdió 21,7 USD hoy (ROAS 0). Sigue prendido: lo volvieron a prender el 11/10 (RV-M: reactivado a pedido de Lorenzo); 7 días sin A1 ni gasto hormiga" }),
         itA(d, s2, a2, { gasto: 32.5, ventas: 1, roas: 0.7, h: [14.1, 0, 0, 2], y: [18.4, 1, 1.24, 5], e: "A", r: "perdió 9,7 USD ayer + hoy (ROAS 0,7). Sigue prendido: es el último anuncio prendido del conjunto y las reglas nunca apagan el último" })]); }
+    // (11/10 tarde) avisos de escala nuevos: campaña topada, escala que funciona y winner cansado
+    if (t === "campana_topada") { const c = CC(0, 0);
+      return ev("campana_topada", "Esta campaña ya gastó ≥ 90 % del presupuesto de hoy con ROAS ayer+hoy ≥ 2. Topada: subile presupuesto o metele BidCap.",
+        [itC(c, { gasto: 58.2, ventas: 9, roas: 2.6, h: [28.1, 4, 2.4, 9], y: [30.1, 5, 2.8, 11], e: "A", r: "hoy 28,1 de 30,55 (92 %, CBO); ayer+hoy 9v ROAS 2,6 → subile presupuesto o metele BidCap" })]); }
+    if (t === "escala_funciona") { const c = CC(1, 0);
+      return ev("escala_funciona", "Esta escala viene con ROAS ≥ 2 y 3+ ventas desde que arrancó. Duplicala o sumale Pocket.",
+        [itC(c, { gasto: 96.4, ventas: 11, roas: 2.4, h: [31.2, 4, 2.5, 8], y: [40.6, 5, 2.3, 10], e: "A", r: "desde que arrancó (52 h): 96,4 USD, 11v, ROAS 2,4 → duplicala / sumale Pocket" })]); }
+    if (t === "winner_fatiga") { const c = CC(2, 0), s = c.conjuntos[0], a = s.anuncios[0];
+      return ev("winner_fatiga", "Este anuncio fue winner (4+ ventas y ROAS ≥ 2 en los 4 días anteriores) y viene ayer y hoy con ROAS < 1,3. Pedí 5 renos de cada uno.",
+        [itA(c, s, a, { gasto: 41.3, ventas: 7, roas: 2.7, h: [12.4, 0, 0, 3], y: [18.9, 1, 1.1, 4], e: "A", r: "4 días antes: 7v ROAS 2,7; ayer ROAS 1,1, hoy 0 → pedí 5 renos (Post ID 1234_5678)" })]); }
     if (t === "escala") { const c = CC(0, 0), d = CC(3, 1); return ev("escala", "ROAS > 2 en los últimos 4 días y todavía no están en ninguna estructura de escala.", [itA(c, c.conjuntos[0], c.conjuntos[0].anuncios[0]), itA(c, c.conjuntos[1], c.conjuntos[1].anuncios[0]), itA(d, d.conjuntos[0], d.conjuntos[0].anuncios[0])]); }
     if (t === "categoria") { const c = CC(2, 0); return ev("categoria", "Con 4 días de datos, el testeo queda como rentable.", [itC(c, { r: "categoría: rentable" })]); }
     if (t === "alerta") return ev("alerta", "Meta frenó las consultas de TESTEOS (límite de llamadas). Los cortes de las 15:00 quedan en cola y se reintentan cada 5 minutos.", []);

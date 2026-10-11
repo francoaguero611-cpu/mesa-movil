@@ -134,7 +134,7 @@ async function api(accion, { q = "", body = null, escritura = false } = {}) {
 let demoP = null;
 function cargarDemo() {
   if (window.DemoAPI) return Promise.resolve();
-  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=25"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=29"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
   return demoP;
 }
 
@@ -1665,6 +1665,9 @@ const EV_TIPOS = {
   winner_2d: ["trofeo", "ok", "Winner de 2 días"],
   costcap_campana: ["cohete", "ok", "Para CostCap"],
   margen: ["triangulo", "peligro", "Margen"],
+  campana_topada: ["grafico", "ok", "Campaña topada"],      // (11/10 tarde) avisos de escala nuevos
+  escala_funciona: ["cohete", "ok", "La escala funciona"],
+  winner_fatiga: ["vuelve", "naranja", "Winner cansado"],
   escala: ["cohete", "ok", "Escala"],
   categoria: ["etiqueta", "acento", "Categoría de testeo"],
   alerta: ["triangulo", "peligro", "Alerta"],
@@ -1720,6 +1723,9 @@ function tituloEvento(ev) {
     case "winner_2d": return n > 1 ? `${n} winners de 2 días` : "Winner de 2 días";
     case "costcap_campana": return "Varios winners: meté una CostCap";
     case "margen": return "Te está comiendo margen";
+    case "campana_topada": return n > 1 ? `${n} campañas topadas: subiles presupuesto o metele BidCap` : "Topada: subile presupuesto o metele BidCap";
+    case "escala_funciona": return n > 1 ? `${n} escalas funcionando: duplicalas o sumales Pocket` : "La escala funciona: duplicala o sumale Pocket";
+    case "winner_fatiga": return n > 1 ? `${n} winners cansados: pedí 5 renos de cada uno` : "Winner cansado: pedí 5 renos de este";
     case "escala": return n ? `${cuantas(its)} ${n === 1 ? "listo" : "listos"} para escalar` : "Hay para escalar";
     case "categoria": return "Nueva categoría de testeo";
     case "alerta": return "Ojo con esto";
