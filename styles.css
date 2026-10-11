@@ -691,13 +691,25 @@ table.camp tbody tr.fila.sel td { background: var(--marca); }
   .niv-tag { margin-bottom: 4px; }
 }
 
-/* ===== Secciones: Dashboard / Ranking (10/10) ===== */
-.secciones { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-width: 420px; margin: -6px 0 20px; }
+/* ===== Secciones: slider Dashboard · Ranking · Cazador (11/10). La lista vive en app.js (SECCIONES). ===== */
+.secciones { position: relative; max-width: 640px; margin: -6px 0 20px; }
+.sec-pista { display: flex; gap: 10px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scroll-padding-inline: 2px; overscroll-behavior-x: contain; scrollbar-width: none; padding: 2px 6px 6px 2px; margin: -2px -6px -6px -2px; }
+.sec-pista::-webkit-scrollbar { display: none; }
+.sec-pista .seccion { flex: 0 0 auto; min-width: 132px; scroll-snap-align: start; white-space: nowrap; }
+.secciones.hay-der .sec-pista { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent); }
+.secciones.hay-izq .sec-pista { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 56px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 56px), transparent); }
+.secciones.hay-izq.hay-der .sec-pista { -webkit-mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent); mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent); }
+.sec-flecha { display: none; position: absolute; top: 50%; z-index: 2; width: 36px; height: 36px; margin-top: -20px; padding: 0; place-items: center; border: 2px solid var(--tinta); border-radius: 50%; background: var(--tarjeta); color: var(--tinta); box-shadow: 2px 2px 0 var(--sombra); cursor: pointer; }
+.sec-flecha:hover { background: var(--papel-2); }
+.sec-flecha.izq { left: -8px; }
+.sec-flecha.der { right: -8px; }
+.sec-flecha.izq svg { transform: scaleX(-1); }
+@media (hover: hover) and (pointer: fine) { .secciones.hay-izq .sec-flecha.izq, .secciones.hay-der .sec-flecha.der { display: grid; } }
 .seccion { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 8px 14px; border: 2px solid var(--tinta); border-radius: var(--r-btn); background: var(--tarjeta); color: var(--tinta); cursor: pointer; font: 700 17px/1 var(--f-titulo); box-shadow: 3px 3px 0 var(--sombra); transition: transform .08s ease-out, box-shadow .08s ease-out, background-color .15s; touch-action: manipulation; }
 .seccion:hover { background: var(--papel-2); }
 .seccion[aria-pressed="true"] { background: var(--tinta); color: var(--papel); transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--sombra); }
 .seccion svg { flex: none; }
-@media (max-width: 720px) { .secciones { max-width: none; margin-top: -8px; } }
+@media (max-width: 720px) { .secciones { max-width: none; margin-top: -8px; } .sec-pista .seccion { min-width: 0; font-size: 16px; padding: 8px 16px; } }
 
 /* ===== Ranking ===== */
 .rk-estado { display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; margin-bottom: 14px; }

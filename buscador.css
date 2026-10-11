@@ -1,9 +1,5 @@
-/* Buscador de ofertas — solo lo que no está en styles.css. Usa sus variables (claro y oscuro). */
-
-.bo-volver { display: inline-block; margin: 0 0 10px -4px; font-size: 15px; text-decoration: none; color: var(--mut); }
-.bo-volver:hover { color: var(--tinta); text-decoration: underline wavy color-mix(in srgb, var(--tinta) 45%, transparent); }
-.marca h1 { font-size: clamp(28px, 6vw, 42px); }
-.marca { min-width: 0; }
+/* Cazador (sección del Dashboard) — solo lo que no está en styles.css. Usa sus variables (claro y oscuro).
+   Se carga recién cuando se entra al Cazador: nada de acá debe pisar estilos del resto de la app. */
 
 /* pestañas: mismo look que .secciones del dashboard */
 .bo-tabs { display: flex; flex-wrap: wrap; gap: 10px; max-width: 640px; margin: -6px 0 20px; }
@@ -118,7 +114,7 @@
 .icono-chico { width: 36px; padding: 0; flex: none; }
 .bo-sinped { font-size: 14px; }
 .bo-ped-lista { padding: 0; }
-.ped-det .log { margin-top: 0; }
+.bo-peds .ped-det .log { margin-top: 0; }
 
 /* barra */
 .bo-barra { width: min(620px, calc(100% - 2 * var(--gutter))); flex-wrap: nowrap; }

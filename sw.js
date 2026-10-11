@@ -1,9 +1,10 @@
 /* Service worker — Dashboard Lorenzo */
-const VERSION = "dash-v26";
-const SHELL = ["./", "index.html", "styles.css?v=24", "app.js?v=25", "demo.js?v=24", "manifest.webmanifest",
+const VERSION = "dash-v27";
+const SHELL = ["./", "index.html", "styles.css?v=27", "app.js?v=27", "demo.js?v=24", "manifest.webmanifest",
   "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png", "icons/apple-touch-icon.png"];
-// Buscador de ofertas: se guarda aparte y sin trabar la instalación si algún archivo falta en el hosting.
-const EXTRA = ["buscador.html", "buscador.css?v=1", "buscador.js?v=2"];
+// Cazador (antes Buscador de ofertas): se guarda aparte y sin trabar la instalación si algún archivo falta en el hosting.
+// buscador.html quedó como redirección a ./#cazador (links viejos).
+const EXTRA = ["buscador.html", "buscador.css?v=2", "buscador.js?v=3"];
 const API_HOST = "tppcpnfzcxxusdhrlmdx.supabase.co";
 const API_CACHE = "dash-api";
 

@@ -1,6 +1,9 @@
-/* Buscador de ofertas — página aparte del Dashboard. Sin build ni dependencias.
+/* Cazador (antes «Buscador de ofertas») — sección del Dashboard desde el 11/10. Sin build ni dependencias.
+   app.js lo carga la primera vez que se entra a la sección y lo monta con window.Cazador.montar(raiz, ctx).
    Backend: Edge Function buscador-ofertas (Codicia). Contrato: scratchpad/spy/CONTRATO-FRONT.md (11/10). */
 "use strict";
+(() => {
+let CTX = { login: () => {} };     // lo pasa app.js al montar
 
 const API = "https://tppcpnfzcxxusdhrlmdx.supabase.co/functions/v1/buscador-ofertas";
 const URLP = new URLSearchParams(location.search);
@@ -211,63 +214,26 @@ function abrirModal(html, { ancho: an = false, bloqueado = () => false, alCerrar
 }
 function cerrarModal() { if (modalActual) { modalActual.velo.remove(); modalActual = null; } }
 
-// ---------- tema ----------
-function temaEfectivo() {
-  const t = document.documentElement.getAttribute("data-theme");
-  if (t) return t;
-  return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-}
-function pintarTema() {
-  const osc = temaEfectivo() === "dark";
-  $$('meta[name="theme-color"]').forEach((m) => m.setAttribute("content", osc ? "#1b1a17" : "#f4efe2"));
-}
-function alternarTema() {
-  const nuevo = temaEfectivo() === "dark" ? "light" : "dark";
-  document.documentElement.setAttribute("data-theme", nuevo);
-  ls.set("dash_tema", nuevo);
-  pintarTema();
-}
-
-// ---------- login (mismo que el dashboard: guarda dash_clave) ----------
-function login(msg = "") {
-  pararRefresco();
-  $("#tabs").hidden = true;
-  $("#barra").hidden = true;
-  $("#main").innerHTML = `
-    <form class="login boceto" id="f-login" autocomplete="on">
-      <h2>Entrar</h2>
-      <p>Poné la clave del dashboard.</p>
-      <label class="sr" for="clave">Clave</label>
-      <input class="campo" id="clave" name="password" type="password" autocomplete="current-password" placeholder="Clave" required>
-      <button class="btn pri" type="submit" id="b-entrar">Entrar</button>
-      <div class="error" id="login-err" role="alert">${esc(msg)}</div>
-    </form>`;
-  $("#clave").focus();
-  $("#f-login").onsubmit = async (e) => {
-    e.preventDefault();
-    const v = $("#clave").value.trim();
-    if (!v) return;
-    const b = $("#b-entrar"); b.classList.add("cargando"); b.innerHTML = `<span class="gira">↻</span> Entrando…`;
-    ls.set("dash_clave", v);
-    await cargar();
-  };
-}
+// ---------- login: lo hace el dashboard (misma clave dash_clave) ----------
+function login(msg = "") { pararRefresco(); B.montado = false; CTX.login(msg); }
 
 // ---------- carga ----------
 async function cargar() {
+  if (B.cargando) return;
   B.cargando = true; B.error = null;
-  $("#b-ref").classList.add("cargando");
+  if (B.montado) $("#b-ref")?.classList.add("cargando");
   if (!B.datos) pintar();
   try {
     const d = await api("ofertas");
     B.datos = { ...d, ofertas: Array.isArray(d?.ofertas) ? d.ofertas : [] };
   } catch (e) {
-    if (e.code === 401) { B.cargando = false; $("#b-ref").classList.remove("cargando"); const habia = !!clave(); ls.del("dash_clave"); return login(habia ? "Clave incorrecta" : ""); }
+    if (e.code === 401) { B.cargando = false; $("#b-ref")?.classList.remove("cargando"); const habia = !!clave(); ls.del("dash_clave"); return login(habia ? "Clave incorrecta" : ""); }
     B.error = e.message || "No se pudo cargar";
   }
   B.cargando = false;
-  $("#b-ref").classList.remove("cargando");
-  $("#tabs").hidden = false;
+  B.cargado = Date.now();
+  if (!B.montado) return;
+  $("#b-ref")?.classList.remove("cargando");
   pintar();
   cargarPedidos();
 }
@@ -281,11 +247,11 @@ async function cargarPedidos() {
     if (e.code === 401) { ls.del("dash_clave"); return login("Clave incorrecta"); }
     B.pedErr = e.message || "No se pudieron leer los pedidos";
   }
-  if (B.vista === "seleccionadas") pintarPedidos();
+  if (B.montado && B.vista === "seleccionadas") pintarPedidos();
 }
 function arrancarRefresco() {
   pararRefresco();
-  B.timer = setInterval(() => { if (!document.hidden && B.vista === "seleccionadas") cargarPedidos(); }, 30000);
+  B.timer = setInterval(() => { if (B.montado && !document.hidden && B.vista === "seleccionadas") cargarPedidos(); }, 30000);
 }
 function pararRefresco() { if (B.timer) { clearInterval(B.timer); B.timer = null; } }
 
@@ -330,11 +296,10 @@ const avatar = (o) => url(o.page_pic) ? `<img class="bo-pic" src="${esc(url(o.pa
 
 // ---------- pintar ----------
 function pintar() {
-  $$("#tabs [data-vista]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.vista === B.vista)));
+  if (!B.montado || !$("#bo-main")) return;
+  $$("#bo-tabs [data-vista]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.vista === B.vista)));
   $("#tab-n").textContent = `(${B.sel.size})`;
-  $("#badges").innerHTML = (DEMO ? `<span class="badge demo" title="Datos de ejemplo, nada va a la compu">DEMO</span>` : "") +
-    (dryOn() ? `<span class="badge" title="El modo prueba del dashboard está prendido">MODO PRUEBA</span>` : "");
-  const main = $("#main");
+  const main = $("#bo-main");
   if (!B.datos) {
     if (B.cargando) main.innerHTML = `<p class="vacio"><span class="cargador"></span>Buscando las ofertas…</p><div class="esqueleto boceto bo-esq"></div><div class="esqueleto boceto bo-esq"></div>`;
     else if (B.error) main.innerHTML = errorBox(B.error);
@@ -367,7 +332,7 @@ const segBtns = (attr, xs, actual) => xs.map(([k, t]) => `<button type="button" 
 
 function pintarGanadoras() {
   const f = B.filtro;
-  const main = $("#main");
+  const main = $("#bo-main");
   const yaFiltros = $("#bo-filtros");
   const foco = document.activeElement && document.activeElement.id;
   main.innerHTML = `${cabDatos()}
@@ -448,7 +413,7 @@ function pintarOportunidades() {
   }
   const NIV = { alta: 0, media: 1, baja: 2 };
   const gs = [...grupos.entries()].map(([m, its]) => [m, its.sort((a, b) => (NIV[a.x.nivel] ?? 3) - (NIV[b.x.nivel] ?? 3) || (b.x.activos_fuerte || 0) - (a.x.activos_fuerte || 0))]).sort((a, b) => b[1].length - a[1].length);
-  const main = $("#main");
+  const main = $("#bo-main");
   if (!gs.length) { main.innerHTML = cabDatos() + `<div class="vacio boceto bo-vacio">No hay oportunidades detectadas: todas las ofertas ya compiten en sus mercados.</div>`; return; }
   main.innerHTML = cabDatos() + `<p class="bo-intro mut">Ofertas que escalan fuerte en un mercado y casi no tienen competencia en otro.</p>` + gs.map(([m, its]) => `
     <section class="bo-grupo" aria-labelledby="op-${esc(m)}">
@@ -472,7 +437,7 @@ function pintarSeleccionadas() {
   const ids = [...B.sel];
   const xs = ids.map(porId).filter(Boolean);
   const faltan = ids.length - xs.length;
-  $("#main").innerHTML = `${cabDatos()}
+  $("#bo-main").innerHTML = `${cabDatos()}
     <section class="bo-selec" aria-labelledby="sel-t">
       <div class="bo-sec-cab"><h2 id="sel-t">Seleccionadas <span class="num">(${ids.length})</span></h2>
         ${ids.length ? `<button type="button" class="btn chico" id="b-sel-limpiar">✕ limpiar</button><button type="button" class="btn pri chico" id="b-sel-modelar" ${xs.length ? "" : "disabled"}>Modelar</button>` : ""}</div>
@@ -538,6 +503,7 @@ const hora = (iso) => { try { return new Date(iso).toLocaleTimeString("es-AR", {
 
 // ---------- barra flotante ----------
 function pintarBarra() {
+  if (!B.montado) return;
   const b = $("#barra");
   const n = B.sel.size;
   if (!n || !B.datos) { b.hidden = true; b.innerHTML = ""; return; }
@@ -645,30 +611,46 @@ function modelar() {
   pintarM();
 }
 
-// ---------- navegación ----------
+// ---------- navegación (sub-vistas del Cazador) ----------
+const VISTAS = [["ganadoras", "Ganadoras"], ["oportunidades", "Oportunidades"], ["seleccionadas", "Seleccionadas"]];
 function irA(v) {
   B.vista = v;
-  try { history.replaceState(null, "", `${location.pathname}${location.search}#${v}`); } catch {}
+  ls.set("caz_vista", v);
   pintar();
   if (v === "seleccionadas") { cargarPedidos(); arrancarRefresco(); } else pararRefresco();
   window.scrollTo({ top: 0, behavior: "auto" });
 }
 
-// ---------- arranque ----------
-function iniciar() {
-  pintarTema();
-  matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", pintarTema);
-  $("#b-tema").onclick = alternarTema;
-  $("#b-ref").onclick = () => { if (!B.cargando) cargar(); };
-  $$("#tabs [data-vista]").forEach((b) => b.onclick = () => irA(b.dataset.vista));
-  const h = location.hash.slice(1);
-  if (["ganadoras", "oportunidades", "seleccionadas"].includes(h)) B.vista = h;
+// ---------- montaje dentro del Dashboard ----------
+let escuchando = false;
+function escuchar() {
+  if (escuchando) return; escuchando = true;
   let eraAncho = ancho();
-  addEventListener("resize", () => { const a = ancho(); if (a !== eraAncho) { eraAncho = a; if (B.vista === "ganadoras" && B.datos) pintarListaGanadoras(); } });
-  document.addEventListener("visibilitychange", () => { if (!document.hidden && B.vista === "seleccionadas" && B.datos) cargarPedidos(); });
+  addEventListener("resize", () => { const a = ancho(); if (a !== eraAncho) { eraAncho = a; if (B.montado && B.vista === "ganadoras" && B.datos) pintarListaGanadoras(); } });
+  document.addEventListener("visibilitychange", () => { if (B.montado && !document.hidden && B.vista === "seleccionadas" && B.datos) cargarPedidos(); });
   addEventListener("storage", (e) => { if (e.key === "buscador_sel") { B.sel.clear(); try { (JSON.parse(e.newValue || "[]") || []).forEach((x) => B.sel.add(String(x))); } catch {} pintar(); } });
+}
+// raiz: el contenedor que le da el Dashboard. ctx: { login(msg) }.
+function montar(raiz, ctx = {}) {
+  CTX = { ...CTX, ...ctx };
+  escuchar();
+  const v = ls.get("caz_vista");
+  if (VISTAS.some(([k]) => k === v)) B.vista = v;
+  raiz.innerHTML = `<nav class="bo-tabs" id="bo-tabs" aria-label="Vistas del Cazador">${VISTAS.map(([k, t]) => `<button type="button" class="seccion" data-vista="${k}" aria-pressed="${k === B.vista}">${t}${k === "seleccionadas" ? ` <span class="num" id="tab-n">(0)</span>` : ""}</button>`).join("")}</nav>
+    <div id="bo-main"></div>`;
+  $$("#bo-tabs [data-vista]", raiz).forEach((b) => b.onclick = () => irA(b.dataset.vista));
+  B.montado = true;
   if (!DEMO && !clave()) return login();
-  cargar();
+  pintar();
+  // Datos guardados: se muestran al toque y se refrescan si tienen más de 10 min.
+  if (!B.datos || !B.cargado || Date.now() - B.cargado > 10 * 60000) cargar(); else cargarPedidos();
   if (B.vista === "seleccionadas") arrancarRefresco();
 }
-iniciar();
+function desmontar() {
+  if (!B.montado) return;
+  B.montado = false;
+  pararRefresco();
+  cerrarModal();
+}
+window.Cazador = { montar, desmontar, refrescar: () => { if (B.montado) cargar(); }, pintarBarra: () => { if (B.montado) pintarBarra(); } };
+})();

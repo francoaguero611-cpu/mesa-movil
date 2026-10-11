@@ -219,7 +219,6 @@ function pintarMenu() {
     </button>
     <button class="item" role="menuitem" id="mi-reglas"><span>Reglas<br><small>ver y editar las automáticas</small></span><span aria-hidden="true">⚙</span></button>
     <button class="item" role="menuitem" id="mi-log"><span>Registro de acciones<br><small>últimas 50</small></span><span aria-hidden="true">📜</span></button>
-    <a class="item" role="menuitem" style="text-decoration:none;color:inherit" href="buscador.html${DEMO ? "?demo=1" : ""}"><span>Buscador de ofertas<br><small>competencia ganadora y oportunidades</small></span><span aria-hidden="true">🔎</span></a>
     <button class="item" role="menuitem" id="mi-avisos"><span>Activar avisos<br><small id="mi-avisos-tx">…</small></span><span aria-hidden="true">🔔</span></button>
     <button class="item" role="menuitem" id="mi-probar"><span>Probar aviso<br><small>${DEMO ? "muestra uno de ejemplo" : "manda uno a tus equipos"}</small></span><span aria-hidden="true">✉</span></button>
     ${DEMO ? `<button class="item" role="menuitem" id="mi-ejemplos"><span>Avisos de ejemplo<br><small>uno de cada tipo</small></span><span aria-hidden="true">✦</span></button>` : ""}
@@ -350,7 +349,7 @@ async function cargarDetalle(c, forzar = false) {
 // ---------- montaje ----------
 function montar() {
   pararRanking(); S.vista = "dash"; ls.set("dash_seccion", "dash");
-  if (location.hash === "#ranking") { try { history.replaceState(null, "", location.pathname + location.search); } catch {} }
+  if (location.hash && seccionDe(location.hash.slice(1))) { try { history.replaceState(null, "", location.pathname + location.search); } catch {} }
   pintarNav();
   $("#main").innerHTML = `
     <div class="sel-grupo-caja boceto"><label class="sr" for="sel-grupo">Oferta y mercado</label><select id="sel-grupo" class="sel-grupo"></select><span class="sel-flecha" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M5.5 9.5 C 8 12, 10.5 14, 12.2 15.5 C 14 13.6, 16.4 11.6, 18.6 9.2" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
@@ -717,6 +716,7 @@ function resumenNiveles(its) {
 }
 function pintarBarra() {
   if (S.vista === "ranking" && $("#rk")) return pintarBarraRanking();
+  if (S.vista === "cazador") { const b = $("#barra"); b.hidden = true; b.innerHTML = ""; return window.Cazador?.pintarBarra(); }
   const b = $("#barra");
   const its = [...S.sel.values()];
   if (!its.length || !$("#carr")) { b.hidden = true; b.innerHTML = ""; return; }
@@ -1899,29 +1899,109 @@ function eventoPendiente() {
   try { mostrarEvento(JSON.parse(p)); } catch {}
 }
 
-// ---------- secciones: Dashboard / Ranking (10/10) ----------
+// ---------- secciones: slider (11/10) ----------
+// PARA AGREGAR UNA SECCIÓN: sumá un objeto a esta lista y listo, el slider se arma solo.
+//   id      → va en la dirección (#id) y en S.vista
+//   nombre  → texto del botón
+//   icono   → path de un SVG 24×24 (trazo a mano, sin relleno)
+//   raiz    → selector que existe solo cuando la sección está montada (para no remontarla)
+//   montar  → función que pinta la sección en #main (tiene que poner S.vista = id y llamar a pintarNav())
+//   ya      → (opcional) qué hacer si se toca la sección estando adentro; si no está, sube arriba de todo
+const SECCIONES = [
+  { id: "dash", nombre: "Dashboard", raiz: "#carr", icono: "M4 20 C 9 19.6, 15 20.2, 20.5 19.8 M6.5 17 V11.5 M11.5 17 V6.5 M16.5 17 V9.5",
+    montar: () => { try { history.replaceState(null, "", location.pathname + location.search); } catch {} montar(); window.scrollTo(0, 0); } },
+  { id: "ranking", nombre: "Ranking", raiz: "#rk", icono: "M4.5 6 C 6 5.8, 7.4 5.9, 8.6 6 M4.5 12 C 6.5 11.8, 9 11.9, 11.6 12 M4.5 18 C 7.5 17.8, 11 17.9, 14.6 18 M15.5 8.5 L18.5 5.2 L21 8.4",
+    montar: (o) => montarRanking(o), ya: (o) => { if (o.pedido != null) abrirPedido(o.pedido); } },
+  { id: "cazador", nombre: "Cazador", raiz: "#caz", icono: "M12 4.2 C 16.5 4, 19.9 7.4, 19.8 12 C 19.7 16.6, 16.4 19.9, 12 19.8 C 7.5 19.7, 4.2 16.5, 4.2 12 C 4.3 7.6, 7.4 4.3, 12.6 4.3 M12 1.8 V7 M12 17 V22.2 M1.8 12 H7 M17 12 H22.2 M11.9 11.6 L12.1 12.4",
+    montar: () => montarCazador() },
+];
+const seccionDe = (id) => SECCIONES.find((x) => x.id === id) || null;
+
+function armarSlider() {
+  const n = $("#secciones"); if (!n || n.dataset.armado) return;
+  n.dataset.armado = "1";
+  n.innerHTML = `<button type="button" class="sec-flecha izq" data-mover="-1" aria-label="Ver secciones anteriores" tabindex="-1">${svgFlecha(18)}</button>
+    <div class="sec-pista" id="sec-pista">${SECCIONES.map((s) => `<button type="button" class="seccion" data-sec="${esc(s.id)}" aria-pressed="false"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="${s.icono}" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>${esc(s.nombre)}</button>`).join("")}</div>
+    <button type="button" class="sec-flecha der" data-mover="1" aria-label="Ver más secciones" tabindex="-1">${svgFlecha(18)}</button>`;
+  const p = $("#sec-pista", n);
+  const bordes = () => {
+    const max = p.scrollWidth - p.clientWidth;
+    n.classList.toggle("hay-izq", p.scrollLeft > 4);
+    n.classList.toggle("hay-der", p.scrollLeft < max - 4);
+  };
+  p.addEventListener("scroll", bordes, { passive: true });
+  addEventListener("resize", bordes);
+  $$("[data-mover]", n).forEach((b) => b.onclick = (e) => { e.stopPropagation(); p.scrollBy({ left: Number(b.dataset.mover) * p.clientWidth * 0.7, behavior: reducido() ? "auto" : "smooth" }); });
+  requestAnimationFrame(bordes);
+}
 function pintarNav() {
   const n = $("#secciones"); if (!n) return;
+  armarSlider();
   n.hidden = false;
-  const sec = S.vista === "ranking" ? "ranking" : "dash";
+  const sec = seccionDe(S.vista) ? S.vista : "dash";
   $$("[data-sec]", n).forEach((b) => b.setAttribute("aria-pressed", b.dataset.sec === sec));
+  const act = $(`[data-sec="${sec}"]`, n), p = $("#sec-pista", n);
+  if (act && p) {
+    const izq = act.offsetLeft - p.offsetLeft, der = izq + act.offsetWidth;
+    if (izq < p.scrollLeft || der > p.scrollLeft + p.clientWidth) p.scrollTo({ left: Math.max(0, izq - 24), behavior: reducido() ? "auto" : "smooth" });
+  }
 }
 function abrirInicial() {
-  if (location.hash === "#ranking" || (location.hash !== "#dash" && ls.get("dash_seccion") === "ranking")) montarRanking();
-  else montar();
+  const h = location.hash.slice(1);
+  const guardada = ls.get("dash_seccion");
+  const s = seccionDe(h) || seccionDe(guardada) || SECCIONES[0];
+  s.montar({});
 }
 function irASeccion(sec, opts = {}) {
   cerrarMenu();
-  if (sec === "ranking") {
-    if (reglasSucias()) { toast("Tenés cambios sin guardar en Reglas: guardalos o descartalos antes de cambiar de sección.", "error", 8000); return false; }
-    RG.draft.clear(); RG.campoMal.clear();
-    if (S.vista === "ranking" && $("#rk")) { if (opts.pedido != null) abrirPedido(opts.pedido); return true; }
-    montarRanking(opts);
+  const s = seccionDe(sec) || SECCIONES[0];
+  if (s.id === "dash" && S.vista === "reglas") { volverDeReglas(); return true; }
+  if (reglasSucias()) { toast("Tenés cambios sin guardar en Reglas: guardalos o descartalos antes de cambiar de sección.", "error", 8000); return false; }
+  RG.draft.clear(); RG.campoMal.clear();
+  if (S.vista === s.id && $(s.raiz)) {
+    if (s.ya) s.ya(opts); else window.scrollTo({ top: 0, behavior: reducido() ? "auto" : "smooth" });
     return true;
   }
-  if (S.vista === "reglas") { volverDeReglas(); return true; }
-  if (S.vista === "dash" && $("#carr")) { window.scrollTo({ top: 0, behavior: reducido() ? "auto" : "smooth" }); return true; }
-  return irAlDash();
+  s.montar(opts);
+  return true;
+}
+
+// ---------- Cazador (antes «Buscador de ofertas», 11/10): buscador.js se carga la primera vez ----------
+let cazCarga = null;
+function cargarCazador() {
+  if (window.Cazador) return Promise.resolve();
+  if (cazCarga) return cazCarga;
+  const css = new Promise((ok) => {
+    if ($('link[href^="buscador.css"]')) return ok();
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "buscador.css?v=2";
+    l.onload = l.onerror = () => ok(); document.head.appendChild(l);
+  });
+  const js = new Promise((ok, mal) => {
+    const sc = document.createElement("script"); sc.src = "buscador.js?v=3";
+    sc.onload = () => window.Cazador ? ok() : mal(new Error("El Cazador no arrancó"));
+    sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar el Cazador. ¿Hay conexión?")); };
+    document.head.appendChild(sc);
+  });
+  cazCarga = Promise.all([css, js]).catch((e) => { cazCarga = null; throw e; });
+  return cazCarga;
+}
+async function montarCazador() {
+  cerrarMenu(); pararRanking();
+  S.vista = "cazador"; ls.set("dash_seccion", "cazador");
+  try { history.replaceState(null, "", location.pathname + location.search + "#cazador"); } catch {}
+  pintarNav();
+  $("#main").innerHTML = `<section class="caz" id="caz" aria-labelledby="caz-t"><h2 class="sr" id="caz-t">Cazador de ofertas</h2><p class="vacio"><span class="cargador"></span>Abriendo el Cazador…</p></section>`;
+  pintarBarra();
+  window.scrollTo(0, 0);
+  try { await cargarCazador(); }
+  catch (e) {
+    if (S.vista !== "cazador" || !$("#caz")) return;
+    $("#caz").innerHTML = `<div class="err-box" role="alert"><b>No se pudo abrir el Cazador.</b> ${esc(e.message)}<div><button type="button" class="btn chico" id="caz-reintentar">Reintentar</button></div></div>`;
+    $("#caz-reintentar").onclick = montarCazador;
+    return;
+  }
+  if (S.vista !== "cazador" || !$("#caz")) return;
+  window.Cazador.montar($("#caz"), { login: (msg) => login(msg) });
 }
 
 // ---------- Ranking ----------
@@ -1970,7 +2050,8 @@ function buscarRk(k) {
   for (const g of gruposRk()) for (const a of g.anuncios || []) if (claveAd(g, a) === k) return { g: { clave: g.clave, etiqueta: g.etiqueta || g.oferta || g.clave, bandera: g.bandera || "" }, a };
   return RK.sel.get(k) || null;
 }
-function pararRanking() { clearInterval(RK.timer); RK.timer = null; }
+// (11/10) también desmonta el Cazador: todo cambio de sección pasa por acá.
+function pararRanking() { clearInterval(RK.timer); RK.timer = null; window.Cazador?.desmontar(); }
 
 function montarRanking({ pedido = null } = {}) {
   cerrarMenu(); pararRanking();
@@ -2653,7 +2734,7 @@ function fiestaHTML() {
 function iniciar() {
   pintarTema();
   pintarBadges();
-  $("#b-ref").onclick = () => { if (S.vista === "ranking" && $("#rk")) { cargarRanking(true); cargarFabrica(); } else if ($("#carr")) cargar(true); };
+  $("#b-ref").onclick = () => { if (S.vista === "ranking" && $("#rk")) { cargarRanking(true); cargarFabrica(); } else if (S.vista === "cazador") window.Cazador?.refrescar(); else if ($("#carr")) cargar(true); };
   $("#secciones").addEventListener("click", (e) => { const b = e.target.closest("[data-sec]"); if (b) irASeccion(b.dataset.sec); });
   matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", pintarTema);
   $("#b-menu").onclick = (e) => { e.stopPropagation(); $("#menu").hidden ? abrirMenu() : cerrarMenu(); };
@@ -2669,7 +2750,8 @@ function iniciar() {
     try { navigator.serviceWorker.startMessages(); } catch {}
   }
   window.addEventListener("hashchange", () => {
-    if (location.hash === "#ranking") { if (S.vista !== "ranking" && (DEMO || clave())) irASeccion("ranking"); return; }
+    const sec = seccionDe(location.hash.slice(1));
+    if (sec) { if (S.vista !== sec.id && (DEMO || clave())) irASeccion(sec.id); return; }
     const ev = leerHashEv(); if (ev) recibirEvento(ev);
   });
   document.addEventListener("visibilitychange", () => {
