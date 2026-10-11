@@ -1,12 +1,14 @@
 /* Service worker — Dashboard Lorenzo */
-const VERSION = "dash-v24";
-const SHELL = ["./", "index.html", "styles.css?v=24", "app.js?v=24", "demo.js?v=24", "manifest.webmanifest",
+const VERSION = "dash-v26";
+const SHELL = ["./", "index.html", "styles.css?v=24", "app.js?v=25", "demo.js?v=24", "manifest.webmanifest",
   "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png", "icons/apple-touch-icon.png"];
+// Buscador de ofertas: se guarda aparte y sin trabar la instalación si algún archivo falta en el hosting.
+const EXTRA = ["buscador.html", "buscador.css?v=1", "buscador.js?v=2"];
 const API_HOST = "tppcpnfzcxxusdhrlmdx.supabase.co";
 const API_CACHE = "dash-api";
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL).then(() => c.addAll(EXTRA).catch(() => {}))).then(() => self.skipWaiting()));
 });
 self.addEventListener("activate", (e) => {
   e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== VERSION && k !== API_CACHE && k !== "dash-fonts").map((k) => caches.delete(k)))).then(() => self.clients.claim()));
@@ -19,6 +21,7 @@ self.addEventListener("fetch", (e) => {
 
   // API: red primero; si falla, la última respuesta guardada (solo lecturas).
   if (url.host === API_HOST) {
+    if (url.pathname.includes("/buscador-ofertas")) return;   // buscador: siempre red, nunca caché
     const accion = url.searchParams.get("accion");
     if (!["dash", "dash_detalle", "ranking"].includes(accion) || url.searchParams.has("dry")) return;
     const clave = new URL(url); clave.searchParams.delete("forzar");
@@ -52,8 +55,9 @@ self.addEventListener("fetch", (e) => {
 
   // Navegación: red primero (para que los deploys lleguen), shell guardado si no hay red.
   if (req.mode === "navigate") {
-    e.respondWith(fetch(req).then((r) => { const c = r.clone(); caches.open(VERSION).then((x) => x.put("index.html", c)); return r; })
-      .catch(() => caches.match("index.html")));
+    const pagina = url.pathname.endsWith("/buscador.html") ? "buscador.html" : "index.html";
+    e.respondWith(fetch(req).then((r) => { if (r.ok) { const c = r.clone(); caches.open(VERSION).then((x) => x.put(pagina, c)); } return r; })
+      .catch(() => caches.match(pagina).then((hit) => hit || caches.match("index.html"))));
     return;
   }
   // Shell: caché primero.

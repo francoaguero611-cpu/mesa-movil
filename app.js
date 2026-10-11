@@ -219,6 +219,7 @@ function pintarMenu() {
     </button>
     <button class="item" role="menuitem" id="mi-reglas"><span>Reglas<br><small>ver y editar las automáticas</small></span><span aria-hidden="true">⚙</span></button>
     <button class="item" role="menuitem" id="mi-log"><span>Registro de acciones<br><small>últimas 50</small></span><span aria-hidden="true">📜</span></button>
+    <a class="item" role="menuitem" style="text-decoration:none;color:inherit" href="buscador.html${DEMO ? "?demo=1" : ""}"><span>Buscador de ofertas<br><small>competencia ganadora y oportunidades</small></span><span aria-hidden="true">🔎</span></a>
     <button class="item" role="menuitem" id="mi-avisos"><span>Activar avisos<br><small id="mi-avisos-tx">…</small></span><span aria-hidden="true">🔔</span></button>
     <button class="item" role="menuitem" id="mi-probar"><span>Probar aviso<br><small>${DEMO ? "muestra uno de ejemplo" : "manda uno a tus equipos"}</small></span><span aria-hidden="true">✉</span></button>
     ${DEMO ? `<button class="item" role="menuitem" id="mi-ejemplos"><span>Avisos de ejemplo<br><small>uno de cada tipo</small></span><span aria-hidden="true">✦</span></button>` : ""}

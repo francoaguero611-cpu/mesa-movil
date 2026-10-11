@@ -1,0 +1,393 @@
+{
+ "generado": "2026-10-11T08:00:00Z",
+ "mercados": {
+  "anglo": "Anglo (US, GB, CA, AU, NZ, IE)",
+  "br": "Brasil",
+  "ar": "Argentina",
+  "eu": "Europa (FR, IT, DE, ES)"
+ },
+ "ofertas": [
+  {
+   "id": "572142332658520",
+   "page_id": "572142332658520",
+   "page_name": "Fit & Healthy After 50",
+   "page_pic": null,
+   "producto": "Walking Yoga — quiz que termina en plan personalizado",
+   "angulo": "Yoga caminando para +50: bajar de peso sin gimnasio ni impacto en las rodillas",
+   "nicho": "fitness",
+   "tipo_producto": "quiz → app",
+   "idioma": "inglés",
+   "formato": "quiz",
+   "dominio": "walking.yoga",
+   "landing_url": "https://walking.yoga/start",
+   "activos_total": 684,
+   "activos": {
+    "anglo": 455,
+    "br": 2,
+    "ar": 178,
+    "eu": 514
+   },
+   "activo_desde": "2026-09-18",
+   "dias_activa": 23,
+   "paises": [
+    "anglo",
+    "ar",
+    "eu"
+   ],
+   "video": {
+    "src": "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+    "poster": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22270%22%20height%3D%22480%22%20viewBox%3D%220%200%20270%20480%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%232f5d62%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23142224%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22270%22%20height%3D%22480%22%20fill%3D%22url%28%23g%29%22/%3E%3Ccircle%20cx%3D%22135%22%20cy%3D%22200%22%20r%3D%2254%22%20fill%3D%22%23ffffff%22%20opacity%3D%22.25%22/%3E%3Ctext%20x%3D%22135%22%20y%3D%22330%22%20font-family%3D%22sans-serif%22%20font-size%3D%2224%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EFit%3C/text%3E%3C/svg%3E",
+    "collation_count": 20,
+    "ad_archive_id": "572142001",
+    "titulo": "Walking Yoga — quiz que termina en plan personalizado",
+    "texto": "Yoga caminando para +50: bajar de peso sin gimnasio ni impacto en las rodillas",
+    "start_date": "2026-09-18"
+   },
+   "videos_top": [
+    {
+     "src": "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+     "poster": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22270%22%20height%3D%22480%22%20viewBox%3D%220%200%20270%20480%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%232f5d62%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23142224%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22270%22%20height%3D%22480%22%20fill%3D%22url%28%23g%29%22/%3E%3Ccircle%20cx%3D%22135%22%20cy%3D%22200%22%20r%3D%2254%22%20fill%3D%22%23ffffff%22%20opacity%3D%22.25%22/%3E%3Ctext%20x%3D%22135%22%20y%3D%22330%22%20font-family%3D%22sans-serif%22%20font-size%3D%2224%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EFit%3C/text%3E%3C/svg%3E",
+     "collation_count": 20,
+     "ad_archive_id": "572142001",
+     "titulo": "Walking Yoga — quiz que termina en plan personalizado",
+     "texto": "Yoga caminando para +50: bajar de peso sin gimnasio ni impacto en las rodillas",
+     "start_date": "2026-09-18"
+    }
+   ],
+   "biblioteca_url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id=572142332658520",
+   "biblioteca_dominio_url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&media_type=all&q=walking.yoga&search_type=keyword_unordered",
+   "oportunidades": [
+    {
+     "mercado": "br",
+     "fuerte_en": "anglo",
+     "activos_fuerte": 455,
+     "activos_aca": 2,
+     "nivel": "alta",
+     "texto": "Oportunidad en Brasil: poca competencia"
+    }
+   ],
+   "actualizado": "2026-10-11T07:40:00Z",
+   "fuente": "demo"
+  },
+  {
+   "id": "611903455120044",
+   "page_id": "611903455120044",
+   "page_name": "Receitas da Vovó",
+   "page_pic": null,
+   "producto": "Cardápio anti-inflamatório de 21 dias",
+   "angulo": "Desinchar en 21 días con recetas de la abuela, sin dieta",
+   "nicho": "salud",
+   "tipo_producto": "ebook",
+   "idioma": "portugués",
+   "formato": "landing",
+   "dominio": "receitasdavovo.com.br",
+   "landing_url": "https://receitasdavovo.com.br/21dias",
+   "activos_total": 412,
+   "activos": {
+    "anglo": 0,
+    "br": 398,
+    "ar": 0,
+    "eu": 14
+   },
+   "activo_desde": "2026-08-30",
+   "dias_activa": 42,
+   "paises": [
+    "br",
+    "eu"
+   ],
+   "video": {
+    "src": "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+    "poster": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22270%22%20height%3D%22480%22%20viewBox%3D%220%200%20270%20480%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23a3361f%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%234d2219%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22270%22%20height%3D%22480%22%20fill%3D%22url%28%23g%29%22/%3E%3Ccircle%20cx%3D%22135%22%20cy%3D%22200%22%20r%3D%2254%22%20fill%3D%22%23ffffff%22%20opacity%3D%22.25%22/%3E%3Ctext%20x%3D%22135%22%20y%3D%22330%22%20font-family%3D%22sans-serif%22%20font-size%3D%2224%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EReceitas%3C/text%3E%3C/svg%3E",
+    "collation_count": 13,
+    "ad_archive_id": "611903001",
+    "titulo": "Cardápio anti-inflamatório de 21 dias",
+    "texto": "Desinchar en 21 días con recetas de la abuela, sin dieta",
+    "start_date": "2026-08-30"
+   },
+   "videos_top": [
+    {
+     "src": "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+     "poster": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22270%22%20height%3D%22480%22%20viewBox%3D%220%200%20270%20480%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23a3361f%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%234d2219%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22270%22%20height%3D%22480%22%20fill%3D%22url%28%23g%29%22/%3E%3Ccircle%20cx%3D%22135%22%20cy%3D%22200%22%20r%3D%2254%22%20fill%3D%22%23ffffff%22%20opacity%3D%22.25%22/%3E%3Ctext%20x%3D%22135%22%20y%3D%22330%22%20font-family%3D%22sans-serif%22%20font-size%3D%2224%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EReceitas%3C/text%3E%3C/svg%3E",
+     "collation_count": 13,
+     "ad_archive_id": "611903001",
+     "titulo": "Cardápio anti-inflamatório de 21 dias",
+     "texto": "Desinchar en 21 días con recetas de la abuela, sin dieta",
+     "start_date": "2026-08-30"
+    }
+   ],
+   "biblioteca_url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id=611903455120044",
+   "biblioteca_dominio_url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&media_type=all&q=receitasdavovo.com.br&search_type=keyword_unordered",
+   "oportunidades": [
+    {
+     "mercado": "anglo",
+     "fuerte_en": "br",
+     "activos_fuerte": 398,
+     "activos_aca": 0,
+     "nivel": "alta",
+     "texto": "Oportunidad en Anglo: poca competencia"
+    },
+    {
+     "mercado": "ar",
+     "fuerte_en": "br",
+     "activos_fuerte": 398,
+     "activos_aca": 0,
+     "nivel": "media",
+     "texto": "Oportunidad en Argentina: poca competencia"
+    }
+   ],
+   "actualizado": "2026-10-11T07:40:00Z",
+   "fuente": "demo"
+  },
+  {
+   "id": "700112998877001",
+   "page_id": "700112998877001",
+   "page_name": "Mente Millonaria",
+   "page_pic": null,
+   "producto": "Método de ahorro en 30 días + planilla",
+   "angulo": "Cómo dejar de llegar a fin de mes con 3 reglas simples",
+   "nicho": "finanzas",
+   "tipo_producto": "curso",
+   "idioma": "español",
+   "formato": "vsl",
+   "dominio": "mentemillonaria.co",
+   "landing_url": "https://mentemillonaria.co/vsl",
+   "activos_total": 355,
+   "activos": {
+    "anglo": 0,
+    "br": 0,
+    "ar": 290,
+    "eu": 65
+   },
+   "activo_desde": "2026-09-02",
+   "dias_activa": 39,
+   "paises": [
+    "ar",
+    "eu"
+   ],
+   "video": null,
+   "videos_top": [],
+   "biblioteca_url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id=700112998877001",
+   "biblioteca_dominio_url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&media_type=all&q=mentemillonaria.co&search_type=keyword_unordered",
+   "oportunidades": [
+    {
+     "mercado": "br",
+     "fuerte_en": "ar",
+     "activos_fuerte": 290,
+     "activos_aca": 0,
+     "nivel": "media",
+     "texto": "Oportunidad en Brasil: poca competencia"
+    }
+   ],
+   "actualizado": "2026-10-11T07:40:00Z",
+   "fuente": "demo"
+  },
+  {
+   "id": "889900112233445",
+   "page_id": "889900112233445",
+   "page_name": "Patterns by Elena",
+   "page_pic": null,
+   "producto": "1.500 moldes de costura en PDF",
+   "angulo": "Moldes imprimibles en todos los talles para coser tu ropa",
+   "nicho": "costura",
+   "tipo_producto": "pack PDF",
+   "idioma": "inglés",
+   "formato": "landing",
+   "dominio": "patternsbyelena.com",
+   "landing_url": "https://patternsbyelena.com",
+   "activos_total": 298,
+   "activos": {
+    "anglo": 260,
+    "br": null,
+    "ar": 12,
+    "eu": null
+   },
+   "activo_desde": "2026-09-25",
+   "dias_activa": 16,
+   "paises": [
+    "anglo",
+    "ar"
+   ],
+   "video": {
+    "src": null,
+    "poster": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22270%22%20height%3D%22480%22%20viewBox%3D%220%200%20270%20480%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%232f6b2a%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%2310230e%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22270%22%20height%3D%22480%22%20fill%3D%22url%28%23g%29%22/%3E%3Ccircle%20cx%3D%22135%22%20cy%3D%22200%22%20r%3D%2254%22%20fill%3D%22%23ffffff%22%20opacity%3D%22.25%22/%3E%3Ctext%20x%3D%22135%22%20y%3D%22330%22%20font-family%3D%22sans-serif%22%20font-size%3D%2224%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EIMAGEN%3C/text%3E%3C/svg%3E",
+    "collation_count": 5,
+    "ad_archive_id": "889900002",
+    "titulo": "1.500 moldes de costura en PDF",
+    "texto": "Moldes imprimibles en todos los talles para coser tu ropa",
+    "start_date": "2026-09-25"
+   },
+   "videos_top": [
+    {
+     "src": null,
+     "poster": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22270%22%20height%3D%22480%22%20viewBox%3D%220%200%20270%20480%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%232f6b2a%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%2310230e%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22270%22%20height%3D%22480%22%20fill%3D%22url%28%23g%29%22/%3E%3Ccircle%20cx%3D%22135%22%20cy%3D%22200%22%20r%3D%2254%22%20fill%3D%22%23ffffff%22%20opacity%3D%22.25%22/%3E%3Ctext%20x%3D%22135%22%20y%3D%22330%22%20font-family%3D%22sans-serif%22%20font-size%3D%2224%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EIMAGEN%3C/text%3E%3C/svg%3E",
+     "collation_count": 5,
+     "ad_archive_id": "889900002",
+     "titulo": "1.500 moldes de costura en PDF",
+     "texto": "Moldes imprimibles en todos los talles para coser tu ropa",
+     "start_date": "2026-09-25"
+    }
+   ],
+   "biblioteca_url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id=889900112233445",
+   "biblioteca_dominio_url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&media_type=all&q=patternsbyelena.com&search_type=keyword_unordered",
+   "oportunidades": [],
+   "actualizado": "2026-10-11T07:40:00Z",
+   "fuente": "demo"
+  },
+  {
+   "id": "123450987600011",
+   "page_id": "123450987600011",
+   "page_name": "Bible Kids 3D",
+   "page_pic": null,
+   "producto": "Biblia ilustrada en 3D para niños",
+   "angulo": "Historias bíblicas que los chicos piden antes de dormir",
+   "nicho": "religión",
+   "tipo_producto": "app",
+   "idioma": "alemán",
+   "formato": "quiz",
+   "dominio": "bibelkinder.de",
+   "landing_url": "https://bibelkinder.de/quiz",
+   "activos_total": 190,
+   "activos": {
+    "anglo": 40,
+    "br": 0,
+    "ar": 0,
+    "eu": 150
+   },
+   "activo_desde": "2026-10-01",
+   "dias_activa": 10,
+   "paises": [
+    "anglo",
+    "eu"
+   ],
+   "video": {
+    "src": "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+    "poster": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22270%22%20height%3D%22480%22%20viewBox%3D%220%200%20270%20480%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%233b372f%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%231b1a17%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22270%22%20height%3D%22480%22%20fill%3D%22url%28%23g%29%22/%3E%3Ccircle%20cx%3D%22135%22%20cy%3D%22200%22%20r%3D%2254%22%20fill%3D%22%23ffffff%22%20opacity%3D%22.25%22/%3E%3Ctext%20x%3D%22135%22%20y%3D%22330%22%20font-family%3D%22sans-serif%22%20font-size%3D%2224%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EBible%3C/text%3E%3C/svg%3E",
+    "collation_count": 7,
+    "ad_archive_id": "123450001",
+    "titulo": "Biblia ilustrada en 3D para niños",
+    "texto": "Historias bíblicas que los chicos piden antes de dormir",
+    "start_date": "2026-10-01"
+   },
+   "videos_top": [
+    {
+     "src": "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+     "poster": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22270%22%20height%3D%22480%22%20viewBox%3D%220%200%20270%20480%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%233b372f%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%231b1a17%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22270%22%20height%3D%22480%22%20fill%3D%22url%28%23g%29%22/%3E%3Ccircle%20cx%3D%22135%22%20cy%3D%22200%22%20r%3D%2254%22%20fill%3D%22%23ffffff%22%20opacity%3D%22.25%22/%3E%3Ctext%20x%3D%22135%22%20y%3D%22330%22%20font-family%3D%22sans-serif%22%20font-size%3D%2224%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EBible%3C/text%3E%3C/svg%3E",
+     "collation_count": 7,
+     "ad_archive_id": "123450001",
+     "titulo": "Biblia ilustrada en 3D para niños",
+     "texto": "Historias bíblicas que los chicos piden antes de dormir",
+     "start_date": "2026-10-01"
+    }
+   ],
+   "biblioteca_url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id=123450987600011",
+   "biblioteca_dominio_url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&media_type=all&q=bibelkinder.de&search_type=keyword_unordered",
+   "oportunidades": [],
+   "actualizado": "2026-10-11T07:40:00Z",
+   "fuente": "demo"
+  },
+  {
+   "id": "998877665544332",
+   "page_id": "998877665544332",
+   "page_name": "Keto Lisa",
+   "page_pic": null,
+   "producto": "Plan keto de 28 días con lista del súper",
+   "angulo": "Keto para mujeres ocupadas: menús en 10 minutos",
+   "nicho": "nutrición",
+   "tipo_producto": "ebook",
+   "idioma": "inglés",
+   "formato": "whatsapp",
+   "dominio": "ketolisa.com",
+   "landing_url": "https://ketolisa.com/wa",
+   "activos_total": 132,
+   "activos": {
+    "anglo": 120,
+    "br": 0,
+    "ar": 0,
+    "eu": 12
+   },
+   "activo_desde": "2026-09-28",
+   "dias_activa": 13,
+   "paises": [
+    "anglo",
+    "eu"
+   ],
+   "video": {
+    "src": "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+    "poster": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22270%22%20height%3D%22480%22%20viewBox%3D%220%200%20270%20480%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%2393460c%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%234d3117%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22270%22%20height%3D%22480%22%20fill%3D%22url%28%23g%29%22/%3E%3Ccircle%20cx%3D%22135%22%20cy%3D%22200%22%20r%3D%2254%22%20fill%3D%22%23ffffff%22%20opacity%3D%22.25%22/%3E%3Ctext%20x%3D%22135%22%20y%3D%22330%22%20font-family%3D%22sans-serif%22%20font-size%3D%2224%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EKeto%3C/text%3E%3C/svg%3E",
+    "collation_count": 6,
+    "ad_archive_id": "998877001",
+    "titulo": "Plan keto de 28 días con lista del súper",
+    "texto": "Keto para mujeres ocupadas: menús en 10 minutos",
+    "start_date": "2026-09-28"
+   },
+   "videos_top": [
+    {
+     "src": "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+     "poster": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22270%22%20height%3D%22480%22%20viewBox%3D%220%200%20270%20480%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%2393460c%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%234d3117%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22270%22%20height%3D%22480%22%20fill%3D%22url%28%23g%29%22/%3E%3Ccircle%20cx%3D%22135%22%20cy%3D%22200%22%20r%3D%2254%22%20fill%3D%22%23ffffff%22%20opacity%3D%22.25%22/%3E%3Ctext%20x%3D%22135%22%20y%3D%22330%22%20font-family%3D%22sans-serif%22%20font-size%3D%2224%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EKeto%3C/text%3E%3C/svg%3E",
+     "collation_count": 6,
+     "ad_archive_id": "998877001",
+     "titulo": "Plan keto de 28 días con lista del súper",
+     "texto": "Keto para mujeres ocupadas: menús en 10 minutos",
+     "start_date": "2026-09-28"
+    }
+   ],
+   "biblioteca_url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id=998877665544332",
+   "biblioteca_dominio_url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&media_type=all&q=ketolisa.com&search_type=keyword_unordered",
+   "oportunidades": [],
+   "actualizado": "2026-10-11T07:40:00Z",
+   "fuente": "demo"
+  },
+  {
+   "id": "445566778899001",
+   "page_id": "445566778899001",
+   "page_name": "Cuero Fácil",
+   "page_pic": null,
+   "producto": "Moldes de marroquinería + videos",
+   "angulo": "Hacé tu primera billetera de cuero con 3 herramientas",
+   "nicho": "cuero",
+   "tipo_producto": "curso",
+   "idioma": "español",
+   "formato": "landing",
+   "dominio": "cuerofacil.com",
+   "landing_url": "https://cuerofacil.com",
+   "activos_total": 64,
+   "activos": {
+    "anglo": 0,
+    "br": 0,
+    "ar": 58,
+    "eu": 6
+   },
+   "activo_desde": "2026-10-05",
+   "dias_activa": 6,
+   "paises": [
+    "ar",
+    "eu"
+   ],
+   "video": {
+    "src": "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+    "poster": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22270%22%20height%3D%22480%22%20viewBox%3D%220%200%20270%20480%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%235f6368%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%2324221e%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22270%22%20height%3D%22480%22%20fill%3D%22url%28%23g%29%22/%3E%3Ccircle%20cx%3D%22135%22%20cy%3D%22200%22%20r%3D%2254%22%20fill%3D%22%23ffffff%22%20opacity%3D%22.25%22/%3E%3Ctext%20x%3D%22135%22%20y%3D%22330%22%20font-family%3D%22sans-serif%22%20font-size%3D%2224%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3ECuero%3C/text%3E%3C/svg%3E",
+    "collation_count": 4,
+    "ad_archive_id": "445566001",
+    "titulo": "Moldes de marroquinería + videos",
+    "texto": "Hacé tu primera billetera de cuero con 3 herramientas",
+    "start_date": "2026-10-05"
+   },
+   "videos_top": [
+    {
+     "src": "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+     "poster": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22270%22%20height%3D%22480%22%20viewBox%3D%220%200%20270%20480%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%235f6368%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%2324221e%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22270%22%20height%3D%22480%22%20fill%3D%22url%28%23g%29%22/%3E%3Ccircle%20cx%3D%22135%22%20cy%3D%22200%22%20r%3D%2254%22%20fill%3D%22%23ffffff%22%20opacity%3D%22.25%22/%3E%3Ctext%20x%3D%22135%22%20y%3D%22330%22%20font-family%3D%22sans-serif%22%20font-size%3D%2224%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3ECuero%3C/text%3E%3C/svg%3E",
+     "collation_count": 4,
+     "ad_archive_id": "445566001",
+     "titulo": "Moldes de marroquinería + videos",
+     "texto": "Hacé tu primera billetera de cuero con 3 herramientas",
+     "start_date": "2026-10-05"
+    }
+   ],
+   "biblioteca_url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id=445566778899001",
+   "biblioteca_dominio_url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&media_type=all&q=cuerofacil.com&search_type=keyword_unordered",
+   "oportunidades": [],
+   "actualizado": "2026-10-11T07:40:00Z",
+   "fuente": "demo"
+  }
+ ]
+}

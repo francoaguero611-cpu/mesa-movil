@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Dashboard Lorenzo</title>
-<meta name="description" content="Facturación, ROAS y campañas de Meta por oferta y mercado">
+<title>Buscador de ofertas</title>
+<meta name="description" content="Ofertas de la competencia que más escalan y oportunidades por mercado">
 <meta name="theme-color" content="#f4efe2" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1b1a17" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Dashboard">
+<meta name="apple-mobile-web-app-title" content="Buscador">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=24">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png?v=24">
@@ -19,6 +19,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css?v=24">
+<link rel="stylesheet" href="buscador.css?v=1">
 <script>
   // Tema antes de pintar, para que no parpadee.
   try { var t = localStorage.getItem("dash_tema"); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
@@ -37,22 +38,21 @@
 <div id="app">
   <header class="top">
     <div class="marca">
-      <h1>Dashboard</h1>
+      <a class="bo-volver link" href="index.html">← Dashboard</a>
+      <h1>Buscador de ofertas</h1>
       <svg class="garabato" viewBox="0 0 160 12" aria-hidden="true"><path d="M2 8 C 30 3, 52 11, 80 6 S 130 3, 158 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
-      <p class="hola">Bienvenido, Lorenzo</p>
+      <p class="hola">Competencia ganadora y oportunidades</p>
       <div id="badges" class="badges"></div>
     </div>
     <div class="acciones-top">
-      <button class="btn icono" id="b-ref" type="button" aria-label="Actualizar datos (pide datos nuevos a Meta)"><span class="gira">↻</span></button>
-      <div class="menu-wrap">
-        <button class="btn icono" id="b-menu" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Menú">☰</button>
-        <div class="menu boceto" id="menu" role="menu" hidden></div>
-      </div>
+      <button class="btn icono" id="b-ref" type="button" aria-label="Actualizar la lista de ofertas"><span class="gira">↻</span></button>
+      <button class="btn icono" id="b-tema" type="button" aria-label="Cambiar entre modo claro y oscuro">◐</button>
     </div>
   </header>
-  <nav class="secciones" id="secciones" aria-label="Secciones" hidden>
-    <button type="button" class="seccion" data-sec="dash" aria-pressed="true"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 20 C 9 19.6, 15 20.2, 20.5 19.8 M6.5 17 V11.5 M11.5 17 V6.5 M16.5 17 V9.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>Dashboard</button>
-    <button type="button" class="seccion" data-sec="ranking" aria-pressed="false"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4.5 6 C 6 5.8, 7.4 5.9, 8.6 6 M4.5 12 C 6.5 11.8, 9 11.9, 11.6 12 M4.5 18 C 7.5 17.8, 11 17.9, 14.6 18 M15.5 8.5 L18.5 5.2 L21 8.4" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Ranking</button>
+  <nav class="bo-tabs" id="tabs" aria-label="Vistas" hidden>
+    <button type="button" class="seccion" data-vista="ganadoras" aria-pressed="true">Ganadoras</button>
+    <button type="button" class="seccion" data-vista="oportunidades" aria-pressed="false">Oportunidades</button>
+    <button type="button" class="seccion" data-vista="seleccionadas" aria-pressed="false">Seleccionadas <span class="num" id="tab-n">(0)</span></button>
   </nav>
   <main id="main"></main>
 </div>
@@ -61,6 +61,6 @@
 <div id="toasts" class="toasts" aria-live="polite" aria-atomic="false"></div>
 <div id="modal-raiz"></div>
 
-<script src="app.js?v=25" defer></script>
+<script src="buscador.js?v=2" defer></script>
 </body>
 </html>
