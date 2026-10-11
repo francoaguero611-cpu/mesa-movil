@@ -1867,7 +1867,31 @@ function escalarDesdeAviso(tipo, ads) {
   for (const a of ads) S.sel.set("anuncio:" + a.id, { id: a.id, act: a.a, nivel: "anuncio", nombre: a.nom || a.id, estado: a.estado || (a.e === "P" ? "PAUSED" : "ACTIVE") });
   quizCap(tipo);
 }
+// (11/10) Aviso de un pedido de TESTEO del Cazador (app-movil le pone ev.sec = "cazador"): abre su paso a paso en el Cazador.
+function mostrarEventoTesteo(ev, ico, color, rotulo) {
+  const ped = ev.pedido != null && ev.pedido !== "" ? String(ev.pedido) : null;
+  const lista = ev.t === "fabrica_lista";
+  const html = `<div class="ev ev-${color} ev-${esc(ev.t)}">
+      ${lista ? fiestaHTML() : ""}
+      <div class="ev-ico boceto">${icoEvento(ico)}</div>
+      <div class="ev-rotulo">Cazador${ped ? ` · testeo #${esc(ped)}` : ""}</div>
+      <h3 class="ev-titulo">${esc(lista ? "¡Testeo armado! Espera tu dale" : tituloEvento(ev))}</h3>
+      <svg class="ev-garabato" viewBox="0 0 160 12" aria-hidden="true"><path d="M2 8 C 30 3, 52 11, 80 6 S 130 3, 158 7" pathLength="1"/></svg>
+      ${ev.r ? `<div class="ev-por"><span class="ev-por-lbl">${lista ? "qué hay" : "en qué va"}</span><p>${esc(ev.r)}</p></div>` : ""}
+      ${lista ? `<p class="ev-sig">Revisá la landing, los anuncios y la campaña. Está todo EN PAUSA hasta que des el dale.</p>` : ""}
+    </div>
+    <div class="botones"><button type="button" class="btn pri" data-ver data-foco>${ped ? "Ver el paso a paso" : "Listo"}</button></div>`;
+  eventoAbierto = true;
+  const m = abrirModal(html, { alCerrar: () => { eventoAbierto = false; irASeccion("cazador", { pedido: ped }); } });
+  m.dlg.classList.add("dialogo-ev");
+  m.dlg.setAttribute("aria-labelledby", "ev-t"); $(".ev-titulo", m.dlg).id = "ev-t";
+  const x = document.createElement("button");
+  x.type = "button"; x.className = "ev-cerrar"; x.setAttribute("aria-label", "Cerrar y ver el testeo"); x.textContent = "✕";
+  x.onclick = m.cerrar; m.dlg.prepend(x);
+  $("[data-ver]", m.dlg).onclick = m.cerrar;
+}
 function mostrarEventoFabrica(ev, ico, color, rotulo) {
+  if (ev.sec === "cazador") return mostrarEventoTesteo(ev, ico, color, rotulo);
   const ped = ev.pedido != null && ev.pedido !== "" ? String(ev.pedido) : null;
   const lista = ev.t === "fabrica_lista", lanzada = ev.t === "fabrica_lanzada";
   let despues = null;
@@ -2012,7 +2036,7 @@ const SECCIONES = [
   { id: "ranking", nombre: "Ranking", raiz: "#rk", icono: "M4.5 6 C 6 5.8, 7.4 5.9, 8.6 6 M4.5 12 C 6.5 11.8, 9 11.9, 11.6 12 M4.5 18 C 7.5 17.8, 11 17.9, 14.6 18 M15.5 8.5 L18.5 5.2 L21 8.4",
     montar: (o) => montarRanking(o), ya: (o) => { if (o.pedido != null) abrirPedido(o.pedido); } },
   { id: "cazador", nombre: "Cazador", raiz: "#caz", icono: "M12 4.2 C 16.5 4, 19.9 7.4, 19.8 12 C 19.7 16.6, 16.4 19.9, 12 19.8 C 7.5 19.7, 4.2 16.5, 4.2 12 C 4.3 7.6, 7.4 4.3, 12.6 4.3 M12 1.8 V7 M12 17 V22.2 M1.8 12 H7 M17 12 H22.2 M11.9 11.6 L12.1 12.4",
-    montar: () => montarCazador() },
+    montar: (o) => montarCazador(o), ya: (o) => { if (o.pedido != null) window.Cazador?.abrirPedido(o.pedido); } },
 ];
 const seccionDe = (id) => SECCIONES.find((x) => x.id === id) || null;
 
@@ -2072,11 +2096,11 @@ function cargarCazador() {
   if (cazCarga) return cazCarga;
   const css = new Promise((ok) => {
     if ($('link[href^="buscador.css"]')) return ok();
-    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "buscador.css?v=2";
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "buscador.css?v=3";
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "buscador.js?v=3";
+    const sc = document.createElement("script"); sc.src = "buscador.js?v=4";
     sc.onload = () => window.Cazador ? ok() : mal(new Error("El Cazador no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar el Cazador. ¿Hay conexión?")); };
     document.head.appendChild(sc);
@@ -2084,7 +2108,8 @@ function cargarCazador() {
   cazCarga = Promise.all([css, js]).catch((e) => { cazCarga = null; throw e; });
   return cazCarga;
 }
-async function montarCazador() {
+// (11/10) o.pedido: abre el paso a paso de ese pedido de testeo (desde el pop-up de un aviso de la fábrica)
+async function montarCazador(o = {}) {
   cerrarMenu(); pararRanking();
   S.vista = "cazador"; ls.set("dash_seccion", "cazador");
   try { history.replaceState(null, "", location.pathname + location.search + "#cazador"); } catch {}
@@ -2096,11 +2121,11 @@ async function montarCazador() {
   catch (e) {
     if (S.vista !== "cazador" || !$("#caz")) return;
     $("#caz").innerHTML = `<div class="err-box" role="alert"><b>No se pudo abrir el Cazador.</b> ${esc(e.message)}<div><button type="button" class="btn chico" id="caz-reintentar">Reintentar</button></div></div>`;
-    $("#caz-reintentar").onclick = montarCazador;
+    $("#caz-reintentar").onclick = () => montarCazador(o);
     return;
   }
   if (S.vista !== "cazador" || !$("#caz")) return;
-  window.Cazador.montar($("#caz"), { login: (msg) => login(msg) });
+  window.Cazador.montar($("#caz"), { login: (msg) => login(msg), pedido: o?.pedido ?? null });
 }
 
 // ---------- Ranking ----------
