@@ -2096,11 +2096,11 @@ function cargarCazador() {
   if (cazCarga) return cazCarga;
   const css = new Promise((ok) => {
     if ($('link[href^="buscador.css"]')) return ok();
-    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "buscador.css?v=3";
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "buscador.css?v=4";
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "buscador.js?v=5";
+    const sc = document.createElement("script"); sc.src = "buscador.js?v=6";
     sc.onload = () => window.Cazador ? ok() : mal(new Error("El Cazador no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar el Cazador. ¿Hay conexión?")); };
     document.head.appendChild(sc);

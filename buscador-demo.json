@@ -138,7 +138,26 @@
     "miniatura": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22270%22%20height%3D%22480%22%20viewBox%3D%220%200%20270%20480%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%232f5d62%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23142224%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22270%22%20height%3D%22480%22%20fill%3D%22url%28%23g%29%22/%3E%3Ccircle%20cx%3D%22135%22%20cy%3D%22200%22%20r%3D%2254%22%20fill%3D%22%23ffffff%22%20opacity%3D%22.25%22/%3E%3Ctext%20x%3D%22135%22%20y%3D%22330%22%20font-family%3D%22sans-serif%22%20font-size%3D%2224%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EFit%3C/text%3E%3C/svg%3E",
     "collation_count": 20
    },
-   "puntaje_oportunidad": 88
+   "puntaje_oportunidad": 88,
+   "mercados_detalle": {
+    "anglo": {
+     "US": 300,
+     "GB": 80,
+     "CA": 45,
+     "AU": 30
+    },
+    "eu": {
+     "DE": 200,
+     "FR": 150,
+     "IT": 110,
+     "ES": 54
+    },
+    "latam": {
+     "MX": 120,
+     "AR": 40,
+     "CO": 18
+    }
+   }
   },
   {
    "id": "611903455120044",
@@ -242,7 +261,12 @@
     "miniatura": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22270%22%20height%3D%22480%22%20viewBox%3D%220%200%20270%20480%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23a3361f%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%234d2219%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22270%22%20height%3D%22480%22%20fill%3D%22url%28%23g%29%22/%3E%3Ccircle%20cx%3D%22135%22%20cy%3D%22200%22%20r%3D%2254%22%20fill%3D%22%23ffffff%22%20opacity%3D%22.25%22/%3E%3Ctext%20x%3D%22135%22%20y%3D%22330%22%20font-family%3D%22sans-serif%22%20font-size%3D%2224%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EReceitas%3C/text%3E%3C/svg%3E",
     "collation_count": 13
    },
-   "puntaje_oportunidad": 81
+   "puntaje_oportunidad": 81,
+   "mercados_detalle": {
+    "br": {
+     "BR": 398
+    }
+   }
   },
   {
    "id": "700112998877001",
@@ -315,7 +339,20 @@
    "activa_desde": "2026-07-14",
    "mercado_recomendado": "br",
    "video_top": null,
-   "puntaje_oportunidad": 62
+   "puntaje_oportunidad": 62,
+   "mercados_detalle": {
+    "latam": {
+     "MX": 120,
+     "CO": 80,
+     "CL": 40,
+     "AR": 25,
+     "PE": 15,
+     "US": 10
+    },
+    "es": {
+     "ES": 65
+    }
+   }
   },
   {
    "id": "889900112233445",
@@ -431,7 +468,17 @@
     "miniatura": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22270%22%20height%3D%22480%22%20viewBox%3D%220%200%20270%20480%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%232f6b2a%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%2310230e%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22270%22%20height%3D%22480%22%20fill%3D%22url%28%23g%29%22/%3E%3Ccircle%20cx%3D%22135%22%20cy%3D%22200%22%20r%3D%2254%22%20fill%3D%22%23ffffff%22%20opacity%3D%22.25%22/%3E%3Ctext%20x%3D%22135%22%20y%3D%22330%22%20font-family%3D%22sans-serif%22%20font-size%3D%2224%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EIMAGEN%3C/text%3E%3C/svg%3E",
     "collation_count": 5
    },
-   "puntaje_oportunidad": 79
+   "puntaje_oportunidad": 79,
+   "mercados_detalle": {
+    "anglo": {
+     "US": 150,
+     "GB": 50,
+     "CA": 30,
+     "AU": 20,
+     "NZ": 6,
+     "IE": 4
+    }
+   }
   },
   {
    "id": "123450987600011",
@@ -455,9 +502,18 @@
    },
    "activo_desde": "2026-10-01",
    "paises": [
-    "US",
-    "CA",
-    "BR"
+    {
+     "pais": "US",
+     "anuncios": 30
+    },
+    {
+     "pais": "CA",
+     "anuncios": 10
+    },
+    {
+     "pais": "BR",
+     "anuncios": 2
+    }
    ],
    "video": {
     "src": "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",

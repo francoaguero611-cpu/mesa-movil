@@ -200,7 +200,19 @@ function norm(o) {
   let mercados = Array.isArray(o.mercados) ? o.mercados.map((m) => mkKey(typeof m === "object" ? (m.clave || m.id || m.mercado) : m)).filter(Boolean)
     : Object.keys(porMk).filter((k) => num(porMk[k]) > 0).map(mkKey);
   mercados = [...new Set(mercados)].sort((a, b) => (ORDEN_MK.indexOf(a) + 99) % 99 - (ORDEN_MK.indexOf(b) + 99) % 99);
-  const paises = (Array.isArray(o.paises) ? o.paises : []).map((p) => String(p).toUpperCase()).filter((p) => /^[A-Z]{2}$/.test(p));
+  // paises[]: strings ISO («MX») o, si el backend los manda con conteo, objetos {pais|cc|codigo, anuncios|n}
+  const paisesN = {};
+  const paises = (Array.isArray(o.paises) ? o.paises : []).map((p) => {
+    if (p && typeof p === "object") { const c = String(p.pais || p.cc || p.codigo || p.code || p.country || "").toUpperCase(); const k = num(p.anuncios ?? p.n ?? p.activos ?? p.count); if (c && k != null) paisesN[c] = k; return c; }
+    return String(p).toUpperCase();
+  }).filter((p) => /^[A-Z]{2}$/.test(p));
+  // (11/10) mercados_detalle: {MERCADO: {CC: n}} (anuncios por país dentro de cada mercado)
+  const detalle = {};
+  if (o.mercados_detalle && typeof o.mercados_detalle === "object") for (const [mk, xs] of Object.entries(o.mercados_detalle)) {
+    if (!xs || typeof xs !== "object") continue;
+    const lista = Object.entries(xs).map(([c, k]) => [String(c).toUpperCase(), num(k)]).filter(([c]) => /^[A-Z]{2}$/.test(c));
+    if (lista.length) detalle[mkKey(mk)] = lista;
+  }
   const paginas = Array.isArray(o.paginas) && o.paginas.length
     ? o.paginas.map((p) => typeof p === "string" ? { nombre: p } : { id: p.id ?? p.page_id, nombre: p.nombre ?? p.name ?? p.page_name, pic: p.pic ?? p.page_pic ?? p.foto })
     : (o.page_name || o.page_id ? [{ id: o.page_id, nombre: o.page_name, pic: o.page_pic }] : []);
@@ -220,7 +232,7 @@ function norm(o) {
     marca: o.page_name || paginas[0]?.nombre || "", pic: url(o.page_pic || paginas[0]?.pic),
     angulo: o.angulo || "", nicho: o.nicho || "", idioma: o.idioma || "",
     precio: o.precio ?? null, moneda: o.moneda || null,
-    anuncios, porMk, mercados, paises, paginas, desde, dias, video, formato, principal,
+    anuncios, porMk, mercados, paises, paisesN, detalle, paginas, desde, dias, video, formato, principal,
     landing: url(o.landing_url || o.landing), dominio: o.dominio || "",
     biblioteca: url(o.biblioteca_url), bibliotecaDom: url(o.biblioteca_dominio_url),
     oportunidades: [], puntaje: null, recomendado: null,
@@ -589,10 +601,47 @@ function videoHTML(o) {
   const play = v.src ? `<button type="button" class="bo-play" data-play="${esc(o.id)}" aria-label="Reproducir el video más escalado de ${esc(o.nombre)}">${SVG_PLAY}</button>` : `<span class="bo-img-tag">imagen</span>`;
   return `<div class="bo-vid" data-vid="${esc(o.id)}">${media}${play}${fo}${usos}${caja(o)}</div>`;
 }
+// (11/10) países de cada mercado: mercados_detalle si viene; si no, paises[] (con o sin conteo) repartidos por mercado
+const MK_PAISES = {
+  anglo: ["US", "GB", "CA", "AU", "NZ", "IE"], latam: MOD.latam[2],
+  eu: ["FR", "IT", "DE", "ES", "PT", "NL", "BE", "AT", "CH", "SE", "NO", "DK", "FI", "PL", "IE", "GR", "CZ", "RO", "HU", "LU"],
+  fr: ["FR", "BE"], de: ["DE", "AT", "CH"], nordicos: ["SE", "NO", "DK", "FI"],
+};
+let NOMBRE_PAIS = null;
+try { NOMBRE_PAIS = new Intl.DisplayNames(["es"], { type: "region" }); } catch {}
+const nombrePais = (c) => { try { return NOMBRE_PAIS?.of(c) || c; } catch { return c; } };
+const paisEnMk = (c, k) => { const mp = B.datos?.mercados_paises?.[k]; const xs = Array.isArray(mp) && mp.length ? mp : MK_PAISES[k]; return xs ? xs.includes(c) : c.toLowerCase() === k; };
+function paisesDe(o, k) {
+  const xs = o.detalle[k] || o.paises.filter((c) => paisEnMk(c, k)).map((c) => [c, o.paisesN[c] ?? null]);
+  return [...xs].sort((a, b) => (b[1] ?? -1) - (a[1] ?? -1));
+}
 function mercadosHTML(o) {
   if (!o.mercados.length) return `<p class="bo-mks mut">Mercados sin dato</p>`;
   return `<ul class="bo-mks" aria-label="Mercados donde corre">${o.mercados.map((k) => { const n = num(o.porMk[k]);
-    return `<li${B.filtro.mercado === k ? ' class="on"' : ""}>${esc(corto(k))}${n != null ? ` <b class="num">${ent(n)}</b>` : ""}</li>`; }).join("")}</ul>`;
+    const tx = `${esc(corto(k))}${n != null ? ` <b class="num">${ent(n)}</b>` : ""}`;
+    const on = B.filtro.mercado === k ? ' class="on"' : "";
+    if (!paisesDe(o, k).length) return `<li${on}><span class="bo-mk">${tx}</span></li>`;
+    return `<li${on}><button type="button" class="bo-mk" data-mkp="${esc(k)}" aria-expanded="false" aria-controls="mkp-${esc(o.id)}" title="Ver países de ${esc(nombreMercado(k))}">${tx}<span class="bo-mk-fl" aria-hidden="true"></span></button></li>`; }).join("")}</ul>
+    <div class="bo-mkp" id="mkp-${esc(o.id)}" role="region" aria-live="polite" hidden></div>`;
+}
+function paisesPanel(o, k) {
+  const xs = paisesDe(o, k);
+  const con = xs.some(([, n]) => n != null);
+  return `<p class="bo-mkp-t">${bandera(k)} ${esc(nombreMercado(k))}: ${pl(xs.length, "país", "países")}</p>
+    <ul class="bo-mkp-l">${xs.map(([c, n]) => `<li><span class="bo-mkp-b" aria-hidden="true">${bandera(c.toLowerCase())}</span><span class="bo-mkp-n">${esc(nombrePais(c))}</span>${n != null ? `<b class="num">${ent(n)}</b>` : ""}</li>`).join("")}</ul>
+    ${con ? "" : `<p class="bo-mkp-sin mut">Sin conteo por país todavía</p>`}`;
+}
+function bindMercados(raiz) {
+  $$("[data-mkp]", raiz).forEach((b) => b.onclick = () => {
+    const card = b.closest("[data-fila]"); const o = porId(card?.dataset.fila); if (!o) return;
+    const panel = $(".bo-mkp", card); const k = b.dataset.mkp;
+    const abierto = b.getAttribute("aria-expanded") === "true";
+    $$("[data-mkp]", card).forEach((x) => x.setAttribute("aria-expanded", "false"));
+    if (abierto) { panel.hidden = true; panel.innerHTML = ""; return; }
+    b.setAttribute("aria-expanded", "true");
+    panel.innerHTML = paisesPanel(o, k); panel.setAttribute("aria-label", `Países de ${nombreMercado(k)}`); panel.hidden = false;
+  });
+  $$("[data-mkp]", raiz).forEach((b) => b.onkeydown = (e) => { if (e.key === "Escape" && b.getAttribute("aria-expanded") === "true") { e.stopPropagation(); b.click(); } });
 }
 function paisesTx(o) {
   if (!o.paises.length) return "";
@@ -659,6 +708,7 @@ function mirarCuadros(raiz) {
 }
 function bindTarjetas(raiz) {
   mirarCuadros(raiz);
+  bindMercados(raiz);
   $$("[data-sel]", raiz).forEach((c) => c.onchange = () => elegir(c.dataset.sel, c.checked));
   $$("[data-det]", raiz).forEach((b) => b.onclick = () => detalleOferta(b.dataset.det));
   $$("[data-play]", raiz).forEach((b) => b.onclick = () => {
