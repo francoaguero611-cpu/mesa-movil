@@ -717,6 +717,7 @@ function resumenNiveles(its) {
 function pintarBarra() {
   if (S.vista === "ranking" && $("#rk")) return pintarBarraRanking();
   if (S.vista === "cazador") { const b = $("#barra"); b.hidden = true; b.innerHTML = ""; return window.Cazador?.pintarBarra(); }
+  if (S.vista === "workspace") { const b = $("#barra"); b.hidden = true; b.innerHTML = ""; return; }
   const b = $("#barra");
   const its = [...S.sel.values()];
   if (!its.length || !$("#carr")) { b.hidden = true; b.innerHTML = ""; return; }
@@ -2051,6 +2052,8 @@ const SECCIONES = [
     montar: (o) => montarRanking(o), ya: (o) => { if (o.pedido != null) abrirPedido(o.pedido); } },
   { id: "cazador", nombre: "Cazador", raiz: "#caz", icono: "M12 4.2 C 16.5 4, 19.9 7.4, 19.8 12 C 19.7 16.6, 16.4 19.9, 12 19.8 C 7.5 19.7, 4.2 16.5, 4.2 12 C 4.3 7.6, 7.4 4.3, 12.6 4.3 M12 1.8 V7 M12 17 V22.2 M1.8 12 H7 M17 12 H22.2 M11.9 11.6 L12.1 12.4",
     montar: (o) => montarCazador(o), ya: (o) => { if (o.pedido != null) window.Cazador?.abrirPedido(o.pedido); } },
+  { id: "workspace", nombre: "Workspace", raiz: "#ws", icono: "M3.8 5 C 9 4.8, 15 5.1, 20.2 4.9 L20 19.2 C 14.8 19.4, 9 19.1, 4 19.2 Z M7 9.5 L9.8 12 L7 14.5 M12 15 H16.5",
+    montar: () => montarWorkspace() },
 ];
 const seccionDe = (id) => SECCIONES.find((x) => x.id === id) || null;
 
@@ -2142,6 +2145,44 @@ async function montarCazador(o = {}) {
   window.Cazador.montar($("#caz"), { login: (msg) => login(msg), pedido: o?.pedido ?? null });
 }
 
+// ---------- Workspace (12/10): workspace.js se carga la primera vez. Spec: Segundo-cerebro-business/OUTPUTS/2026-10-12-workspace-spec.md ----------
+let wsCarga = null;
+function cargarWorkspace() {
+  if (window.Workspace) return Promise.resolve();
+  if (wsCarga) return wsCarga;
+  const css = new Promise((ok) => {
+    if ($('link[href^="workspace.css"]')) return ok();
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "workspace.css?v=1";
+    l.onload = l.onerror = () => ok(); document.head.appendChild(l);
+  });
+  const js = new Promise((ok, mal) => {
+    const sc = document.createElement("script"); sc.src = "workspace.js?v=1";
+    sc.onload = () => window.Workspace ? ok() : mal(new Error("El Workspace no arrancó"));
+    sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar el Workspace. ¿Hay conexión?")); };
+    document.head.appendChild(sc);
+  });
+  wsCarga = Promise.all([css, js]).catch((e) => { wsCarga = null; throw e; });
+  return wsCarga;
+}
+async function montarWorkspace() {
+  cerrarMenu(); pararRanking();
+  S.vista = "workspace"; ls.set("dash_seccion", "workspace");
+  try { history.replaceState(null, "", location.pathname + location.search + "#workspace"); } catch {}
+  pintarNav();
+  $("#main").innerHTML = `<section class="ws" id="ws" aria-labelledby="ws-t"><h2 class="sr" id="ws-t">Workspace</h2><p class="vacio"><span class="cargador"></span>Abriendo el Workspace…</p></section>`;
+  pintarBarra();
+  window.scrollTo(0, 0);
+  try { await cargarWorkspace(); }
+  catch (e) {
+    if (S.vista !== "workspace" || !$("#ws")) return;
+    $("#ws").innerHTML = `<div class="err-box" role="alert"><b>No se pudo abrir el Workspace.</b> ${esc(e.message)}<div><button type="button" class="btn chico" id="ws-reintentar">Reintentar</button></div></div>`;
+    $("#ws-reintentar").onclick = () => montarWorkspace();
+    return;
+  }
+  if (S.vista !== "workspace" || !$("#ws")) return;
+  window.Workspace.montar($("#ws"), { login: (msg) => login(msg) });
+}
+
 // ---------- Ranking ----------
 const RK = {
   periodo: periodoValido(ls.get("rk_periodo")) ? ls.get("rk_periodo") : "3d",
@@ -2189,7 +2230,7 @@ function buscarRk(k) {
   return RK.sel.get(k) || null;
 }
 // (11/10) también desmonta el Cazador: todo cambio de sección pasa por acá.
-function pararRanking() { clearInterval(RK.timer); RK.timer = null; window.Cazador?.desmontar(); }
+function pararRanking() { clearInterval(RK.timer); RK.timer = null; window.Cazador?.desmontar(); window.Workspace?.desmontar(); }
 
 function montarRanking({ pedido = null } = {}) {
   cerrarMenu(); pararRanking();
