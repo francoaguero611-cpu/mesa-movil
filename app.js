@@ -134,7 +134,7 @@ async function api(accion, { q = "", body = null, escritura = false } = {}) {
 let demoP = null;
 function cargarDemo() {
   if (window.DemoAPI) return Promise.resolve();
-  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=29"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=30"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
   return demoP;
 }
 
@@ -732,13 +732,13 @@ function pintarBarra() {
     <button type="button" class="btn chico" id="b-limpiar">limpiar</button>
     <span class="sp"></span>
     <div class="acciones-sel">
-    ${soloAds ? `<span class="caps">${its.length === 1 ? `<button type="button" class="btn chico" id="b-aislada">Aislada</button>` : ""}<button type="button" class="btn chico" id="b-bidcap">BidCap</button><button type="button" class="btn chico" id="b-costcap">CostCap</button></span>` : ""}
+    ${soloAds ? `<span class="caps">${its.length === 1 ? `<button type="button" class="btn chico" id="b-aislada">Aislada</button>` : ""}<button type="button" class="btn chico" id="b-bidcap">BidCap</button><button type="button" class="btn chico" id="b-costcap">CostCap</button><button type="button" class="btn chico" id="b-horizontal" title="Madre topada: CBO 1-1-winners en otra cuenta">Escala</button></span>` : ""}
     <div class="grupo-sw"><span class="sw-lbl" id="sw-lbl">${lbl}</span>
       <button type="button" class="switch" role="switch" id="sw" aria-checked="${est}" aria-labelledby="sw-lbl" aria-describedby="sw-ayuda"><span class="perilla" aria-hidden="true"></span></button>
       <span class="sr" id="sw-ayuda">Deslizá o tocá para ${est === "true" ? "apagar" : est === "false" ? "prender" : "prender o apagar"} lo seleccionado en Meta. Pide confirmación.</span>
     </div></div>`;
   $("#b-limpiar").onclick = () => { S.sel.clear(); pintarTabla(); pintarBarra(); };
-  if (soloAds) { $("#b-bidcap").onclick = () => quizCap("bidcap"); $("#b-costcap").onclick = () => quizCap("costcap"); const ba = $("#b-aislada"); if (ba) ba.onclick = () => quizCap("aislada"); }
+  if (soloAds) { $("#b-bidcap").onclick = () => quizCap("bidcap"); $("#b-costcap").onclick = () => quizCap("costcap"); $("#b-horizontal").onclick = () => quizCap("horizontal"); const ba = $("#b-aislada"); if (ba) ba.onclick = () => quizCap("aislada"); }
   switchArrastrable($("#sw"), est);
 }
 function switchArrastrable(sw, est) {
@@ -829,10 +829,12 @@ function actualizarEstadoLocal(id, estado) {
 function quizCap(tipo) {
   const ads = [...S.sel.values()].filter((i) => i.nivel === "anuncio");
   const acts = [...new Set(ads.map((a) => a.act))];
-  const T = tipo === "bidcap" ? "BidCap" : tipo === "aislada" ? "CBO aislada" : "CostCap";
+  const T = tipo === "bidcap" ? "BidCap" : tipo === "aislada" ? "CBO aislada" : tipo === "horizontal" ? "Escala horizontal" : "CostCap";
   const AIS = tipo === "aislada";
-  const nomEsc = (e) => AIS ? "1 anuncio por Post ID" : e === "cpa5" ? (tipo === "bidcap" ? "CPA promedio × 2 +5" : "CPA promedio +5") : "Doble ticket −5";
-  let presupuesto = 30.55;
+  // (12/10 b) método Santi: CBO 1-1-winners por Post ID en OTRA cuenta (la elegís acá) y presupuesto en tickets del front
+  const RT = tipo === "horizontal" ? { min: 5, max: 20, def: 10 } : { min: 20, max: 30, def: 20 };
+  const nomEsc = () => AIS ? "1 anuncio por Post ID" : tipo === "costcap" ? "front ÷ 2 × 1,3" : tipo === "bidcap" ? "front × 1,3" : "CBO 1-1-winners";
+  let presupuesto = 30.55, destino = null, tickets = RT.def;
   if (acts.length > 1) {
     const m = abrirModal(`<h3>Son de cuentas distintas</h3><p>Para armar una ${T} los anuncios tienen que ser de la misma cuenta publicitaria. Elegiste de ${acts.length} cuentas:</p>
       <ul class="lista-nombres">${ads.map((a) => `<li><span class="niv">${esc(a.act)}</span><span>${esc(a.nombre)}</span></li>`).join("")}</ul>
@@ -844,25 +846,37 @@ function quizCap(tipo) {
   const body = { tipo, act, ads: ads.map((a) => a.id) };
   let ocupado = false;
   const m = abrirModal("", { ancho: true, bloqueado: () => ocupado });
-  const paso1 = () => {
+  const paso1 = async () => {
     if (AIS) return paso2(null);
+    ocupado = true;
+    m.set(`<h3>${T} con ${plural(ads.length, "anuncio")}</h3><p class="mut"><span class="cargador"></span>Buscando cuentas con pago andando…</p>`);
+    let lista;
+    try { lista = await api("cap_cuentas", { q: `&act=${encodeURIComponent(act)}` }); }
+    catch (e) {
+      ocupado = false;
+      if (e.code === 401) { m.cerrar(); ls.del("dash_clave"); return login("Clave incorrecta"); }
+      m.set(`<h3>No se pudo</h3><div class="err-box">${esc(e.message)}</div><div class="botones"><button class="btn pri" data-x>Cerrar</button></div>`); $("[data-x]", m.dlg).onclick = m.cerrar; return;
+    }
+    ocupado = false;
+    const cs = lista.cuentas || [];
     m.set(`<h3>${T} con ${plural(ads.length, "anuncio")}</h3>
-      <p class="mut">¿Cómo armo la escalera de pujas? Un conjunto por puja, US$ 50,55 cada uno. Los anuncios van por Post ID.</p>
-      <div class="opciones">
-        ${tipo === "bidcap"
-          ? `<button type="button" class="opcion" data-esc="cpa5" data-foco><b>CPA promedio × 2 +5</b><span>CPA × 2, subiendo de a US$ 1 hasta CPA × 2 + 5 (CPA 10 → 20…25).</span></button>`
-          : `<button type="button" class="opcion" data-esc="cpa5" data-foco><b>CPA promedio +5</b><span>Desde el CPA promedio real de estos anuncios (sin decimales) subiendo de a US$ 1 hasta CPA + 5.</span></button>`}
-        <button type="button" class="opcion" data-esc="doble"><b>Doble ticket −5</b><span>Desde 2× el ticket bajando de a US$ 1, 6 escalones (ticket 10 → 20, 19, 18, 17, 16, 15).</span></button>
-      </div>
+      <p class="mut">Método Santi: CBO 1-1-winners por Post ID en <b>otra cuenta</b> (nunca la de la madre)${tipo === "costcap" ? ", puja = front ÷ 2 × 1,3" : tipo === "bidcap" ? ", puja = front × 1,3" : ", sin puja"}. Elegí la cuenta:</p>
+      <div class="opciones">${cs.map((c) => `<button type="button" class="opcion" data-cta="${esc(c.act)}" ${c.elegible ? "" : "disabled"}><b>${esc(c.nombre)}</b><span>${esc(c.act)}${c.moneda ? ` · ${esc(c.moneda)}` : ""}${c.pago ? ` · ${esc(c.pago)}` : ""}${c.vigilada ? " · ya vigilada" : ""}${c.motivo ? ` · ${esc(c.motivo)}` : ""}${c.aviso ? ` · ${esc(c.aviso)}` : ""}</span></button>`).join("") || `<p class="mut">No hay cuentas.</p>`}</div>
+      <div class="pres-ais"><label for="tickets">Presupuesto en tickets del front (${RT.min} a ${RT.max})</label><input class="campo num" id="tickets" inputmode="numeric" value="${tickets}"></div>
+      <div class="mut" id="tk-err" role="alert"></div>
       <div class="botones"><button type="button" class="btn" data-x>Cancelar</button></div>`);
     $("[data-x]", m.dlg).onclick = m.cerrar;
-    $$("[data-esc]", m.dlg).forEach((b) => b.onclick = () => paso2(b.dataset.esc));
+    $$("[data-cta]", m.dlg).forEach((b) => b.onclick = () => {
+      const v = Number(String($("#tickets").value).trim().replace(",", "."));
+      if (!(v >= RT.min && v <= RT.max)) { $("#tk-err").textContent = `Poné entre ${RT.min} y ${RT.max} tickets.`; $("#tickets").focus(); return; }
+      tickets = v; destino = b.dataset.cta; paso2(null);
+    });
   };
   const paso2 = async (escalera) => {
     ocupado = true;
     m.set(`<h3>${T} · ${nomEsc(escalera)}</h3><p class="mut"><span class="cargador"></span>Calculando el plan con los datos reales…</p>`);
     let plan;
-    try { plan = await api("cap_plan", { body: AIS ? { ...body, presupuesto } : { ...body, escalera } }); }
+    try { plan = await api("cap_plan", { body: AIS ? { ...body, presupuesto } : { ...body, act_destino: destino, tickets } }); }
     catch (e) {
       ocupado = false;
       if (e.code === 401) { m.cerrar(); ls.del("dash_clave"); return login("Clave incorrecta"); }
@@ -878,9 +892,8 @@ function quizCap(tipo) {
     const ini = p.inicio || {};
     const o = p.origen || {};
     const posts = o.posts || [];
-    const formula = c.texto || (AIS ? "" : escalera === "cpa5"
-      ? `CPA = ${NF2.format(c.gasto ?? 0)} ÷ ${c.compras ?? "?"} = ${NF2.format(c.cpa_promedio ?? 0)}${tipo === "bidcap" ? " × 2" : ""} → ${c.cpa_base ?? (p.bids || [])[0] ?? "?"}`
-      : `Ticket ${NF2.format(c.ticket ?? 0)} × 2 → ${(p.bids || [])[0] ?? "?"}`);
+    const formula = c.texto || "";
+    const cd = p.cuenta_destino || {}, pm = p.presupuesto_moneda;
     const nConj = p.conjuntos ?? 3;
     const bloqueCalc = AIS ? `<div class="calculo">
         <div class="formula">CBO con ${ent(nConj)} conjuntos, el mismo anuncio por Post ID en cada uno</div>
@@ -895,10 +908,11 @@ function quizCap(tipo) {
         <div class="formula num">${esc(formula)}</div>
         <div class="mut num">Gasto ${usd(c.gasto)} · ${ent(c.compras)} compras · CPA prom. ${usd(c.cpa_promedio)}${c.ticket ? ` · ticket ${usd(c.ticket)}` : ""}${c.ventana ? ` · ${esc(c.ventana)}` : ""}</div>
         ${c.ticket_fuente ? `<div class="mut">Ticket: ${esc(c.ticket_fuente)}</div>` : ""}
-        <div class="chips" aria-label="Pujas">${(p.bids || []).map((b) => `<span class="chip num">US$ ${esc(b)}</span>`).join("")}</div>
-        <div class="num"><b>${ent(p.conjuntos)} conjuntos × ${usd(p.presupuesto_conjunto)} = ${usd(p.presupuesto_total)} por día</b></div>
+        <div class="chips" aria-label="Puja">${(p.bids || []).map((b) => `<span class="chip num">puja US$ ${esc(b)}${p.bid_moneda && cd.moneda && cd.moneda !== "USD" ? ` = ${esc(p.bid_moneda)} ${esc(cd.moneda)}` : ""}</span>`).join("")}</div>
+        <div class="num"><b>CBO 1-1 · ${usd(p.presupuesto_campana)} por día${pm && pm.moneda !== "USD" ? ` (${NF2.format(pm.monto)} ${esc(pm.moneda)})` : ""}${c.tickets ? ` · ${ent(c.tickets)} tickets` : ""}</b></div>
       </div>`}
       <dl class="datos">
+        ${cd.nombre ? `<dt>Cuenta</dt><dd><b>${esc(cd.nombre)}</b> <span class="mut num">${esc(cd.act)}</span>${cd.vigilada ? "" : `<div class="mut">Se suma a la vigilancia (PUJA → cuentas extra)</div>`}</dd>` : ""}
         <dt>Campaña</dt><dd><b>${esc(p.nombre_campana)}</b>${(p.nombres_conjuntos || []).length ? `<div class="mut">${esc(p.nombres_conjuntos.join(" · "))}</div>` : ""}</dd>
         <dt>Inicio</dt><dd>${esc(ini.ar || ini.iso || "—")}${(ini.locales || []).length ? `<div class="mut">${ini.locales.map((l) => `${esc(l.pais)} ${esc(l.hora)}`).join(" · ")}</div>` : ""}${ini.regla ? `<div class="mut">${esc(ini.regla)}</div>` : ""}</dd>
         <dt>Países</dt><dd>${esc((o.paises || []).join(", ") || "—")}</dd>
@@ -928,7 +942,7 @@ function quizCap(tipo) {
     const bc = $("[data-crear]", m.dlg); bc.classList.add("cargando"); bc.innerHTML = `<span class="gira">↻</span> Creando…`;
     $("[data-v]", m.dlg).disabled = true;
     let r;
-    try { r = await api("cap_crear", { body: AIS ? { ...body, presupuesto, confirmar: true } : { ...body, escalera, confirmar: true }, escritura: true }); }
+    try { r = await api("cap_crear", { body: AIS ? { ...body, presupuesto, confirmar: true } : { ...body, act_destino: destino, tickets, confirmar: true }, escritura: true }); }
     catch (e) {
       ocupado = false;
       if (e.code === 401) { m.cerrar(); ls.del("dash_clave"); return login("Clave incorrecta"); }

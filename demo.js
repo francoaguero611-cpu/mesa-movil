@@ -124,6 +124,7 @@
   function buscarAd(id) { for (const c of ESTR) for (const s of c.conjuntos) for (const a of s.anuncios) if (a.id === id) return { c, s, a }; return null; }
 
   function capPlan(b) {
+    if (b.tipo !== "aislada") return capPlanSanti(b);
     const encontrados = (b.ads || []).map(buscarAd).filter(Boolean);
     if (!encontrados.length) throw new Error("No encontré esos anuncios");
     const c = encontrados[0].c;
@@ -154,6 +155,27 @@
       avisos: ["falta ciclo de vida: lo aplica el proceso local (navegador invisible)", ...(compras < 4 ? [`Solo ${compras} compras en la ventana: el CPA puede estar sesgado.`] : [])] };
   }
 
+
+  // (12/10 b) método Santi: CBO 1-1-winners por Post ID en otra cuenta
+  function capPlanSanti(b) {
+    const encontrados = (b.ads || []).map(buscarAd).filter(Boolean);
+    if (!encontrados.length) throw new Error("No encontré esos anuncios");
+    if (!b.act_destino) throw new Error("falta act_destino: la escala va en una cuenta distinta de la madre");
+    const c = encontrados[0].c, f2 = (n) => n.toFixed(2).replace(".", ",");
+    const cap = b.tipo === "costcap" || b.tipo === "bidcap", tk = Number(b.tickets) || (b.tipo === "horizontal" ? 10 : 20);
+    const bid = b.tipo === "costcap" ? Math.round(c.ticket / 2 * 1.3) : b.tipo === "bidcap" ? Math.round(c.ticket * 1.3) : null;
+    const pres = Math.round(c.ticket * tk) + 0.55;
+    const man = new Date(Date.now() + 864e5), dm = `${man.getDate()}.${man.getMonth() + 1}`;
+    const T = b.tipo === "bidcap" ? "BIDCAP" : b.tipo === "costcap" ? "COSTCAP" : "CBO ESCALA";
+    const texto = (cap ? (b.tipo === "costcap" ? `CostCap = front ÷ 2 × 1,3 = ${f2(c.ticket)} ÷ 2 × 1,3 → ${bid} USD` : `BidCap = front × 1,3 = ${f2(c.ticket)} × 1,3 → ${bid} USD`) + " · " : "Escala horizontal (sin puja) · ") + `presupuesto ${tk} tickets × ${f2(c.ticket)} → ${f2(pres)} USD`;
+    return { tipo: b.tipo, metodo: "santi", estructura: "CBO", calculo: { ticket: c.ticket, tickets: tk, ventana: "últimos 7 días + hoy", texto },
+      bids: cap ? [bid] : [], bid_moneda: bid, presupuesto_campana: pres, presupuesto_total: pres, conjuntos: 1,
+      cuenta_destino: { act: b.act_destino, nombre: "Cuenta de escala (demo)", moneda: "USD", vigilada: false },
+      nombre_campana: `${c.band || ""} ${dm} ${T} ${c.oferta}`.trim(), nombres_conjuntos: [`${dm} ${cap ? `BID ${bid} USD` : "WINNERS"} (${encontrados.length} Post ID)`],
+      inicio: { iso: `${man.toISOString().slice(0, 10)}T00:00:00-0300`, ar: `${man.getDate()}/${man.getMonth() + 1} 00:00 AR`, locales: [], regla: "05:00 del país más adelantado" },
+      origen: { campana: c.nombre, pixel: "1126243803161942", paises: c.paises, pagina: c.oferta === "40 Días" ? "Mariana Gutierrez" : "Carolina Castro", posts: encontrados.map(({ a }) => ({ ad_id: a.id, post: a.post, nombre: a.nombre })) },
+      avisos: ["falta ciclo de vida: lo aplica el proceso local (navegador invisible)", "al crear, la cuenta se agrega a Reglas → PUJA → cuentas_extra"] };
+  }
 
   // ---------- Reglas (demo) ----------
   const ahoraISO = () => new Date().toISOString();
@@ -478,6 +500,11 @@
       };
       return { items: (body?.items || []).filter((i) => ESTADOS.has(i.id)).map((i) => ({ id: i.id, n: i.n, a: i.a, estado: ESTADOS.get(i.id), hoy: de(i.n, i.id, "hoy"), ayer: de(i.n, i.id, "ayer") })), errores: [] };
     }
+    if (accion === "cap_cuentas") return { origen: p.get("act"), cuentas_extra: [], cuentas: [
+      { act: "2992990974209825", nombre: "LATAM Ecom Leiva", moneda: "USD", pago: "VISA *5317", elegible: true, vigilada: false },
+      { act: "1050235314427621", nombre: "A1 WINNER Portafolio Europa", moneda: "USD", pago: "VISA *5092", elegible: true, vigilada: false },
+      { act: "1061270255420794", nombre: "Casa Olmos", moneda: "ARS", pago: "VISA *9022", elegible: true, vigilada: false, aviso: "en ARS: cortes-caps la vigila (convierte), cortes-testeos no (reglas en USD)" },
+      { act: "1653261475671762", nombre: "AR y MX", moneda: "USD", elegible: false, motivo: "cuenta pago pendiente (deuda)" }].filter((c) => c.act !== String(p.get("act") || "").replace("act_", "")) };
     if (accion === "cap_plan") return capPlan(body);
     if (accion === "cap_crear") {
       const plan = capPlan(body);
