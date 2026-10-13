@@ -7,6 +7,20 @@
    presupuesto, y paso a paso en vivo del pedido. Backup del anterior: buscador.js.bak-cazador2. */
 "use strict";
 (() => {
+// (13/10) Búsqueda sin importar tildes ni mayúsculas, y con 1 letra de error en palabras de 4+ letras («40 dais» encuentra «40 Días»)
+const sinTilde = (s) => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+function casi(a, b) { // a lo sumo 1 cambio: letra distinta, de más, de menos o dos letras cruzadas
+  if (a === b) return true;
+  const la = a.length, lb = b.length; if (Math.abs(la - lb) > 1) return false;
+  let i = 0; while (i < la && i < lb && a[i] === b[i]) i++;
+  if (la === lb) return a.slice(i + 1) === b.slice(i + 1) || (a[i] === b[i + 1] && a[i + 1] === b[i] && a.slice(i + 2) === b.slice(i + 2));
+  return la > lb ? a.slice(i + 1) === b.slice(i) : a.slice(i) === b.slice(i + 1);
+}
+function coincide(q, ...textos) {
+  const t = sinTilde(textos.join(" ")), pals = t.split(/[^a-z0-9]+/).filter(Boolean);
+  return sinTilde(q).split(/\s+/).filter(Boolean).every((w) => t.includes(w)
+    || (w.length >= 4 && pals.some((p) => casi(w, p) || (p.length > w.length && casi(w, p.slice(0, w.length))))));
+}
 let CTX = { login: () => {} };     // lo pasa app.js al montar
 
 const API = "https://tppcpnfzcxxusdhrlmdx.supabase.co/functions/v1/buscador-ofertas";
@@ -551,7 +565,7 @@ function filtradas() {
     if (f.formatos.length && !f.formatos.includes(o.formato)) return false;
     if (f.dmin != null && !(o.dias != null && o.dias >= f.dmin)) return false;
     if (f.dmax != null && !(o.dias != null && o.dias <= f.dmax)) return false;
-    if (q && ![o.nombre, o.marca, o.angulo, o.nicho, o.dominio, o.idioma, FORMATO_TX[o.formato], ...o.paginas.map((p) => p.nombre), ...o.paises].some((x) => String(x || "").toLowerCase().includes(q))) return false;
+    if (q && !coincide(q, ...[o.nombre, o.marca, o.angulo, o.nicho, o.dominio, o.idioma, FORMATO_TX[o.formato], ...o.paginas.map((p) => p.nombre), ...o.paises].map((x) => String(x || "")))) return false;
     return true;
   });
   const dias = (o) => o.dias ?? -1;

@@ -2121,7 +2121,7 @@ function cargarCazador() {
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "buscador.js?v=8";
+    const sc = document.createElement("script"); sc.src = "buscador.js?v=9";
     sc.onload = () => window.Cazador ? ok() : mal(new Error("El Cazador no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar el Cazador. ¿Hay conexión?")); };
     document.head.appendChild(sc);
@@ -2160,7 +2160,7 @@ function cargarCreativos() {
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "creativos.js?v=1";
+    const sc = document.createElement("script"); sc.src = "creativos.js?v=2";
     sc.onload = () => window.Creativos ? ok() : mal(new Error("Creativos no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar Creativos. ¿Hay conexión?")); };
     document.head.appendChild(sc);

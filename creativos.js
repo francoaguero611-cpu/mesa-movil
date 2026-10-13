@@ -25,6 +25,20 @@ const dm = (f) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(f || ""); return m
 const diaSem = (f) => { try { return DIAS[new Date(f + "T12:00:00Z").getUTCDay()]; } catch { return ""; } };
 const plata = (n) => n == null ? "—" : "$" + Number(n).toLocaleString("es-AR", { minimumFractionDigits: n >= 100 ? 0 : 2, maximumFractionDigits: n >= 100 ? 0 : 2 });
 const roasCls = (r) => r == null ? "gris" : r < 1 ? "rojo" : r < 1.5 ? "nar" : r < 2 ? "ama" : "ver";
+// (13/10) Búsqueda sin importar tildes ni mayúsculas, y con 1 letra de error en palabras de 4+ letras («40 dais» encuentra «40 Días»)
+const sinTilde = (s) => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+function casi(a, b) { // a lo sumo 1 cambio: letra distinta, de más, de menos o dos letras cruzadas
+  if (a === b) return true;
+  const la = a.length, lb = b.length; if (Math.abs(la - lb) > 1) return false;
+  let i = 0; while (i < la && i < lb && a[i] === b[i]) i++;
+  if (la === lb) return a.slice(i + 1) === b.slice(i + 1) || (a[i] === b[i + 1] && a[i + 1] === b[i] && a.slice(i + 2) === b.slice(i + 2));
+  return la > lb ? a.slice(i + 1) === b.slice(i) : a.slice(i) === b.slice(i + 1);
+}
+function coincide(q, ...textos) {
+  const t = sinTilde(textos.join(" ")), pals = t.split(/[^a-z0-9]+/).filter(Boolean);
+  return sinTilde(q).split(/\s+/).filter(Boolean).every((w) => t.includes(w)
+    || (w.length >= 4 && pals.some((p) => casi(w, p) || (p.length > w.length && casi(w, p.slice(0, w.length))))));
+}
 const PERSONAS = [["lorenzo", "Lorenzo"], ["franco", "Franco"]];
 const ESTADO_CHAT = { abierto: "Sin mandar", en_cola: "En cola en la Mac", trabajando: "Claude está trabajando", listo: "Listo", error: "Hubo un problema" };
 const ICO = {
@@ -173,8 +187,8 @@ function pintarRaiz() {
   if (!d.carpetas.length) {
     c.innerHTML = `<p class="vacio">Todavía no hay creativos. Tocá «↻ Buscar nuevos» para traerlos de Meta.</p>`; return;
   }
-  const q = C.buscar.trim().toLowerCase();
-  const lista = d.carpetas.filter((x) => !q || `${x.etiqueta} ${x.oferta} ${x.mercado}`.toLowerCase().includes(q));
+  const q = C.buscar.trim();
+  const lista = d.carpetas.filter((x) => !q || coincide(q, x.etiqueta, x.oferta, x.mercado, x.grupo));
   c.innerHTML = `
     <div class="cr-filtro">
       <label class="sr" for="cr-buscar">Buscar oferta o país</label>
