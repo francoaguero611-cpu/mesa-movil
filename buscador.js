@@ -151,7 +151,19 @@ function aAR(tz, local) {
 }
 
 // ---------- estado ----------
-const FILTRO_DEF = { q: "", min: 0, mercado: "todos", formatos: [], dmin: null, dmax: null, orden: "oportunidad" };
+// (12/10, v3) filtros como dice Santi: solo winners (≥ 45 anuncios, ≥ 7 días, mismo funnel), solo digitales y libros físicos,
+// sin marcas personales, ordenadas por nicho (plata extra > prosperidad > salud > peso > relaciones > …) y adentro de mejor a peor.
+const CLASES = [["digital", "Digital"], ["libro_fisico", "Libro físico"], ["app", "App"], ["suplemento", "Suplemento"], ["fisico", "Físico"],
+  ["servicio", "Servicio"], ["captacion", "Webinar / captación"], ["desconocido", "Sin clasificar"]];
+const CLASE_TX = Object.fromEntries(CLASES);
+const CLASES_DEF = ["digital", "libro_fisico"];
+// Orden de Santi (criterios_santi.py VERTICALES)
+const VERTICALES = [["plata_extra", "Plata extra"], ["prosperidad", "Prosperidad y manifestación"], ["salud", "Salud"], ["peso", "Bajar de peso"],
+  ["relaciones", "Relaciones, maternidad y TDAH"], ["educacion", "Educación"], ["fitness", "Fitness"], ["religion", "Religión"], ["psicologia", "Psicología"], ["otro", "Otros nichos"]];
+const VERT_TX = Object.fromEntries(VERTICALES);
+const vertIdx = (k) => { const i = VERTICALES.findIndex(([x]) => x === k); return i < 0 ? VERTICALES.length : i; };
+const FILTRO_DEF = { q: "", min: 0, mercado: "todos", formatos: [], dmin: null, dmax: null, orden: "nicho", v: 3,
+  santi: true, clases: CLASES_DEF, marcas: false, verticales: [] };
 const B = {
   vista: "ofertas",               // ofertas (una sola grilla, con las oportunidades adentro) | testeos («Seleccionadas»)
   datos: null, cargando: false, error: null,
@@ -166,7 +178,15 @@ try {
   const v = JSON.parse(ls.get("buscador_sel", "[]"));
   if (Array.isArray(v)) v.forEach((x) => Array.isArray(x) ? B.sel.set(String(x[0]), x[1] || null) : B.sel.set(String(x), null));
 } catch {}
-try { const f = JSON.parse(ls.get("caz_filtro", "null")); if (f && typeof f === "object") B.filtro = { ...FILTRO_DEF, ...f, formatos: Array.isArray(f.formatos) ? f.formatos : [] }; } catch {}
+try {
+  const f = JSON.parse(ls.get("caz_filtro", "null"));
+  if (f && typeof f === "object") {
+    B.filtro = { ...FILTRO_DEF, ...f, formatos: Array.isArray(f.formatos) ? f.formatos : [] };
+    if (f.v !== FILTRO_DEF.v) Object.assign(B.filtro, { orden: "nicho", santi: true, clases: CLASES_DEF, marcas: false, verticales: [], v: FILTRO_DEF.v });  // filtros guardados antes de la v3
+    if (!Array.isArray(B.filtro.clases)) B.filtro.clases = CLASES_DEF;
+    if (!Array.isArray(B.filtro.verticales)) B.filtro.verticales = [];
+  }
+} catch {}
 const guardarSel = () => ls.set("buscador_sel", JSON.stringify([...B.sel.entries()]));
 const guardarFiltro = () => ls.set("caz_filtro", JSON.stringify(B.filtro));
 
@@ -236,6 +256,10 @@ function norm(o) {
     landing: url(o.landing_url || o.landing), dominio: o.dominio || "",
     biblioteca: url(o.biblioteca_url), bibliotecaDom: url(o.biblioteca_dominio_url),
     oportunidades: [], puntaje: null, recomendado: null,
+    // (12/10) tipo de producto (clasificar.py) y criterios de Santi (criterios_santi.py)
+    clase: CLASE_TX[o.clase] ? o.clase : "desconocido", claseMotivo: o.clase_motivo || "", marcaPersonal: !!o.marca_personal,
+    winner: !!(o.santi_winner ?? o.santi?.winner), vertical: VERT_TX[o.santi?.vertical] ? o.santi.vertical : "otro",
+    puntajeSanti: num(o.puntaje_santi), banderas: Array.isArray(o.santi?.banderas) ? o.santi.banderas : [], saludNota: o.santi?.salud_peso_nota || "",
   };
   // (11/10) oportunidades por mercado: {mercado, paises, paginas_competencia, anuncios_competencia, keywords_usadas, puntaje 0-100, motivo}.
   // Respaldo con el formato viejo {mercado, fuerte_en, activos_fuerte, activos_aca, nivel, texto}.
@@ -492,12 +516,20 @@ const cabDatos = () => B.datos?.generado ? `<p class="bo-gen mut">Datos del ${es
 
 // --- filtros ---
 const RANGOS_DIAS = [["todos", "Todos", null, null], ["0-7", "Menos de 7", null, 7], ["7-30", "7 a 30", 7, 30], ["30-90", "30 a 90", 30, 90], ["90-", "Más de 90", 90, null]];
-const ORDENES = [["oportunidad", "Mejor oportunidad"], ["anuncios", "Más anuncios activos"], ["viejas", "Más días corriendo"]];
+const ORDENES = [["nicho", "Por nicho (Santi)"], ["santi", "Mejor según Santi"], ["oportunidad", "Mejor oportunidad"], ["anuncios", "Más anuncios activos"], ["viejas", "Más días corriendo"]];
+// marca personal confirmada por clasificar.py (dominio con el nombre o Dr./Dra.); la bandera de Santi por regex queda solo como aviso
+const esMarca = (o) => o.marcaPersonal;
+// mejor a peor: puntaje de Santi (0 si no es winner), después oportunidad y anuncios
+const mejor = (a, b) => (b.puntajeSanti ?? -1) - (a.puntajeSanti ?? -1) || (b.puntaje ?? -1) - (a.puntaje ?? -1) || b.anuncios - a.anuncios;
 function filtradas() {
   const f = B.filtro;
   const q = f.q.trim().toLowerCase();
   const xs = ofertas().filter((o) => {
     if (o.anuncios < (Number(f.min) || 0)) return false;
+    if (f.santi && !o.winner) return false;
+    if (f.clases.length && !f.clases.includes(o.clase)) return false;
+    if (!f.marcas && esMarca(o)) return false;
+    if (f.verticales.length && !f.verticales.includes(o.vertical)) return false;
     if (f.mercado !== "todos" && !o.mercados.includes(f.mercado)) return false;
     if (f.formatos.length && !f.formatos.includes(o.formato)) return false;
     if (f.dmin != null && !(o.dias != null && o.dias >= f.dmin)) return false;
@@ -506,18 +538,22 @@ function filtradas() {
     return true;
   });
   const dias = (o) => o.dias ?? -1;
-  if (f.orden === "oportunidad") xs.sort((a, b) => (b.puntaje ?? -1) - (a.puntaje ?? -1) || b.anuncios - a.anuncios);
+  if (f.orden === "nicho") xs.sort((a, b) => vertIdx(a.vertical) - vertIdx(b.vertical) || mejor(a, b));
+  else if (f.orden === "santi") xs.sort(mejor);
+  else if (f.orden === "oportunidad") xs.sort((a, b) => (b.puntaje ?? -1) - (a.puntaje ?? -1) || b.anuncios - a.anuncios);
   else if (f.orden === "viejas") xs.sort((a, b) => dias(b) - dias(a) || b.anuncios - a.anuncios);
   else xs.sort((a, b) => b.anuncios - a.anuncios);
   return xs;
 }
 function nFiltros() {
   const f = B.filtro;
-  return (f.q.trim() ? 1 : 0) + (Number(f.min) > 0 ? 1 : 0) + (f.mercado !== "todos" ? 1 : 0) + (f.formatos.length ? 1 : 0) + (f.dmin != null || f.dmax != null ? 1 : 0);
+  const mismas = (a, b) => a.length === b.length && a.every((x) => b.includes(x));
+  return (f.santi ? 0 : 1) + (mismas(f.clases, CLASES_DEF) ? 0 : 1) + (f.marcas ? 1 : 0) + (f.verticales.length ? 1 : 0) + (f.q.trim() ? 1 : 0) + (Number(f.min) > 0 ? 1 : 0) + (f.mercado !== "todos" ? 1 : 0) + (f.formatos.length ? 1 : 0) + (f.dmin != null || f.dmax != null ? 1 : 0);
 }
 const maxAnuncios = () => { const m = Math.max(0, ...ofertas().map((o) => o.anuncios)); return Math.max(50, Math.ceil(m / 50) * 50); };
 const mercadosData = () => { const s = new Set(); ofertas().forEach((o) => o.mercados.forEach((k) => s.add(k))); return [...s].sort((a, b) => (ORDEN_MK.indexOf(a) + 99) % 99 - (ORDEN_MK.indexOf(b) + 99) % 99); };
 const formatosData = () => { const s = new Set(ofertas().map((o) => o.formato)); return Object.keys(FORMATO_TX).filter((k) => s.has(k)); };
+const cuentaClase = (k) => { const n = ofertas().filter((o) => o.clase === k).length; return n ? `(${n})` : ""; };
 const chip = (attr, k, t, on) => `<button type="button" class="seg-b" ${attr}="${esc(k)}" aria-pressed="${on}">${esc(t)}</button>`;
 
 function filtrosHTML() {
@@ -530,7 +566,13 @@ function filtrosHTML() {
       <label class="bo-q"><span class="sr">Buscar</span><input class="campo" id="f-q" type="search" placeholder="Buscar nombre, página, nicho, dominio…" value="${esc(f.q)}" autocomplete="off"></label>
       <label class="bo-orden"><span class="sr">Ordenar</span><select class="campo" id="f-orden">${ORDENES.map(([k, t]) => `<option value="${k}" ${k === f.orden ? "selected" : ""}>${t}</option>`).join("")}</select></label>
     </div>
+    <div class="bo-santi" role="group" aria-label="Criterios de Santi">
+      ${chip("data-fsanti", "1", "Solo winners Santi (45+ anuncios, 7+ días, mismo funnel)", f.santi)}
+      ${chip("data-fmarca", "1", "Mostrar marcas personales", f.marcas)}
+    </div>
     <section class="bo-filtros boceto${B.filtrosAbiertos ? " abierto" : ""}" id="bo-filtros" aria-label="Filtros">
+      <div class="bo-f"><span class="bo-f-l" id="fl-cl">Tipo de producto</span><div class="segs" role="group" aria-labelledby="fl-cl">${CLASES.map(([k, t]) => chip("data-fcl", k, `${t} ${cuentaClase(k)}`, f.clases.includes(k))).join("")}</div></div>
+      <div class="bo-f"><span class="bo-f-l" id="fl-ve">Nicho (orden de Santi)</span><div class="segs" role="group" aria-labelledby="fl-ve">${chip("data-fve", "todos", "Todos", !f.verticales.length)}${VERTICALES.map(([k, t]) => chip("data-fve", k, t, f.verticales.includes(k))).join("")}</div></div>
       <div class="bo-f bo-f-min"><span class="bo-f-l" id="fl-min">Anuncios activos (mínimo)</span>
         <div class="bo-rango"><input type="range" id="f-min-r" min="0" max="${mx}" step="${mx > 500 ? 25 : 10}" value="${Math.min(Number(f.min) || 0, mx)}" aria-labelledby="fl-min">
         <input class="campo num bo-min-n" id="f-min" type="number" inputmode="numeric" min="0" step="10" value="${esc(f.min)}" aria-label="Mínimo de anuncios activos"></div></div>
@@ -539,7 +581,7 @@ function filtrosHTML() {
       <div class="bo-f"><span class="bo-f-l" id="fl-di">Tiempo corriendo (días)</span><div class="segs" role="group" aria-labelledby="fl-di">${RANGOS_DIAS.map(([k, t]) => chip("data-fdi", k, t, rango === k)).join("")}</div>
         <div class="bo-dias"><label>de <input class="campo num" id="f-dmin" type="number" inputmode="numeric" min="0" value="${f.dmin ?? ""}" placeholder="0" aria-label="Días mínimos"></label>
         <label>a <input class="campo num" id="f-dmax" type="number" inputmode="numeric" min="0" value="${f.dmax ?? ""}" placeholder="∞" aria-label="Días máximos"></label> días</div></div>
-      ${n ? `<div class="bo-f bo-f-limpiar"><button type="button" class="link" id="f-limpiar">Sacar todos los filtros</button></div>` : ""}
+      ${n ? `<div class="bo-f bo-f-limpiar"><button type="button" class="link" id="f-limpiar">Volver a los filtros de Santi</button></div>` : ""}
     </section>`;
 }
 function pintarOfertas() {
@@ -563,6 +605,13 @@ function bindFiltros() {
   $("#f-orden").onchange = (e) => cambiar((f) => { f.orden = e.target.value; }, false);
   $("#f-min-r").oninput = (e) => { const v = Number(e.target.value) || 0; $("#f-min").value = v; cambiar((f) => { f.min = v; }, false); };
   $("#f-min").onchange = (e) => { const v = Math.max(0, Number(e.target.value) || 0); cambiar((f) => { f.min = v; }); };
+  $$("[data-fsanti]").forEach((b) => b.onclick = () => cambiar((f) => { f.santi = !f.santi; }));
+  $$("[data-fmarca]").forEach((b) => b.onclick = () => cambiar((f) => { f.marcas = !f.marcas; }));
+  $$("[data-fcl]").forEach((b) => b.onclick = () => cambiar((f) => { const k = b.dataset.fcl; f.clases = f.clases.includes(k) ? f.clases.filter((x) => x !== k) : [...f.clases, k]; }));
+  $$("[data-fve]").forEach((b) => b.onclick = () => cambiar((f) => {
+    const k = b.dataset.fve;
+    if (k === "todos") f.verticales = []; else f.verticales = f.verticales.includes(k) ? f.verticales.filter((x) => x !== k) : [...f.verticales, k];
+  }));
   $$("[data-fmk]").forEach((b) => b.onclick = () => cambiar((f) => { f.mercado = b.dataset.fmk; }));
   $$("[data-ffo]").forEach((b) => b.onclick = () => cambiar((f) => {
     const k = b.dataset.ffo;
@@ -572,7 +621,7 @@ function bindFiltros() {
   const dias = (id, k) => { $(id).onchange = (e) => { const v = e.target.value === "" ? null : Math.max(0, Math.round(Number(e.target.value))); cambiar((f) => { f[k] = Number.isFinite(v) ? v : null; }); }; };
   dias("#f-dmin", "dmin"); dias("#f-dmax", "dmax");
   const l = $("#f-limpiar"); if (l) l.onclick = () => cambiar((f) => Object.assign(f, { ...FILTRO_DEF, orden: f.orden }));
-  if (!ORDENES.some(([k]) => k === B.filtro.orden)) { B.filtro.orden = "oportunidad"; $("#f-orden").value = "oportunidad"; }
+  if (!ORDENES.some(([k]) => k === B.filtro.orden)) { B.filtro.orden = "nicho"; $("#f-orden").value = "nicho"; }
 }
 function pintarLista() {
   const xs = filtradas();
@@ -581,10 +630,16 @@ function pintarLista() {
   const tot = ofertas().length;
   const res = `<p class="bo-res mut num" aria-live="polite">${xs.length === tot ? pl(tot, "oferta") : `${ent(xs.length)} de ${pl(tot, "oferta")}`}${B.filtro.mercado !== "todos" ? ` que corren en ${esc(nombreMercado(B.filtro.mercado))}` : ""}</p>`;
   if (!xs.length) {
-    box.innerHTML = res + `<div class="vacio boceto bo-vacio">${tot ? "Ninguna oferta pasa los filtros. Probá bajar el mínimo de anuncios o sacar algún filtro." : "Todavía no hay ofertas cargadas."}</div>`;
+    box.innerHTML = res + `<div class="vacio boceto bo-vacio">${tot ? "Ninguna oferta pasa los filtros. Probá sacar «Solo winners Santi», sumar tipos de producto o bajar el mínimo de anuncios." : "Todavía no hay ofertas cargadas."}</div>`;
     return;
   }
-  box.innerHTML = res + `<div class="bo-grid">${xs.map(tarjeta).join("")}</div>`;
+  if (B.filtro.orden === "nicho") {
+    const grupos = [];
+    for (const o of xs) { const g = grupos[grupos.length - 1]; if (g && g.k === o.vertical) g.xs.push(o); else grupos.push({ k: o.vertical, xs: [o] }); }
+    box.innerHTML = res + grupos.map((g) => `<section class="bo-nicho" aria-label="${esc(VERT_TX[g.k])}">
+      <h3 class="bo-nicho-t"><span class="bo-nicho-n num">${vertIdx(g.k) + 1}</span>${esc(VERT_TX[g.k])} <small class="mut num">${pl(g.xs.length, "oferta")}</small></h3>
+      <div class="bo-grid">${g.xs.map(tarjeta).join("")}</div></section>`).join("");
+  } else box.innerHTML = res + `<div class="bo-grid">${xs.map(tarjeta).join("")}</div>`;
   bindTarjetas(box);
 }
 
@@ -658,6 +713,7 @@ function tarjeta(o) {
       <h3 class="bo-of-nom"><button type="button" class="bo-of-ab" data-det="${esc(o.id)}" title="${esc(o.nombre)}">${esc(o.nombre)}</button></h3>
       ${sub.length ? `<p class="bo-of-sub">${esc(sub.join(" · "))}${esc(pags)}</p>` : ""}
       <p class="bo-of-nums"><b class="num">${ent(o.anuncios)}</b> anuncios activos${o.dias != null ? ` · <span class="num">${pl(o.dias, "día")}</span>` : ""}</p>
+      ${santiHTML(o)}
       ${o.desde ? `<p class="bo-of-desde mut">corre desde el ${esc(dmy(o.desde))}</p>` : ""}
       ${mercadosHTML(o)}
       ${paisesTx(o)}
@@ -669,6 +725,16 @@ function tarjeta(o) {
       </div>
     </div>
   </article>`;
+}
+// (12/10) Santi: puntaje, tipo de producto, nicho y banderas para revisar a mano
+function santiHTML(o) {
+  const ch = [];
+  if (o.winner && o.puntajeSanti != null) ch.push(`<span class="fchip ${o.puntajeSanti >= 70 ? "verde-fuerte" : o.puntajeSanti >= 50 ? "verde" : "amarillo"}" title="Puntaje de Santi: nicho, mercado y banderas">Santi <span class="num">${ent(o.puntajeSanti)}</span></span>`);
+  ch.push(`<span class="fchip ${["digital", "libro_fisico"].includes(o.clase) ? "acento" : "rojo"}" title="${esc(o.claseMotivo)}">${esc(CLASE_TX[o.clase])}</span>`);
+  ch.push(`<span class="fchip">${esc(VERT_TX[o.vertical])}</span>`);
+  if (esMarca(o)) ch.push(`<span class="fchip rojo">Marca personal</span>`);
+  const ban = o.banderas.filter((b) => b.clave !== "marca_personal" || !esMarca(o));
+  return `<p class="bo-santi-ch">${ch.join("")}</p>${ban.length || o.saludNota ? `<ul class="bo-ban">${ban.map((b) => `<li>⚠ ${esc(b.texto)}</li>`).join("")}${o.saludNota ? `<li>⚠ ${esc(o.saludNota)}</li>` : ""}</ul>` : ""}`;
 }
 // Chips con los 2 o 3 mejores mercados: «Oportunidad: 🇫🇷 Francia · 5 páginas compitiendo»
 function oportunidadesHTML(o) {
