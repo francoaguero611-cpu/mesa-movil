@@ -2027,6 +2027,8 @@ function leerHashEv() {
 }
 async function recibirEvento(ev) {
   if (!ev) return;
+  // (12/10) respuesta de Claude en Correcciones: abre la carpeta y el chat
+  if (ev.sec === "creativos" && ev.cr) { if (!DEMO && !clave()) { ls.set("dash_ev_pend", JSON.stringify(ev)); return; } irASeccion("creativos", { ruta: { g: ev.cr.g, f: ev.cr.f, chat: ev.cr.chat } }); return; }
   if (ev.demo) { await cargarDemo(); ev = window.DemoAPI.ejemplo(ev.demo); }
   if (!DEMO && !clave()) { ls.set("dash_ev_pend", JSON.stringify(ev)); return; }
   mostrarEvento(ev);
@@ -2054,6 +2056,8 @@ const SECCIONES = [
     montar: (o) => montarCazador(o), ya: (o) => { if (o.pedido != null) window.Cazador?.abrirPedido(o.pedido); } },
   { id: "workspace", nombre: "Workspace", raiz: "#ws", icono: "M3.8 5 C 9 4.8, 15 5.1, 20.2 4.9 L20 19.2 C 14.8 19.4, 9 19.1, 4 19.2 Z M7 9.5 L9.8 12 L7 14.5 M12 15 H16.5",
     montar: () => montarWorkspace() },
+  { id: "creativos", nombre: "Creativos", raiz: "#cr", icono: "M3.6 7 C 3.5 6, 4.1 5.3, 5 5.3 L9.3 5.2 L11.1 7.2 L19 7.1 C 20 7.1, 20.6 7.7, 20.5 8.6 L20.3 17.9 C 20.2 18.8, 19.6 19.3, 18.8 19.3 L5.1 19.1 C 4.2 19.1, 3.7 18.5, 3.7 17.7 Z M10.2 10.8 L14.6 13.2 L10.3 15.6 Z",
+    montar: (o) => montarCreativos(o), ya: (o) => window.Creativos?.abrir(o.ruta || {}) }, // tocarla estando adentro = volver a todas las carpetas
 ];
 const seccionDe = (id) => SECCIONES.find((x) => x.id === id) || null;
 
@@ -2087,7 +2091,7 @@ function pintarNav() {
   }
 }
 function abrirInicial() {
-  const h = location.hash.slice(1);
+  const h = location.hash.slice(1).split("/")[0]; // (12/10) #creativos/<oferta>/<fecha>
   const guardada = ls.get("dash_seccion");
   const s = seccionDe(h) || seccionDe(guardada) || SECCIONES[0];
   s.montar({});
@@ -2143,6 +2147,44 @@ async function montarCazador(o = {}) {
   }
   if (S.vista !== "cazador" || !$("#caz")) return;
   window.Cazador.montar($("#caz"), { login: (msg) => login(msg), pedido: o?.pedido ?? null });
+}
+
+// ---------- Creativos (12/10): creativos.js se carga la primera vez. Backend: app-movil/creativos.ts ----------
+let crCarga = null;
+function cargarCreativos() {
+  if (window.Creativos) return Promise.resolve();
+  if (crCarga) return crCarga;
+  const css = new Promise((ok) => {
+    if ($('link[href^="creativos.css"]')) return ok();
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "creativos.css?v=1";
+    l.onload = l.onerror = () => ok(); document.head.appendChild(l);
+  });
+  const js = new Promise((ok, mal) => {
+    const sc = document.createElement("script"); sc.src = "creativos.js?v=1";
+    sc.onload = () => window.Creativos ? ok() : mal(new Error("Creativos no arrancó"));
+    sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar Creativos. ¿Hay conexión?")); };
+    document.head.appendChild(sc);
+  });
+  crCarga = Promise.all([css, js]).catch((e) => { crCarga = null; throw e; });
+  return crCarga;
+}
+async function montarCreativos(o = {}) {
+  cerrarMenu(); pararRanking();
+  S.vista = "creativos"; ls.set("dash_seccion", "creativos");
+  if (!location.hash.startsWith("#creativos")) { try { history.replaceState(null, "", location.pathname + location.search + "#creativos"); } catch {} }
+  pintarNav();
+  $("#main").innerHTML = `<section class="cr" id="cr" aria-labelledby="cr-t"><h2 class="sr" id="cr-t">Creativos</h2><p class="vacio"><span class="cargador"></span>Abriendo Creativos…</p></section>`;
+  pintarBarra();
+  window.scrollTo(0, 0);
+  try { await cargarCreativos(); }
+  catch (e) {
+    if (S.vista !== "creativos" || !$("#cr")) return;
+    $("#cr").innerHTML = `<div class="err-box" role="alert"><b>No se pudo abrir Creativos.</b> ${esc(e.message)}<div><button type="button" class="btn chico" id="cr-reintentar">Reintentar</button></div></div>`;
+    $("#cr-reintentar").onclick = () => montarCreativos(o);
+    return;
+  }
+  if (S.vista !== "creativos" || !$("#cr")) return;
+  window.Creativos.montar($("#cr"), { login: (msg) => login(msg), toast, abrirModal, ruta: o?.ruta ?? null });
 }
 
 // ---------- Workspace (12/10): workspace.js se carga la primera vez. Spec: Segundo-cerebro-business/OUTPUTS/2026-10-12-workspace-spec.md ----------
@@ -2230,7 +2272,7 @@ function buscarRk(k) {
   return RK.sel.get(k) || null;
 }
 // (11/10) también desmonta el Cazador: todo cambio de sección pasa por acá.
-function pararRanking() { clearInterval(RK.timer); RK.timer = null; window.Cazador?.desmontar(); window.Workspace?.desmontar(); }
+function pararRanking() { clearInterval(RK.timer); RK.timer = null; window.Cazador?.desmontar(); window.Workspace?.desmontar(); window.Creativos?.desmontar(); }
 
 function montarRanking({ pedido = null } = {}) {
   cerrarMenu(); pararRanking();
@@ -2913,7 +2955,7 @@ function fiestaHTML() {
 function iniciar() {
   pintarTema();
   pintarBadges();
-  $("#b-ref").onclick = () => { if (S.vista === "ranking" && $("#rk")) { cargarRanking(true); cargarFabrica(); } else if (S.vista === "cazador") window.Cazador?.refrescar(); else if ($("#carr")) cargar(true); };
+  $("#b-ref").onclick = () => { if (S.vista === "ranking" && $("#rk")) { cargarRanking(true); cargarFabrica(); } else if (S.vista === "cazador") window.Cazador?.refrescar(); else if (S.vista === "creativos") window.Creativos?.refrescar(); else if ($("#carr")) cargar(true); };
   $("#secciones").addEventListener("click", (e) => { const b = e.target.closest("[data-sec]"); if (b) irASeccion(b.dataset.sec); });
   matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", pintarTema);
   $("#b-menu").onclick = (e) => { e.stopPropagation(); $("#menu").hidden ? abrirMenu() : cerrarMenu(); };
@@ -2929,7 +2971,7 @@ function iniciar() {
     try { navigator.serviceWorker.startMessages(); } catch {}
   }
   window.addEventListener("hashchange", () => {
-    const sec = seccionDe(location.hash.slice(1));
+    const sec = seccionDe(location.hash.slice(1).split("/")[0]);
     if (sec) { if (S.vista !== sec.id && (DEMO || clave())) irASeccion(sec.id); return; }
     const ev = leerHashEv(); if (ev) recibirEvento(ev);
   });
