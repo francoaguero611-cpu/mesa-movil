@@ -270,7 +270,7 @@ function pintarHola() {
 }
 function pintarTitulo(sec) {
   const t = $(".marca h1"); if (!t) return;
-  t.textContent = S.vista === "login" ? "Dashboard" : (seccionDe(sec)?.nombre || "Dashboard");
+  t.textContent = (!sec && S.vista === "login") ? "Dashboard" : (seccionDe(sec || S.vista)?.nombre || "Dashboard");
 }
 // ---------- login ----------
 function login(msg = "") {
