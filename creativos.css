@@ -172,3 +172,23 @@ button.cr-miga:hover { background: var(--papel-2); }
 .cr-anillo .lleno { stroke: #fff; stroke-linecap: round; transition: stroke-dashoffset .6s ease; }
 .cr-barrita { display: block; width: 80%; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .25); overflow: hidden; }
 .cr-barrita span { display: block; height: 100%; background: #fff; border-radius: 3px; transition: width .6s ease; }
+
+/* (13/10) Fila «Correcciones» arriba de todo */
+.cr-fila { margin: 0 0 16px; }
+.cr-fila-cab { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; font: 700 16px var(--f-titulo); }
+.cr-fila-pista { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x proximity; padding: 2px 4px 8px 2px; overscroll-behavior-x: contain; scrollbar-width: thin; }
+.cr-fi { flex: 0 0 auto; display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 10px; align-items: center; width: min(78vw, 290px); padding: 8px; border: 2px solid var(--tinta); border-radius: var(--r-card);
+  background: var(--tarjeta); color: var(--tinta); text-align: left; font: inherit; cursor: pointer; scroll-snap-align: start; box-shadow: 3px 3px 0 var(--sombra); }
+.cr-fi:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--sombra); }
+.cr-fi.e-listo { background: var(--r-ver-bg); } .cr-fi.e-error { background: var(--r-rojo-bg); }
+.cr-fi-img { position: relative; display: grid; place-items: center; width: 52px; aspect-ratio: 9 / 16; overflow: hidden; border-radius: 6px; background: var(--papel-2); }
+.cr-fi-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.cr-fi.e-trabajando .cr-fi-img img, .cr-fi.e-en_cola .cr-fi-img img { filter: brightness(.45); }
+.cr-fi-est { position: relative; color: #fff; font: 700 14px var(--f-titulo); text-shadow: 0 1px 2px rgba(0, 0, 0, .6); }
+.cr-fi.e-listo .cr-fi-est { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--ok); color: #fff; text-shadow: none; }
+.cr-fi-tx { display: grid; gap: 2px; min-width: 0; }
+.cr-fi-of { font-size: 12.5px; font-weight: 600; color: var(--mut); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cr-fi-nom { font: 700 15px/1.2 var(--f-titulo); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cr-fi-sub { font-size: 12.5px; color: var(--tinta-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cr-fi-barra { display: block; height: 5px; margin-top: 3px; border-radius: 3px; background: var(--papel-2); overflow: hidden; }
+.cr-fi-barra span { display: block; height: 100%; background: var(--tinta); transition: width .6s ease; }

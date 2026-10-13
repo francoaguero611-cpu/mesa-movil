@@ -56,6 +56,7 @@ const C = {
   periodo: "total", desde: hoyAR(), hasta: hoyAR(),
   m: null, mCargando: false, mErr: null,  // métricas de la carpeta abierta
   timer: null, chatTimer: null,
+  fila: null, filaTimer: null, abrirLuego: null,   // (13/10) fila «Correcciones» de arriba
   quien: ls.get("ws_persona", "lorenzo"),
 };
 
@@ -102,11 +103,11 @@ function montar(raiz, ctx = {}) {
   addEventListener("popstate", alVolver);
   document.addEventListener("click", cerrarMenusFuera);
   document.addEventListener("keydown", teclaMenus);
-  pintar(); cargar();
+  pintar(); cargar(); cargarFila();
   if (r.chat) abrirChat({ chatId: Number(r.chat) });
 }
 function desmontar() {
-  C.montado = false; clearTimeout(C.timer); C.timer = null; clearInterval(C.chatTimer); C.chatTimer = null;
+  C.montado = false; clearTimeout(C.timer); C.timer = null; clearTimeout(C.filaTimer); C.filaTimer = null; clearInterval(C.chatTimer); C.chatTimer = null;
   removeEventListener("popstate", alVolver);
   document.removeEventListener("click", cerrarMenusFuera);
   document.removeEventListener("keydown", teclaMenus);
@@ -137,6 +138,9 @@ async function cargar({ sync = false } = {}) {
   if (!C.montado || C.g !== g || C.f !== f) return;
   pintar();
   if (f && C.metr && !C.m && !C.mCargando) cargarMetricas();
+  if (f && C.abrirLuego) { const q = C.abrirLuego; C.abrirLuego = null; const d0 = C.carpeta[g + "|" + f];
+    const cr = d0?.creativos.find((x) => x.id === q.id || x.anterior?.id === q.id || x.id === q.id2);
+    if (q.chat) abrirChat({ chatId: q.chat }); else if (cr) verCreativo(cr); }
   // mientras haya transcripciones o correcciones en curso, se refresca solo
   const d = f ? C.carpeta[g + "|" + f] : null;
   const vivo = d && (d.creativos.some((c) => ["en_cola", "transcribiendo"].includes(c.transcripcion?.estado)) || d.chats.some((c) => ["en_cola", "trabajando"].includes(c.estado)));
@@ -151,6 +155,48 @@ async function cargarMetricas({ forzar = false } = {}) {
   } catch (e) { if (falla(e)) return; C.mErr = e.message; }
   C.mCargando = false;
   if (C.montado && C.g === g && C.f === f) { pintarMetricas(); pintarTarjetas(); }
+}
+
+// ---------------------------------------------------------------- fila «Correcciones» (13/10)
+// Arriba de todo, en cualquier carpeta: lo que se está corrigiendo y lo terminado en las últimas 48 h, de todas las ofertas y mercados.
+async function cargarFila() {
+  clearTimeout(C.filaTimer); C.filaTimer = null;
+  try { C.fila = (await api("creativos_correcciones")).items || []; } catch (e) { if (falla(e)) return; }
+  if (!C.montado) return;
+  pintarFila();
+  const vivo = (C.fila || []).some((x) => ["en_cola", "trabajando"].includes(x.estado));
+  C.filaTimer = setTimeout(() => { if (C.montado) document.hidden ? (C.filaTimer = setTimeout(cargarFila, 30000)) : cargarFila(); }, vivo ? 6000 : 30000);
+}
+function pintarFila() {
+  const n = $("#cr-fila", C.raiz); if (!n) return;
+  const L = C.fila || [];
+  if (!L.length) { n.hidden = true; n.innerHTML = ""; return; }
+  const enMarcha = L.filter((x) => ["en_cola", "trabajando"].includes(x.estado)).length, listas = L.filter((x) => x.estado === "listo").length;
+  const scroll = $(".cr-fila-pista", n)?.scrollLeft || 0;
+  n.hidden = false;
+  n.innerHTML = `<div class="cr-fila-cab"><b>Correcciones</b><span class="cr-mut">${enMarcha ? `${enMarcha} en marcha` : ""}${enMarcha && listas ? " · " : ""}${listas ? `${listas} lista${listas === 1 ? "" : "s"} (48 h)` : ""}</span></div>
+    <div class="cr-fila-pista" role="list">${L.map((x, i) => {
+      const a = avance(x), vivo = ["en_cola", "trabajando"].includes(x.estado);
+      return `<button type="button" class="cr-fi e-${esc(x.estado)}" role="listitem" data-k="${i}" aria-label="${esc(`${x.etiqueta} ${x.nombre || "carpeta " + dm(x.fecha)}: ${x.estado === "listo" ? "lista" : x.estado === "error" ? "con error" : a.pct + " %"}`)}">
+        <span class="cr-fi-img">${x.thumb ? `<img src="${esc(url(x.thumb))}" alt="" loading="lazy" onerror="this.remove()">` : ""}
+          <span class="cr-fi-est">${x.estado === "listo" ? "✓" : x.estado === "error" ? "✕" : x.estado === "en_cola" ? "⋯" : `${a.pct}%`}</span></span>
+        <span class="cr-fi-tx">
+          <span class="cr-fi-of">${x.bandera ? `${esc(x.bandera)} ` : ""}${esc(x.oferta || x.etiqueta)}${x.mercado ? ` · ${esc(x.mercado)}` : ""}</span>
+          <span class="cr-fi-nom">${esc(x.nombre || `Toda la carpeta ${dm(x.fecha)}`)}</span>
+          <span class="cr-fi-sub">${x.estado === "listo" ? `Lista · ${esc(horaCorta(x.actualizado))}` : x.estado === "error" ? "Hubo un problema · ver chat" : x.estado === "en_cola" ? "En cola en la Mac" : `${esc(a.txt)} · ≈ ${a.resta} min`}</span>
+          ${vivo && x.estado === "trabajando" ? `<span class="cr-fi-barra"><span style="width:${a.pct}%"></span></span>` : ""}
+        </span>
+      </button>`; }).join("")}</div>`;
+  const p = $(".cr-fila-pista", n); p.scrollLeft = scroll;
+  $$("[data-k]", n).forEach((b) => b.onclick = () => {
+    const x = L[Number(b.dataset.k)];
+    // terminada: abre el video nuevo · en marcha o con error: abre el chat · general: abre la carpeta
+    if (x.alcance === "creativo" && x.estado === "listo") C.abrirLuego = { id: x.nuevo_id || x.creativo_id, id2: x.creativo_id };
+    else if (x.alcance === "creativo" || x.estado === "error") C.abrirLuego = { chat: x.chat };
+    if (C.g === x.grupo && C.f === x.fecha && C.carpeta[x.grupo + "|" + x.fecha]) { const q = C.abrirLuego; C.abrirLuego = null;
+      if (q?.chat) abrirChat({ chatId: q.chat }); else if (q) { const cr = C.carpeta[x.grupo + "|" + x.fecha].creativos.find((y) => y.id === q.id || y.anterior?.id === q.id2 || y.id === q.id2); if (cr) verCreativo(cr); } return; }
+    ir(x.grupo, x.fecha);
+  });
 }
 
 // ---------------------------------------------------------------- pintar
@@ -179,7 +225,8 @@ function pintar() {
   const acciones = !C.g && !C.o
     ? `<button type="button" class="btn chico" data-sync title="Trae de Meta los anuncios que salieron recién">↻ Buscar nuevos</button>`
     : C.f ? `<div class="cr-menu-wrap"><button type="button" class="btn icono cr-puntos" data-menu="carpeta" aria-haspopup="true" aria-expanded="false" aria-label="Opciones de la carpeta">${ICO.puntos}</button></div>` : "";
-  C.raiz.innerHTML = `<div class="cr-cab">${migas()}<div class="cr-acc">${acciones}</div></div><div class="cr-cuerpo" id="cr-cuerpo"></div>`;
+  C.raiz.innerHTML = `<div class="cr-fila" id="cr-fila" hidden></div><div class="cr-cab">${migas()}<div class="cr-acc">${acciones}</div></div><div class="cr-cuerpo" id="cr-cuerpo"></div>`;
+  pintarFila();
   $$("[data-ir]", C.raiz).forEach((b) => b.onclick = () => ir(b.dataset.ir || null, null));
   $$("[data-ir-o]", C.raiz).forEach((b) => b.onclick = () => ir(null, null, { o: b.dataset.irO }));
   const s = $("[data-sync]", C.raiz);
