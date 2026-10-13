@@ -51,7 +51,7 @@ const ESTADO = {
 // Estado por persona
 const W = {
   montado: false,
-  persona: ls.get("ws_persona", "lorenzo"),
+  persona: ls.get("ws_persona", (typeof usuarioActual === "function" && usuarioActual()?.id) || "lorenzo"),
   fecha: "hoy",                // "hoy" | YYYY-MM-DD
   d: {},                       // persona -> { fecha, ofertas, eventos, ultimo, error, cargando }
   timer: null,

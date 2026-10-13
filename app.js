@@ -235,7 +235,7 @@ function pintarMenu() {
   if ($("#mi-ejemplos")) $("#mi-ejemplos").onclick = () => { cerrarMenu(); avisosEjemplo(); };
   pintarEstadoAvisos();
   const s = $("#mi-salir");
-  if (s) s.onclick = () => { ls.del("dash_clave"); S.datos = {}; S.det.clear(); S.sel.clear(); RK.datos = {}; RK.sel.clear(); RK.fab = null; cerrarMenu(); pintarBarra(); login(); };
+  if (s) s.onclick = () => { ls.del("dash_clave"); ls.del("dash_usuario"); S.datos = {}; S.det.clear(); S.sel.clear(); RK.datos = {}; RK.sel.clear(); RK.fab = null; cerrarMenu(); pintarBarra(); login(); };
 }
 function abrirMenu() { pintarMenu(); $("#menu").hidden = false; $("#b-menu").setAttribute("aria-expanded", "true"); ($("#menu .item:not([disabled])") || $("#menu")).focus(); }
 function cerrarMenu() { $("#menu").hidden = true; $("#b-menu").setAttribute("aria-expanded", "false"); }
@@ -259,25 +259,42 @@ async function verRegistro() {
   const b = $("[data-cerrar]", m.dlg); if (b) b.onclick = m.cerrar;
 }
 
+
+// ---------- usuario (12/10): cada uno con su mail; título = sección actual ----------
+const USUARIOS = { "lorenleiva7@gmail.com": { id: "lorenzo", nombre: "Lorenzo" }, "francoaguero611@gmail.com": { id: "franco", nombre: "Franco" } };
+const usuarioActual = () => USUARIOS[ls.get("dash_usuario", "")] || null;
+function pintarHola() {
+  const h = $(".hola"); if (!h) return;
+  const u = usuarioActual();
+  h.textContent = u ? `Bienvenido, ${u.nombre}` : "Bienvenido";
+}
+function pintarTitulo(sec) {
+  const t = $(".marca h1"); if (!t) return;
+  t.textContent = S.vista === "login" ? "Dashboard" : (seccionDe(sec)?.nombre || "Dashboard");
+}
 // ---------- login ----------
 function login(msg = "") {
-  pararRanking(); S.vista = "login";
+  pararRanking(); S.vista = "login"; pintarTitulo();
   const nav = $("#secciones"); if (nav) nav.hidden = true;
   pintarBarra();
   $("#main").innerHTML = `
     <form class="login boceto" id="f-login" autocomplete="on">
       <h2>Entrar</h2>
-      <p>Poné la clave del dashboard.</p>
-      <label class="sr" for="clave">Clave</label>
-      <input class="campo" id="clave" name="password" type="password" autocomplete="current-password" placeholder="Clave" required data-foco>
+      <p>Entrá con tu mail y tu contraseña.</p>
+      <label class="sr" for="mail">Mail</label>
+      <input class="campo" id="mail" name="email" type="email" autocomplete="username" placeholder="Mail" required data-foco>
+      <label class="sr" for="clave">Contraseña</label>
+      <input class="campo" id="clave" name="password" type="password" autocomplete="current-password" placeholder="Contraseña" required>
       <button class="btn pri" type="submit" id="b-entrar">Entrar</button>
       <div class="error" id="login-err" role="alert">${esc(msg)}</div>
     </form>`;
-  $("#clave").focus();
+  $("#mail").focus();
   $("#f-login").onsubmit = async (e) => {
     e.preventDefault();
-    const v = $("#clave").value.trim();
-    if (!v) return;
+    const mail = $("#mail").value.trim().toLowerCase(), pass = $("#clave").value;
+    if (!mail || !pass) return;
+    const v = `${mail}|${pass}`; // el servidor compara el hash de «mail|contraseña»
+    ls.set("dash_usuario", mail); pintarHola();
     const b = $("#b-entrar"); b.classList.add("cargando"); b.innerHTML = `<span class="gira">↻</span> Entrando…`;
     ls.set("dash_clave", v);
     try {
@@ -286,7 +303,7 @@ function login(msg = "") {
       abrirInicial();
       eventoPendiente();
     } catch (err) {
-      if (err.code === 401) { ls.del("dash_clave"); login("Clave incorrecta"); }
+      if (err.code === 401) { ls.del("dash_clave"); login("Mail o contraseña incorrectos"); }
       else { login(err.message || "No se pudo conectar"); ls.set("dash_clave", v); }
     }
   };
@@ -2084,6 +2101,7 @@ function pintarNav() {
   n.hidden = false;
   const sec = seccionDe(S.vista) ? S.vista : "dash";
   $$("[data-sec]", n).forEach((b) => b.setAttribute("aria-pressed", b.dataset.sec === sec));
+  pintarTitulo(sec); pintarHola();
   const act = $(`[data-sec="${sec}"]`, n), p = $("#sec-pista", n);
   if (act && p) {
     const izq = act.offsetLeft - p.offsetLeft, der = izq + act.offsetWidth;
@@ -2091,6 +2109,7 @@ function pintarNav() {
   }
 }
 function abrirInicial() {
+  pintarHola();
   const h = location.hash.slice(1).split("/")[0]; // (12/10) #creativos/<oferta>/<fecha>
   const guardada = ls.get("dash_seccion");
   const s = seccionDe(h) || seccionDe(guardada) || SECCIONES[0];
@@ -2198,7 +2217,7 @@ function cargarWorkspace() {
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "workspace.js?v=1";
+    const sc = document.createElement("script"); sc.src = "workspace.js?v=2";
     sc.onload = () => window.Workspace ? ok() : mal(new Error("El Workspace no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar el Workspace. ¿Hay conexión?")); };
     document.head.appendChild(sc);
