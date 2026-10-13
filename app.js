@@ -2117,7 +2117,7 @@ function cargarCazador() {
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "buscador.js?v=7";
+    const sc = document.createElement("script"); sc.src = "buscador.js?v=8";
     sc.onload = () => window.Cazador ? ok() : mal(new Error("El Cazador no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar el Cazador. ¿Hay conexión?")); };
     document.head.appendChild(sc);

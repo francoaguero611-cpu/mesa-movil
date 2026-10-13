@@ -156,14 +156,18 @@ function aAR(tz, local) {
 const CLASES = [["digital", "Digital"], ["libro_fisico", "Libro físico"], ["app", "App"], ["suplemento", "Suplemento"], ["fisico", "Físico"],
   ["servicio", "Servicio"], ["captacion", "Webinar / captación"], ["desconocido", "Sin clasificar"]];
 const CLASE_TX = Object.fromEntries(CLASES);
+const ORIGENES = ["br", "latam", "ar", "mx", "es"];
+const DESTINOS = ["anglo", "fr", "it", "de", "ro", "pl", "eu"];   // los que pidió Lorenzo (12/10); nórdicos, NL y PT no suman
 const CLASES_DEF = ["digital", "libro_fisico"];
 // Orden de Santi (criterios_santi.py VERTICALES)
 const VERTICALES = [["plata_extra", "Plata extra"], ["prosperidad", "Prosperidad y manifestación"], ["salud", "Salud"], ["peso", "Bajar de peso"],
   ["relaciones", "Relaciones, maternidad y TDAH"], ["educacion", "Educación"], ["fitness", "Fitness"], ["religion", "Religión"], ["psicologia", "Psicología"], ["otro", "Otros nichos"]];
 const VERT_TX = Object.fromEntries(VERTICALES);
 const vertIdx = (k) => { const i = VERTICALES.findIndex(([x]) => x === k); return i < 0 ? VERTICALES.length : i; };
-const FILTRO_DEF = { q: "", min: 0, mercado: "todos", formatos: [], dmin: null, dmax: null, orden: "nicho", v: 3,
-  santi: true, clases: CLASES_DEF, marcas: false, verticales: [] };
+// (12/10 noche, v4, Lorenzo: «no tan filtrado, con más cantidad»): sin el preset estricto; 30–800 anuncios (más de 1.000 = marca
+// muy explotada), todos los anuncios a la misma landing, digital/libro físico, sin marcas personales; por nicho y adentro lo mejor para EXPORTAR.
+const FILTRO_DEF = { q: "", min: 30, max: 800, mercado: "todos", formatos: [], dmin: null, dmax: null, orden: "nicho", v: 4,
+  santi: false, funnel: true, clases: [...CLASES_DEF, "desconocido"], marcas: false, verticales: [] };
 const B = {
   vista: "ofertas",               // ofertas (una sola grilla, con las oportunidades adentro) | testeos («Seleccionadas»)
   datos: null, cargando: false, error: null,
@@ -182,7 +186,7 @@ try {
   const f = JSON.parse(ls.get("caz_filtro", "null"));
   if (f && typeof f === "object") {
     B.filtro = { ...FILTRO_DEF, ...f, formatos: Array.isArray(f.formatos) ? f.formatos : [] };
-    if (f.v !== FILTRO_DEF.v) Object.assign(B.filtro, { orden: "nicho", santi: true, clases: CLASES_DEF, marcas: false, verticales: [], v: FILTRO_DEF.v });  // filtros guardados antes de la v3
+    if (f.v !== FILTRO_DEF.v) B.filtro = { ...FILTRO_DEF };  // filtros guardados de antes de la v4: arrancan de cero
     if (!Array.isArray(B.filtro.clases)) B.filtro.clases = CLASES_DEF;
     if (!Array.isArray(B.filtro.verticales)) B.filtro.verticales = [];
   }
@@ -259,7 +263,7 @@ function norm(o) {
     // (12/10) tipo de producto (clasificar.py) y criterios de Santi (criterios_santi.py)
     clase: CLASE_TX[o.clase] ? o.clase : "desconocido", claseMotivo: o.clase_motivo || "", marcaPersonal: !!o.marca_personal,
     winner: !!(o.santi_winner ?? o.santi?.winner), vertical: VERT_TX[o.santi?.vertical] ? o.santi.vertical : "otro",
-    puntajeSanti: num(o.puntaje_santi), banderas: Array.isArray(o.santi?.banderas) ? o.santi.banderas : [], saludNota: o.santi?.salud_peso_nota || "",
+    puntajeSanti: num(o.puntaje_santi), funnel: o.santi?.cumple?.mismo_funnel !== false, funnelPct: num(o.santi?.mismo_funnel_pct), banderas: Array.isArray(o.santi?.banderas) ? o.santi.banderas : [], saludNota: o.santi?.salud_peso_nota || "",
   };
   // (11/10) oportunidades por mercado: {mercado, paises, paginas_competencia, anuncios_competencia, keywords_usadas, puntaje 0-100, motivo}.
   // Respaldo con el formato viejo {mercado, fuerte_en, activos_fuerte, activos_aca, nivel, texto}.
@@ -270,9 +274,19 @@ function norm(o) {
     const motivo = x.motivo || x.texto || [paginas != null ? `hay ${pl(paginas, "página")} vendiendo esto` : anuncios != null ? `hay ${pl(anuncios, "anuncio")} de este nicho` : "",
       x.fuerte_en ? `y la oferta escala fuerte en ${corto(mkKey(x.fuerte_en))}${num(x.activos_fuerte) != null ? ` (${pl(num(x.activos_fuerte), "anuncio")})` : ""}` : ""].filter(Boolean).join(" ");
     return { mercado: k, paises: Array.isArray(x.paises) ? x.paises : [], paginas, anuncios, keywords: Array.isArray(x.keywords_usadas) ? x.keywords_usadas : [],
-      puntaje: num(x.puntaje) ?? NIVEL[x.nivel] ?? null, motivo };
+      puntaje: num(x.puntaje) ?? NIVEL[x.nivel] ?? null, motivo, mismo: !!x.mismo_mercado };
   }).sort((a, b) => (b.puntaje ?? -1) - (a.puntaje ?? -1));
   n.puntaje = num(o.puntaje_oportunidad) ?? n.oportunidades[0]?.puntaje ?? null;
+  // (12/10 noche) EXPORTAR (Lorenzo): ofertas de BR / LATAM / AR que no salieron de ahí, llevadas a anglo, Francia, Italia, Alemania,
+  // Rumania, Polonia… donde la marca no pauta y hay poca competencia. Puntaje = mejor destino (competencia medida) + origen + pocos mercados.
+  const dest = n.oportunidades.filter((x) => !x.mismo && DESTINOS.includes(x.mercado)).sort((a, b) => (b.puntaje ?? -1) - (a.puntaje ?? -1));
+  const americano = n.mercados.length > 0 && n.mercados.every((k) => ORIGENES.includes(k));
+  let ex = dest[0]?.puntaje ?? 0;
+  if (americano) ex += 15;
+  if (n.mercados.length === 1) ex += 10; else if (n.mercados.length === 2) ex += 5; else if (n.mercados.length >= 6) ex -= 15;
+  if (n.anuncios >= 50 && n.anuncios <= 500) ex += 5;
+  n.exportar = dest.length ? Math.max(0, Math.min(100, Math.round(ex))) : null;
+  n.destino = dest[0] || null; n.americano = americano;
   n.recomendado = o.mercado_recomendado ? mkKey(o.mercado_recomendado) : n.oportunidades[0]?.mercado || null;
   cacheNorm.set(o, n);
   return n;
@@ -516,10 +530,11 @@ const cabDatos = () => B.datos?.generado ? `<p class="bo-gen mut">Datos del ${es
 
 // --- filtros ---
 const RANGOS_DIAS = [["todos", "Todos", null, null], ["0-7", "Menos de 7", null, 7], ["7-30", "7 a 30", 7, 30], ["30-90", "30 a 90", 30, 90], ["90-", "Más de 90", 90, null]];
-const ORDENES = [["nicho", "Por nicho (Santi)"], ["santi", "Mejor según Santi"], ["oportunidad", "Mejor oportunidad"], ["anuncios", "Más anuncios activos"], ["viejas", "Más días corriendo"]];
+const ORDENES = [["nicho", "Por nicho, mejor para exportar"], ["exportar", "Mejor para exportar"], ["santi", "Mejor según Santi"], ["oportunidad", "Mejor oportunidad"], ["anuncios", "Más anuncios activos"], ["viejas", "Más días corriendo"]];
 // marca personal confirmada por clasificar.py (dominio con el nombre o Dr./Dra.); la bandera de Santi por regex queda solo como aviso
 const esMarca = (o) => o.marcaPersonal;
 // mejor a peor: puntaje de Santi (0 si no es winner), después oportunidad y anuncios
+const paraExportar = (a, b) => (b.exportar ?? -1) - (a.exportar ?? -1) || (b.puntaje ?? -1) - (a.puntaje ?? -1) || b.anuncios - a.anuncios;
 const mejor = (a, b) => (b.puntajeSanti ?? -1) - (a.puntajeSanti ?? -1) || (b.puntaje ?? -1) - (a.puntaje ?? -1) || b.anuncios - a.anuncios;
 function filtradas() {
   const f = B.filtro;
@@ -527,6 +542,8 @@ function filtradas() {
   const xs = ofertas().filter((o) => {
     if (o.anuncios < (Number(f.min) || 0)) return false;
     if (f.santi && !o.winner) return false;
+    if (f.funnel && !o.funnel) return false;
+    if (Number(f.max) > 0 && o.anuncios > Number(f.max)) return false;
     if (f.clases.length && !f.clases.includes(o.clase)) return false;
     if (!f.marcas && esMarca(o)) return false;
     if (f.verticales.length && !f.verticales.includes(o.vertical)) return false;
@@ -538,7 +555,8 @@ function filtradas() {
     return true;
   });
   const dias = (o) => o.dias ?? -1;
-  if (f.orden === "nicho") xs.sort((a, b) => vertIdx(a.vertical) - vertIdx(b.vertical) || mejor(a, b));
+  if (f.orden === "nicho") xs.sort((a, b) => vertIdx(a.vertical) - vertIdx(b.vertical) || paraExportar(a, b));
+  else if (f.orden === "exportar") xs.sort(paraExportar);
   else if (f.orden === "santi") xs.sort(mejor);
   else if (f.orden === "oportunidad") xs.sort((a, b) => (b.puntaje ?? -1) - (a.puntaje ?? -1) || b.anuncios - a.anuncios);
   else if (f.orden === "viejas") xs.sort((a, b) => dias(b) - dias(a) || b.anuncios - a.anuncios);
@@ -548,7 +566,8 @@ function filtradas() {
 function nFiltros() {
   const f = B.filtro;
   const mismas = (a, b) => a.length === b.length && a.every((x) => b.includes(x));
-  return (f.santi ? 0 : 1) + (mismas(f.clases, CLASES_DEF) ? 0 : 1) + (f.marcas ? 1 : 0) + (f.verticales.length ? 1 : 0) + (f.q.trim() ? 1 : 0) + (Number(f.min) > 0 ? 1 : 0) + (f.mercado !== "todos" ? 1 : 0) + (f.formatos.length ? 1 : 0) + (f.dmin != null || f.dmax != null ? 1 : 0);
+  return (f.santi ? 1 : 0) + (f.funnel ? 0 : 1) + (mismas(f.clases, FILTRO_DEF.clases) ? 0 : 1) + (f.marcas ? 1 : 0) + (f.verticales.length ? 1 : 0) + (f.q.trim() ? 1 : 0)
+    + (Number(f.min) !== FILTRO_DEF.min || Number(f.max) !== FILTRO_DEF.max ? 1 : 0) + (f.mercado !== "todos" ? 1 : 0) + (f.formatos.length ? 1 : 0) + (f.dmin != null || f.dmax != null ? 1 : 0);
 }
 const maxAnuncios = () => { const m = Math.max(0, ...ofertas().map((o) => o.anuncios)); return Math.max(50, Math.ceil(m / 50) * 50); };
 const mercadosData = () => { const s = new Set(); ofertas().forEach((o) => o.mercados.forEach((k) => s.add(k))); return [...s].sort((a, b) => (ORDEN_MK.indexOf(a) + 99) % 99 - (ORDEN_MK.indexOf(b) + 99) % 99); };
@@ -567,7 +586,8 @@ function filtrosHTML() {
       <label class="bo-orden"><span class="sr">Ordenar</span><select class="campo" id="f-orden">${ORDENES.map(([k, t]) => `<option value="${k}" ${k === f.orden ? "selected" : ""}>${t}</option>`).join("")}</select></label>
     </div>
     <div class="bo-santi" role="group" aria-label="Criterios de Santi">
-      ${chip("data-fsanti", "1", "Solo winners Santi (45+ anuncios, 7+ días, mismo funnel)", f.santi)}
+      ${chip("data-ffun", "1", "Todos los anuncios a la misma landing", f.funnel)}
+      ${chip("data-fsanti", "1", "Solo winners Santi (45+ anuncios, 7+ días)", f.santi)}
       ${chip("data-fmarca", "1", "Mostrar marcas personales", f.marcas)}
     </div>
     <section class="bo-filtros boceto${B.filtrosAbiertos ? " abierto" : ""}" id="bo-filtros" aria-label="Filtros">
@@ -575,13 +595,14 @@ function filtrosHTML() {
       <div class="bo-f"><span class="bo-f-l" id="fl-ve">Nicho (orden de Santi)</span><div class="segs" role="group" aria-labelledby="fl-ve">${chip("data-fve", "todos", "Todos", !f.verticales.length)}${VERTICALES.map(([k, t]) => chip("data-fve", k, t, f.verticales.includes(k))).join("")}</div></div>
       <div class="bo-f bo-f-min"><span class="bo-f-l" id="fl-min">Anuncios activos (mínimo)</span>
         <div class="bo-rango"><input type="range" id="f-min-r" min="0" max="${mx}" step="${mx > 500 ? 25 : 10}" value="${Math.min(Number(f.min) || 0, mx)}" aria-labelledby="fl-min">
-        <input class="campo num bo-min-n" id="f-min" type="number" inputmode="numeric" min="0" step="10" value="${esc(f.min)}" aria-label="Mínimo de anuncios activos"></div></div>
+        <input class="campo num bo-min-n" id="f-min" type="number" inputmode="numeric" min="0" step="10" value="${esc(f.min)}" aria-label="Mínimo de anuncios activos"></div>
+        <div class="bo-dias"><label>hasta <input class="campo num" id="f-max" type="number" inputmode="numeric" min="0" step="50" value="${f.max || ""}" placeholder="sin tope" aria-label="Máximo de anuncios activos"></label> anuncios <span class="mut">(más de 1.000 suele ser marca muy explotada)</span></div></div>
       <div class="bo-f"><span class="bo-f-l" id="fl-mk">Corre en (presencia mínima)</span><div class="segs" role="group" aria-labelledby="fl-mk">${chip("data-fmk", "todos", "Todos", f.mercado === "todos")}${mercadosData().map((k) => chip("data-fmk", k, nombreMercado(k), f.mercado === k)).join("")}</div></div>
       <div class="bo-f"><span class="bo-f-l" id="fl-fo">Formato</span><div class="segs" role="group" aria-labelledby="fl-fo">${chip("data-ffo", "todos", "Todos", !f.formatos.length)}${formatosData().map((k) => chip("data-ffo", k, FORMATO_TX[k], f.formatos.includes(k))).join("")}</div></div>
       <div class="bo-f"><span class="bo-f-l" id="fl-di">Tiempo corriendo (días)</span><div class="segs" role="group" aria-labelledby="fl-di">${RANGOS_DIAS.map(([k, t]) => chip("data-fdi", k, t, rango === k)).join("")}</div>
         <div class="bo-dias"><label>de <input class="campo num" id="f-dmin" type="number" inputmode="numeric" min="0" value="${f.dmin ?? ""}" placeholder="0" aria-label="Días mínimos"></label>
         <label>a <input class="campo num" id="f-dmax" type="number" inputmode="numeric" min="0" value="${f.dmax ?? ""}" placeholder="∞" aria-label="Días máximos"></label> días</div></div>
-      ${n ? `<div class="bo-f bo-f-limpiar"><button type="button" class="link" id="f-limpiar">Volver a los filtros de Santi</button></div>` : ""}
+      ${n ? `<div class="bo-f bo-f-limpiar"><button type="button" class="link" id="f-limpiar">Volver a los filtros de siempre</button></div>` : ""}
     </section>`;
 }
 function pintarOfertas() {
@@ -605,6 +626,8 @@ function bindFiltros() {
   $("#f-orden").onchange = (e) => cambiar((f) => { f.orden = e.target.value; }, false);
   $("#f-min-r").oninput = (e) => { const v = Number(e.target.value) || 0; $("#f-min").value = v; cambiar((f) => { f.min = v; }, false); };
   $("#f-min").onchange = (e) => { const v = Math.max(0, Number(e.target.value) || 0); cambiar((f) => { f.min = v; }); };
+  $$("[data-ffun]").forEach((b) => b.onclick = () => cambiar((f) => { f.funnel = !f.funnel; }));
+  $("#f-max").onchange = (e) => { const v = e.target.value === "" ? 0 : Math.max(0, Number(e.target.value) || 0); cambiar((f) => { f.max = v; }); };
   $$("[data-fsanti]").forEach((b) => b.onclick = () => cambiar((f) => { f.santi = !f.santi; }));
   $$("[data-fmarca]").forEach((b) => b.onclick = () => cambiar((f) => { f.marcas = !f.marcas; }));
   $$("[data-fcl]").forEach((b) => b.onclick = () => cambiar((f) => { const k = b.dataset.fcl; f.clases = f.clases.includes(k) ? f.clases.filter((x) => x !== k) : [...f.clases, k]; }));
@@ -630,7 +653,7 @@ function pintarLista() {
   const tot = ofertas().length;
   const res = `<p class="bo-res mut num" aria-live="polite">${xs.length === tot ? pl(tot, "oferta") : `${ent(xs.length)} de ${pl(tot, "oferta")}`}${B.filtro.mercado !== "todos" ? ` que corren en ${esc(nombreMercado(B.filtro.mercado))}` : ""}</p>`;
   if (!xs.length) {
-    box.innerHTML = res + `<div class="vacio boceto bo-vacio">${tot ? "Ninguna oferta pasa los filtros. Probá sacar «Solo winners Santi», sumar tipos de producto o bajar el mínimo de anuncios." : "Todavía no hay ofertas cargadas."}</div>`;
+    box.innerHTML = res + `<div class="vacio boceto bo-vacio">${tot ? "Ninguna oferta pasa los filtros. Probá «Volver a los filtros de siempre», sumar tipos de producto o cambiar el rango de anuncios." : "Todavía no hay ofertas cargadas."}</div>`;
     return;
   }
   if (B.filtro.orden === "nicho") {
@@ -729,6 +752,8 @@ function tarjeta(o) {
 // (12/10) Santi: puntaje, tipo de producto, nicho y banderas para revisar a mano
 function santiHTML(o) {
   const ch = [];
+  if (o.exportar != null) ch.push(`<span class="fchip ${o.exportar >= 75 ? "verde-fuerte" : o.exportar >= 55 ? "verde" : "amarillo"}" title="${esc(o.destino?.motivo || "")}">Exportar <span class="num">${ent(o.exportar)}</span> → ${bandera(o.destino.mercado)} ${esc(corto(o.destino.mercado))}</span>`);
+  if (o.americano) ch.push(`<span class="fchip acento" title="Corre solo en Brasil / LATAM / Argentina">Solo ${esc(o.mercados.map(corto).join(" · "))}</span>`);
   if (o.winner && o.puntajeSanti != null) ch.push(`<span class="fchip ${o.puntajeSanti >= 70 ? "verde-fuerte" : o.puntajeSanti >= 50 ? "verde" : "amarillo"}" title="Puntaje de Santi: nicho, mercado y banderas">Santi <span class="num">${ent(o.puntajeSanti)}</span></span>`);
   ch.push(`<span class="fchip ${["digital", "libro_fisico"].includes(o.clase) ? "acento" : "rojo"}" title="${esc(o.claseMotivo)}">${esc(CLASE_TX[o.clase])}</span>`);
   ch.push(`<span class="fchip">${esc(VERT_TX[o.vertical])}</span>`);
@@ -738,7 +763,7 @@ function santiHTML(o) {
 }
 // Chips con los 2 o 3 mejores mercados: «Oportunidad: 🇫🇷 Francia · 5 páginas compitiendo»
 function oportunidadesHTML(o) {
-  const xs = o.oportunidades.slice(0, 3);
+  const xs = [...o.oportunidades].sort((a, b) => a.mismo - b.mismo || DESTINOS.includes(b.mercado) - DESTINOS.includes(a.mercado) || (b.puntaje ?? -1) - (a.puntaje ?? -1)).slice(0, 3);
   if (!xs.length) return "";
   return `<ul class="bo-opts" aria-label="Oportunidades">${xs.map((x, i) => `<li class="${x.mercado === o.recomendado ? "rec" : ""}"><span class="bo-opt-l">${i === 0 ? "Oportunidad:" : ""}</span> ${bandera(x.mercado)} ${esc(nombreMercado(x.mercado))}${x.paginas != null ? ` · <span class="num">${pl(x.paginas, "página")}</span> compitiendo` : x.anuncios != null ? ` · <span class="num">${pl(x.anuncios, "anuncio")}</span>` : ""}</li>`).join("")}</ul>`;
 }
