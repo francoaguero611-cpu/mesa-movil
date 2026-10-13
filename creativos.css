@@ -113,7 +113,7 @@ button.cr-miga:hover { background: var(--papel-2); }
 .cr-corr textarea { width: 100%; min-height: 110px; resize: vertical; font: 500 15px/1.45 var(--f-texto); }
 /* Tarjeta mientras Claude la corrige: no se puede ver, se reemplaza por la versión nueva */
 .cr-card.corrigiendo .cr-poster { cursor: progress; }
-.cr-card.corrigiendo .cr-poster img { filter: grayscale(.6) brightness(.55); }
+.cr-card.corrigiendo .cr-poster img { filter: grayscale(.7) brightness(.3) blur(1.5px); }
 .cr-corrigiendo { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 6px; padding: 10px; color: #fff; font: 700 14px/1.25 var(--f-titulo); text-align: center; }
 .cr-corrigiendo small { font: 500 11.5px/1.3 var(--f-texto); opacity: .85; }
 .cr-corrigiendo .cargador { width: 26px; height: 26px; margin: 0; border-color: #fff; border-right-color: transparent; }
@@ -146,3 +146,29 @@ button.cr-miga:hover { background: var(--papel-2); }
 .cr-chat-form { display: grid; gap: 8px; margin-top: 12px; }
 .cr-quien { display: flex; gap: 6px; }
 .cr-chat-form textarea { width: 100%; min-height: 76px; resize: vertical; font: 500 15px/1.45 var(--f-texto); }
+
+/* (13/10) Guion «karaoke» al costado del video */
+.cr-gv { display: grid; gap: 6px; padding: 10px 12px; border: 2px solid var(--tinta); border-radius: var(--r-card); background: var(--tarjeta); }
+.cr-gv-cab { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 10px; }
+.cr-gv-lista { display: grid; gap: 2px; max-height: min(42vh, 380px); overflow-y: auto; overscroll-behavior: contain; scroll-padding: 40px; }
+@media (max-width: 760px) { .cr-gv-lista { max-height: 30vh; } }
+.cr-seg { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 2px 8px; width: 100%; padding: 6px 8px; border: 0; border-radius: var(--r-btn); background: none; color: var(--mut); text-align: left; font: 500 15px/1.4 var(--f-texto); cursor: pointer; transition: background .15s, color .15s; }
+.cr-seg:hover { background: var(--papel-2); }
+.cr-seg-t { grid-row: span 2; padding-top: 2px; font: 600 12px var(--f-titulo); font-variant-numeric: tabular-nums; color: var(--mut); }
+.cr-seg-es { overflow-wrap: anywhere; }
+.cr-seg-or { font-size: 13px; opacity: .8; overflow-wrap: anywhere; }
+.cr-seg.ahora { background: var(--marca); color: var(--tinta); box-shadow: inset 4px 0 0 var(--tinta); }
+.cr-seg.ahora .cr-seg-es { font-weight: 700; }
+.cr-seg .w { border-radius: 4px; transition: background .08s; }
+.cr-seg.ahora .w.dice { background: var(--tinta); color: var(--papel); padding: 0 2px; margin: 0 -2px; }
+@media (prefers-reduced-motion: reduce) { .cr-seg, .cr-seg .w { transition: none; } }
+
+/* (13/10) Progreso de la corrección en la tarjeta */
+.cr-anillo-box { position: relative; display: grid; place-items: center; width: 64px; height: 64px; }
+.cr-anillo-box b { position: absolute; font: 700 15px var(--f-titulo); font-variant-numeric: tabular-nums; }
+.cr-anillo { width: 64px; height: 64px; transform: rotate(-90deg); }
+.cr-anillo circle { fill: none; stroke-width: 6; }
+.cr-anillo .fondo { stroke: rgba(255, 255, 255, .25); }
+.cr-anillo .lleno { stroke: #fff; stroke-linecap: round; transition: stroke-dashoffset .6s ease; }
+.cr-barrita { display: block; width: 80%; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .25); overflow: hidden; }
+.cr-barrita span { display: block; height: 100%; background: #fff; border-radius: 3px; transition: width .6s ease; }

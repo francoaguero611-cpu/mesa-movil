@@ -317,6 +317,22 @@ function pintarMetricas() {
 const sinFecha = (n) => String(n || "").replace(/^\s*\d{1,2}\.\d{1,2}\.?(\d{2,4})?\s*[-·|]?\s*/, "");
 const porNumero = (a, b) => sinFecha(a.nombre).localeCompare(sinFecha(b.nombre), "es", { numeric: true, sensitivity: "base" }) || String(a.nombre).localeCompare(String(b.nombre), "es", { numeric: true });
 const enCurso = (ch) => ch && ["en_cola", "trabajando"].includes(ch.estado);
+// (13/10) Progreso de una corrección: el % que informa la Mac; si no informa, se estima por el tiempo (≈ 20 min por creativo, tope 90 %)
+const MIN_CORR = 20;
+function avance(ch) {
+  if (ch.estado === "en_cola") return { pct: 0, txt: "En cola en la Mac", resta: null };
+  const ini = ch.inicio ? new Date(ch.inicio).getTime() : null, ya = ini ? (Date.now() - ini) / 60e3 : 0;
+  const est = Math.min(90, Math.round((ya / MIN_CORR) * 90));
+  const pct = Math.max(ch.progreso || 0, ch.progreso >= 10 ? 0 : est);
+  // lo que falta: el que calcula la Mac; si no, lo que queda de los ≈ 20 min según el %
+  let resta = ch.eta ? (new Date(ch.eta).getTime() - Date.now()) / 60e3 : MIN_CORR * (100 - pct) / 100;
+  resta = Math.max(1, Math.round(resta));
+  return { pct, txt: ch.paso || "Corrigiendo…", resta, lento: !ch.eta && ya > MIN_CORR * 1.5 };
+}
+function anillo(pct) {
+  const r = 26, c = 2 * Math.PI * r;
+  return `<svg class="cr-anillo" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="${r}" class="fondo"/><circle cx="32" cy="32" r="${r}" class="lleno" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${(c * (1 - pct / 100)).toFixed(1)}"/></svg>`;
+}
 // chat que está corrigiendo esta tarjeta ahora (el suyo, el de su versión anterior o el general de la carpeta)
 function corrigiendo(d, c) {
   return d.chats.find((ch) => enCurso(ch) && (ch.alcance === "carpeta" || ch.creativo_id === c.id || (c.anterior && ch.creativo_id === c.anterior.id))) || null;
@@ -333,7 +349,11 @@ function pintarTarjetas() {
     return `<article class="cr-card boceto${corr ? " corrigiendo" : ""}" data-i="${i}">
       <button type="button" class="cr-poster" data-play aria-label="${corr ? `Corrigiendo ${esc(c.nombre || "creativo")}` : `Ver ${esc(c.nombre || "creativo")}`}" ${corr ? "disabled" : ""}>
         ${c.thumb ? `<img src="${esc(url(c.thumb))}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ""}
-        ${corr ? `<span class="cr-corrigiendo" role="status"><span class="cargador"></span>${corr.estado === "en_cola" ? "En cola para corregir" : "Corrigiendo…"}<small>se reemplaza por la versión nueva</small></span>`
+        ${corr ? (() => { const a = avance(corr); return `<span class="cr-corrigiendo" role="status" aria-label="Corrigiendo: ${a.pct} %">
+            <span class="cr-anillo-box">${corr.estado === "en_cola" ? '<span class="cargador"></span>' : `${anillo(a.pct)}<b>${a.pct}%</b>`}</span>
+            <span>${esc(a.txt)}</span>
+            ${corr.estado === "en_cola" ? `<small>arranca cuando la Mac termine lo anterior</small>` : `<span class="cr-barrita"><span style="width:${a.pct}%"></span></span><small>${a.lento ? "tarda más de lo normal" : `faltan ≈ ${a.resta} min`} · se reemplaza por la versión nueva</small>`}
+          </span>`; })()
           : `<span class="cr-playico" aria-hidden="true">${ICO.play}</span>`}
       </button>
       <div class="cr-menu-wrap cr-card-menu"><button type="button" class="cr-puntos-card" data-menu="card" aria-haspopup="true" aria-expanded="false" aria-label="Opciones de ${esc(c.nombre || "este creativo")}">${ICO.puntos}</button></div>
@@ -439,6 +459,7 @@ async function verCreativo(c) {
         </div>
       </div>
       <div class="cr-ver-der">
+        <section class="cr-gv" id="cr-gv" aria-label="Guion"><p class="cr-mut"><span class="cargador mini"></span> Cargando el guion…</p></section>
         ${esAnterior ? `<p class="cr-mut">Esta es la versión anterior. La que corre ahora es «${esc(c.anteriorDe.nombre || "")}».</p>` : `
         <form class="cr-corr" id="cr-corr">
           <div class="cr-corr-tit"><b>Corrección</b><button type="button" class="btn chico" data-marcar>📍 Marcar 0:00</button></div>
@@ -447,7 +468,6 @@ async function verCreativo(c) {
           <div class="cr-quien" role="group" aria-label="Escribís como">${PERSONAS.map(([k, l]) => `<button type="button" class="btn chico" data-q="${k}" aria-pressed="${C.quien === k}">${l}</button>`).join("")}</div>
           <button type="submit" class="btn pri">Mandar a Claude</button>
         </form>`}
-        ${tr?.estado === "listo" ? `<details class="cr-guion-mini"><summary>Guion en español</summary><pre>${esc(tr.es)}</pre></details>` : ""}
         <div class="botones">
           ${esAnterior ? "" : `<button type="button" class="btn" data-chat>💬 Ver el chat</button>`}
           <button type="button" class="btn" data-cerrar data-foco>Cerrar</button>
@@ -500,6 +520,7 @@ async function verCreativo(c) {
     const ta = $("#cr-corr-txt", m.dlg); const pre = ta.value && !ta.value.endsWith("\n") ? "\n" : "";
     ta.value += `${pre}[${marca(vid.currentTime)}] `; ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
   };
+  guionVivo(c, vid, m);
   // teclado en la compu: espacio pausa, flechas ±0,5 s (si no se está escribiendo)
   m.dlg.addEventListener("keydown", (e) => {
     if (e.target.closest("textarea, input")) return;
@@ -507,6 +528,59 @@ async function verCreativo(c) {
     if (e.key === "ArrowLeft") { e.preventDefault(); $('[data-paso="-0.5"]', m.dlg).click(); }
     if (e.key === "ArrowRight") { e.preventDefault(); $('[data-paso="0.5"]', m.dlg).click(); }
   });
+}
+
+// (13/10) Guion «karaoke»: frase actual resaltada y palabra actual marcada mientras habla; tocar una frase lleva a ese segundo.
+// Sale del audio real (ElevenLabs con el segundo de cada palabra). Si el video no es en español: la frase en español y abajo el original.
+async function guionVivo(c, vid, m) {
+  const box = $("#cr-gv", m.dlg); if (!box) return;
+  let t = c.transcripcion;
+  if (!t?.segs?.length || t.estado !== "listo") {
+    if (!(c.n_ads || c.video_url)) { box.innerHTML = `<p class="cr-mut">El guion aparece cuando el video esté en Meta.</p>`; return; }
+    if (!["en_cola", "transcribiendo"].includes(t?.estado)) { try { await api("creativos_transcribir", { body: { ids: [c.id] } }); } catch (e) { if (falla(e)) return; } }
+    box.innerHTML = `<p class="cr-mut"><span class="cargador mini"></span> Preparando el guion con los tiempos de cada palabra (≈ 20 s)…</p>`;
+    for (let i = 0; i < 40 && box.isConnected; i++) {
+      await new Promise((ok) => setTimeout(ok, 3000));
+      try { const r = await api("creativos_uno", { q: `&id=${encodeURIComponent(c.id)}` }); t = r.transcripcion; } catch (e) { if (falla(e)) return; }
+      if (t?.estado === "listo" || t?.estado === "error") break;
+    }
+    if (!box.isConnected) return;
+    if (t?.estado !== "listo" || !t.segs?.length) { box.innerHTML = `<p class="cr-mut">${t?.estado === "error" ? "No se pudo sacar el guion: " + esc(t.error || "") : t?.es ? esc(t.es) : "El guion todavía no está."}</p>`; return; }
+    c.transcripcion = t;
+  }
+  const es = /^(spa|es)/i.test(t.idioma || "");
+  const segs = t.segs;
+  box.innerHTML = `<div class="cr-gv-cab"><b>Guion</b><span class="cr-mut">${es ? "tocá una frase para ir a ese segundo" : `en español · abajo el original (${esc(t.idioma)})`}</span></div>
+    <div class="cr-gv-lista" id="cr-gv-lista">${segs.map((x, i) => `
+      <button type="button" class="cr-seg" data-i="${i}" data-s="${x.s}">
+        <span class="cr-seg-t">${marca(x.s)}</span>
+        <span class="cr-seg-es">${es ? x.w.map((w, j) => `<span class="w" data-j="${j}">${esc(w[0])}</span>`).join(" ") : esc(x.es)}</span>
+        ${es ? "" : `<span class="cr-seg-or">${x.w.map((w, j) => `<span class="w" data-j="${j}">${esc(w[0])}</span>`).join(" ")}</span>`}
+      </button>`).join("")}</div>`;
+  const lista = $("#cr-gv-lista", box), filas = $$(".cr-seg", lista);
+  filas.forEach((f) => f.onclick = () => { vid.currentTime = Number(f.dataset.s) + 0.01; vid.play(); });
+  let segAct = -1, palAct = null, raf = 0;
+  const marcar = () => {
+    const now = vid.currentTime;
+    let i = segs.findIndex((x, k) => now >= x.s - 0.05 && now < (segs[k + 1]?.s ?? Infinity));
+    if (now < (segs[0]?.s ?? 0)) i = -1;
+    if (i !== segAct) {
+      filas[segAct]?.classList.remove("ahora"); segAct = i;
+      const f = filas[i];
+      if (f) { f.classList.add("ahora");
+        const top = f.offsetTop - lista.offsetTop - lista.clientHeight / 3;
+        lista.scrollTo({ top, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); }
+    }
+    const x = segs[i]; let j = -1;
+    if (x) j = x.w.findIndex((w) => now >= w[1] - 0.04 && now < w[2] + 0.12);
+    const pal = j >= 0 ? $(`.w[data-j="${j}"]`, filas[i].querySelector(es ? ".cr-seg-es" : ".cr-seg-or")) : null;
+    if (pal !== palAct) { palAct?.classList.remove("dice"); pal?.classList.add("dice"); palAct = pal; }
+  };
+  const loop = () => { marcar(); if (!vid.paused && box.isConnected) raf = requestAnimationFrame(loop); };
+  vid.addEventListener("play", () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(loop); });
+  ["seeked", "timeupdate", "pause"].forEach((ev) => vid.addEventListener(ev, marcar));
+  if (!vid.paused) raf = requestAnimationFrame(loop);
+  marcar();
 }
 
 // ---------------------------------------------------------------- transcribir
