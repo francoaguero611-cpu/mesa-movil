@@ -2113,7 +2113,7 @@ function abrirInicial() {
   const h = location.hash.slice(1).split("/")[0]; // (12/10) #creativos/<oferta>/<fecha>
   const guardada = ls.get("dash_seccion");
   const s = seccionDe(h) || seccionDe(guardada) || SECCIONES[0];
-  s.montar({});
+  s.montar({}); pintarTitulo(s.id);
 }
 function irASeccion(sec, opts = {}) {
   cerrarMenu();
@@ -2125,7 +2125,7 @@ function irASeccion(sec, opts = {}) {
     if (s.ya) s.ya(opts); else window.scrollTo({ top: 0, behavior: reducido() ? "auto" : "smooth" });
     return true;
   }
-  s.montar(opts);
+  s.montar(opts); pintarTitulo(s.id);
   return true;
 }
 
