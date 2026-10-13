@@ -125,8 +125,8 @@ async function cargar({ sync = false } = {}) {
   const g = C.g, f = C.f;
   try {
     if (sync) { const r = await api("creativos_sync", { body: {} }); toast(r.nuevos ? `Listo: ${r.nuevos} creativos nuevos` : "Al día: no hay creativos nuevos"); }
+    if (g && !C.raizD) api("creativos").then((r) => { C.raizD = r; if (C.montado && C.g === g) pintar(); }).catch(() => {}); // nombre de la oferta en las migas
     if (!g) C.raizD = await api("creativos");
-    else if (!C.raizD) api("creativos").then((r) => { C.raizD = r; if (C.montado && C.g === g) pintar(); }).catch(() => {}); // nombre de la oferta en las migas
     else if (!f) C.oferta[g] = await api("creativos", { q: `&grupo=${encodeURIComponent(g)}` });
     else C.carpeta[g + "|" + f] = await api("creativos", { q: `&grupo=${encodeURIComponent(g)}&fecha=${f}` });
   } catch (e) {
@@ -313,29 +313,41 @@ function pintarMetricas() {
   };
 }
 
+// (13/10) Orden por número: «13.10 AD 2» antes que «13.10 AD 10» (la fecha del principio no cuenta)
+const sinFecha = (n) => String(n || "").replace(/^\s*\d{1,2}\.\d{1,2}\.?(\d{2,4})?\s*[-·|]?\s*/, "");
+const porNumero = (a, b) => sinFecha(a.nombre).localeCompare(sinFecha(b.nombre), "es", { numeric: true, sensitivity: "base" }) || String(a.nombre).localeCompare(String(b.nombre), "es", { numeric: true });
+const enCurso = (ch) => ch && ["en_cola", "trabajando"].includes(ch.estado);
+// chat que está corrigiendo esta tarjeta ahora (el suyo, el de su versión anterior o el general de la carpeta)
+function corrigiendo(d, c) {
+  return d.chats.find((ch) => enCurso(ch) && (ch.alcance === "carpeta" || ch.creativo_id === c.id || (c.anterior && ch.creativo_id === c.anterior.id))) || null;
+}
+
 function pintarTarjetas() {
   const n = $("#cr-tarjetas", C.raiz); const d = C.carpeta[C.g + "|" + C.f]; if (!n || !d) return;
   if (!d.creativos.length) { n.innerHTML = `<p class="vacio">No hay creativos en esta fecha.</p>`; return; }
+  d.creativos.sort(porNumero);
   const chatDe = new Map(); for (const ch of d.chats) if (ch.alcance === "creativo" && !chatDe.has(ch.creativo_id)) chatDe.set(ch.creativo_id, ch);
   n.innerHTML = d.creativos.map((c, i) => {
-    const tr = c.transcripcion?.estado, ch = chatDe.get(c.id), m = C.metr && C.m ? C.m.creativos?.[c.id] : null;
-    return `<article class="cr-card boceto" data-i="${i}">
-      <button type="button" class="cr-poster" data-play aria-label="Ver ${esc(c.nombre || "creativo")}">
+    const tr = c.transcripcion?.estado, ch = chatDe.get(c.id), m = C.metr && C.m ? C.m.creativos?.[c.metr_id || c.id] : null;
+    const corr = corrigiendo(d, c);
+    return `<article class="cr-card boceto${corr ? " corrigiendo" : ""}" data-i="${i}">
+      <button type="button" class="cr-poster" data-play aria-label="${corr ? `Corrigiendo ${esc(c.nombre || "creativo")}` : `Ver ${esc(c.nombre || "creativo")}`}" ${corr ? "disabled" : ""}>
         ${c.thumb ? `<img src="${esc(url(c.thumb))}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ""}
-        <span class="cr-playico" aria-hidden="true">${ICO.play}</span>
+        ${corr ? `<span class="cr-corrigiendo" role="status"><span class="cargador"></span>${corr.estado === "en_cola" ? "En cola para corregir" : "Corrigiendo…"}<small>se reemplaza por la versión nueva</small></span>`
+          : `<span class="cr-playico" aria-hidden="true">${ICO.play}</span>`}
       </button>
       <div class="cr-menu-wrap cr-card-menu"><button type="button" class="cr-puntos-card" data-menu="card" aria-haspopup="true" aria-expanded="false" aria-label="Opciones de ${esc(c.nombre || "este creativo")}">${ICO.puntos}</button></div>
       <div class="cr-badges">
         ${c.origen === "fabrica" && !c.n_ads ? `<span class="cr-badge b-nuevo">sin salir</span>` : ""}
-        ${c.version_de ? `<span class="cr-badge b-ver">corregido</span>` : ""}
+        ${c.version_de ? `<span class="cr-badge b-ver">corregido${/\sv(\d+)$/i.test(c.nombre || "") ? " " + esc(/\s(v\d+)$/i.exec(c.nombre)[1]) : ""}</span>` : ""}
         ${tr === "listo" ? `<span class="cr-badge b-ok">guion</span>` : tr === "en_cola" || tr === "transcribiendo" ? `<span class="cr-badge b-trab"><span class="cargador mini"></span>guion</span>` : tr === "error" ? `<span class="cr-badge b-err">guion ✕</span>` : ""}
-        ${ch ? `<span class="cr-badge ${["en_cola", "trabajando"].includes(ch.estado) ? "b-trab" : ch.estado === "listo" ? "b-ok" : ch.estado === "error" ? "b-err" : ""}">${["en_cola", "trabajando"].includes(ch.estado) ? '<span class="cargador mini"></span>' : "💬"}${ch.estado === "listo" ? "corregido" : "corrección"}</span>` : ""}
+        ${ch && !corr && ch.estado === "error" ? `<span class="cr-badge b-err">corrección ✕</span>` : ""}
       </div>
       <div class="cr-pie">
         <p class="cr-nom" title="${esc(c.nombre)}">${esc(c.nombre || "Sin nombre")}</p>
         ${C.metr ? (C.mCargando && !m ? `<div class="cr-m cr-mut"><span class="cargador mini"></span></div>` : `<div class="cr-m">
           <span><small>Gasto</small>${plata(m?.gasto ?? 0)}</span><span><small>Ventas</small>${m?.ventas ?? 0}</span><span><small>ROAS</small><b class="roas r-${roasCls(m?.roas ?? null)}">${m?.roas ?? "—"}</b></span></div>`)
-          : `<p class="cr-mut cr-sub">${c.n_ads ? `${c.n_ads} anuncio${c.n_ads === 1 ? "" : "s"}` : "todavía no salió"}</p>`}
+          : `<p class="cr-mut cr-sub">${c.version_de && !c.ads?.length ? "versión nueva, sin salir" : c.n_ads ? `${c.n_ads} anuncio${c.n_ads === 1 ? "" : "s"}` : "todavía no salió"}</p>`}
       </div>
     </article>`;
   }).join("");
@@ -371,7 +383,7 @@ function menu(boton, items) {
 }
 function menuCarpeta(boton) {
   const d = C.carpeta[C.g + "|" + C.f]; if (!d) return;
-  const sinGuion = d.creativos.filter((c) => c.n_ads && !["listo", "en_cola", "transcribiendo"].includes(c.transcripcion?.estado));
+  const sinGuion = d.creativos.filter((c) => (c.n_ads || c.video_url) && !["listo", "en_cola", "transcribiendo"].includes(c.transcripcion?.estado));
   const conGuion = d.creativos.filter((c) => c.transcripcion?.estado === "listo");
   menu(boton, [
     { t: "Correcciones", sub: "para todos los anuncios de esta fecha", ico: "💬", fn: () => abrirChat({ alcance: "carpeta" }) },
@@ -389,44 +401,117 @@ function menuCard(boton, c) {
   menu(boton, [
     { t: "Correcciones", sub: "chat para rehacer este anuncio", ico: "💬", fn: () => abrirChat({ alcance: "creativo", creativo: c }) },
     tr === "listo" ? { t: "Ver guion", sub: "en español", ico: "📄", fn: () => verGuiones([c]) }
-      : { t: tr === "en_cola" || tr === "transcribiendo" ? "Transcribiendo…" : "Transcribir", sub: c.n_ads ? "guion en español" : "cuando salga en Meta", ico: "📝", off: !c.n_ads || tr === "en_cola" || tr === "transcribiendo", fn: () => transcribir([c]) },
+      : { t: tr === "en_cola" || tr === "transcribiendo" ? "Transcribiendo…" : "Transcribir", sub: c.n_ads || c.video_url ? "guion en español" : "cuando salga en Meta", ico: "📝", off: !(c.n_ads || c.video_url) || tr === "en_cola" || tr === "transcribiendo", fn: () => transcribir([c]) },
+    ...(c.anterior ? [{ t: "Ver versión anterior", sub: c.anterior.nombre || "", ico: "⏮", fn: () => verCreativo({ ...c.anterior, n_ads: c.anterior.ads?.length || 0, anteriorDe: c }) }] : []),
     ...(c.post_id ? [{ t: "Ver en Facebook", ico: "↗", fn: () => window.open(`https://www.facebook.com/${c.post_id}`, "_blank", "noopener") }] : []),
     ...(url(c.drive_url) ? [{ t: "Abrir en Drive", ico: "↗", fn: () => window.open(c.drive_url, "_blank", "noopener") }] : []),
   ]);
 }
 
 // ---------------------------------------------------------------- ver un creativo
-async function verCreativo(c) {
-  const tr = c.transcripcion;
-  const m = C.ctx.abrirModal(`
-    <h3 class="cr-m-tit">${esc(c.nombre || "Creativo")}</h3>
-    <div class="cr-video" id="cr-video">${c.thumb ? `<img src="${esc(url(c.thumb))}" alt="">` : ""}<span class="cr-v-carga"><span class="cargador"></span>Cargando el video…</span></div>
-    ${tr?.estado === "listo" ? `<details class="cr-guion-mini"><summary>Guion en español</summary><pre>${esc(tr.es)}</pre></details>` : ""}
-    <div class="botones">
-      <button type="button" class="btn" data-corr>💬 Correcciones</button>
-      ${tr?.estado === "listo" ? "" : `<button type="button" class="btn" data-tr ${c.n_ads ? "" : "disabled"}>📝 Transcribir</button>`}
-      <button type="button" class="btn pri" data-cerrar data-foco>Cerrar</button>
-    </div>`, { ancho: true });
-  m.dlg.classList.add("cr-dlg");
-  $("[data-cerrar]", m.dlg).onclick = m.cerrar;
-  $("[data-corr]", m.dlg).onclick = () => { m.cerrar(); abrirChat({ alcance: "creativo", creativo: c }); };
-  const t = $("[data-tr]", m.dlg); if (t) t.onclick = () => { m.cerrar(); transcribir([c]); };
-  const box = $("#cr-video", m.dlg);
-  if (!c.ads?.length) { box.innerHTML = c.drive_url ? `<p class="cr-mut">Todavía no salió en Meta. <a href="${esc(url(c.drive_url))}" target="_blank" rel="noopener">Abrir en Drive ↗</a></p>` : `<p class="cr-mut">Todavía no salió en Meta.</p>`; return; }
-  for (const [ad, act] of c.ads.slice(0, 3)) {
-    try {
-      const v = await api("video", { q: `&ad=${encodeURIComponent(ad)}&act=${encodeURIComponent(act)}` });
-      if (!box.isConnected) return;
-      if (v.src) { box.innerHTML = `<video src="${esc(url(v.src))}" ${v.poster ? `poster="${esc(url(v.poster))}"` : ""} controls playsinline autoplay preload="metadata"></video>`; return; }
-      if (v.link) { box.innerHTML = `<p class="cr-mut">${esc(v.error || "No se puede reproducir acá.")} <a href="${esc(url(v.link))}" target="_blank" rel="noopener">Verlo en Facebook ↗</a></p>`; return; }
-    } catch (e) { if (falla(e)) return; }
+// (13/10) Reproductor vertical 9:16 (celu y compu) con barra de segundos, ±0,5 s y «Marcar este segundo» para escribir la corrección ahí mismo.
+const tiempo = (t) => { t = Math.max(0, t || 0); const m = Math.floor(t / 60), s2 = t - m * 60; return `${m}:${s2 < 10 ? "0" : ""}${s2.toFixed(1)}`; };
+const marca = (t) => { t = Math.max(0, Math.floor(t || 0)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`; };
+async function srcDe(c) {
+  if (url(c.video_url)) return { src: c.video_url };
+  for (const [ad, act] of (c.ads || []).slice(0, 3)) {
+    try { const v = await api("video", { q: `&ad=${encodeURIComponent(ad)}&act=${encodeURIComponent(act)}` }); if (v.src || v.link) return v; }
+    catch (e) { if (falla(e)) throw e; }
   }
-  if (box.isConnected) box.innerHTML = `<p class="cr-mut">No se pudo cargar el video.${c.post_id ? ` <a href="https://www.facebook.com/${esc(c.post_id)}" target="_blank" rel="noopener">Verlo en Facebook ↗</a>` : ""}</p>`;
+  return null;
+}
+async function verCreativo(c) {
+  const tr = c.transcripcion, esAnterior = !!c.anteriorDe;
+  const m = C.ctx.abrirModal(`
+    <h3 class="cr-m-tit">${esc(c.nombre || "Creativo")}${esAnterior ? ` <small class="cr-mut">· versión anterior</small>` : ""}</h3>
+    <div class="cr-ver">
+      <div class="cr-ver-izq">
+        <div class="cr-video" id="cr-video">${c.thumb ? `<img src="${esc(url(c.thumb))}" alt="">` : ""}<span class="cr-v-carga"><span class="cargador"></span>Cargando el video…</span></div>
+        <div class="cr-ctrl" id="cr-ctrl" hidden>
+          <div class="cr-ctrl-fila">
+            <button type="button" class="btn chico" data-paso="-0.5" aria-label="Atrás medio segundo">−0,5 s</button>
+            <button type="button" class="btn chico pri cr-play" data-pp aria-label="Reproducir o pausar">▶</button>
+            <button type="button" class="btn chico" data-paso="0.5" aria-label="Adelante medio segundo">+0,5 s</button>
+            <span class="cr-t" id="cr-t" aria-live="off">0:00.0 / 0:00.0</span>
+          </div>
+          <label class="sr" for="cr-barra">Segundo del video</label>
+          <input type="range" id="cr-barra" class="cr-barra" min="0" max="1" step="0.05" value="0">
+        </div>
+      </div>
+      <div class="cr-ver-der">
+        ${esAnterior ? `<p class="cr-mut">Esta es la versión anterior. La que corre ahora es «${esc(c.anteriorDe.nombre || "")}».</p>` : `
+        <form class="cr-corr" id="cr-corr">
+          <div class="cr-corr-tit"><b>Corrección</b><button type="button" class="btn chico" data-marcar>📍 Marcar 0:00</button></div>
+          <label class="sr" for="cr-corr-txt">Corrección para este anuncio</label>
+          <textarea class="campo" id="cr-corr-txt" rows="5" placeholder="Pausá en el segundo, tocá «Marcar» y escribí qué cambiar. Ej.: [0:03] el texto dice 70 %, va 50 %"></textarea>
+          <div class="cr-quien" role="group" aria-label="Escribís como">${PERSONAS.map(([k, l]) => `<button type="button" class="btn chico" data-q="${k}" aria-pressed="${C.quien === k}">${l}</button>`).join("")}</div>
+          <button type="submit" class="btn pri">Mandar a Claude</button>
+        </form>`}
+        ${tr?.estado === "listo" ? `<details class="cr-guion-mini"><summary>Guion en español</summary><pre>${esc(tr.es)}</pre></details>` : ""}
+        <div class="botones">
+          ${esAnterior ? "" : `<button type="button" class="btn" data-chat>💬 Ver el chat</button>`}
+          <button type="button" class="btn" data-cerrar data-foco>Cerrar</button>
+        </div>
+      </div>
+    </div>`, { ancho: true });
+  m.dlg.classList.add("cr-dlg", "cr-dlg-ver");
+  $("[data-cerrar]", m.dlg).onclick = m.cerrar;
+  const bc = $("[data-chat]", m.dlg); if (bc) bc.onclick = () => { m.cerrar(); abrirChat({ alcance: "creativo", creativo: c }); };
+  $$("[data-q]", m.dlg).forEach((b) => b.onclick = () => { C.quien = b.dataset.q; ls.set("ws_persona", C.quien); $$("[data-q]", m.dlg).forEach((x) => x.setAttribute("aria-pressed", x.dataset.q === C.quien)); });
+  const f = $("#cr-corr", m.dlg);
+  if (f) f.onsubmit = async (e) => {
+    e.preventDefault();
+    const ta = $("#cr-corr-txt", m.dlg), texto = ta.value.trim(); if (!texto) { ta.focus(); return; }
+    const btn = $('button[type="submit"]', f); btn.classList.add("cargando"); btn.disabled = true;
+    const d = C.carpeta[C.g + "|" + C.f];
+    const ult = d?.chats.find((x) => x.alcance === "creativo" && x.creativo_id === c.id);
+    try {
+      await api("creativos_mensaje", { body: ult ? { chat_id: ult.id, quien: C.quien, texto } : { alcance: "creativo", grupo: C.g, fecha: C.f, creativo_id: c.id, quien: C.quien, texto } });
+      toast("Mandado a Claude. La tarjeta queda «corrigiendo» hasta que suba la versión nueva.");
+      m.cerrar(); cargar();
+    } catch (e2) { if (!falla(e2)) toast("No se pudo mandar: " + e2.message, "error"); btn.classList.remove("cargando"); btn.disabled = false; }
+  };
+  const box = $("#cr-video", m.dlg);
+  let v = null;
+  try { v = await srcDe(c); } catch { m.cerrar(); return; }
+  if (!box.isConnected) return;
+  if (!v?.src) {
+    const link = v?.link || (c.post_id ? `https://www.facebook.com/${c.post_id}` : "") || c.drive_url;
+    box.innerHTML = `<p class="cr-mut">${esc(v?.error || (c.ads?.length ? "No se pudo cargar el video." : "Todavía no salió en Meta."))}${url(link) ? ` <a href="${esc(url(link))}" target="_blank" rel="noopener">Abrirlo ↗</a>` : ""}</p>`;
+    return;
+  }
+  box.innerHTML = `<video src="${esc(url(v.src))}" ${v.poster ? `poster="${esc(url(v.poster))}"` : ""} playsinline autoplay preload="auto"></video>`;
+  const vid = $("video", box), ctrl = $("#cr-ctrl", m.dlg), barra = $("#cr-barra", m.dlg), t = $("#cr-t", m.dlg), pp = $("[data-pp]", m.dlg), bm = $("[data-marcar]", m.dlg);
+  ctrl.hidden = false;
+  const pintarT = () => {
+    t.textContent = `${tiempo(vid.currentTime)} / ${tiempo(vid.duration || 0)}`;
+    if (!barra.matches(":active")) barra.value = vid.currentTime;
+    pp.textContent = vid.paused ? "▶" : "❚❚";
+    if (bm) bm.textContent = `📍 Marcar ${marca(vid.currentTime)}`;
+  };
+  vid.addEventListener("loadedmetadata", () => { barra.max = vid.duration || 1; pintarT(); });
+  ["timeupdate", "play", "pause", "seeked"].forEach((ev) => vid.addEventListener(ev, pintarT));
+  vid.onclick = () => vid.paused ? vid.play() : vid.pause();
+  pp.onclick = () => vid.paused ? vid.play() : vid.pause();
+  barra.oninput = () => { vid.currentTime = Number(barra.value); pintarT(); };
+  $$("[data-paso]", m.dlg).forEach((b) => b.onclick = () => { vid.pause(); vid.currentTime = Math.min(vid.duration || 0, Math.max(0, vid.currentTime + Number(b.dataset.paso))); });
+  if (bm) bm.onclick = () => {
+    vid.pause();
+    const ta = $("#cr-corr-txt", m.dlg); const pre = ta.value && !ta.value.endsWith("\n") ? "\n" : "";
+    ta.value += `${pre}[${marca(vid.currentTime)}] `; ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+  };
+  // teclado en la compu: espacio pausa, flechas ±0,5 s (si no se está escribiendo)
+  m.dlg.addEventListener("keydown", (e) => {
+    if (e.target.closest("textarea, input")) return;
+    if (e.key === " ") { e.preventDefault(); pp.click(); }
+    if (e.key === "ArrowLeft") { e.preventDefault(); $('[data-paso="-0.5"]', m.dlg).click(); }
+    if (e.key === "ArrowRight") { e.preventDefault(); $('[data-paso="0.5"]', m.dlg).click(); }
+  });
 }
 
 // ---------------------------------------------------------------- transcribir
 async function transcribir(lista) {
-  const ids = lista.filter((c) => c.n_ads).map((c) => c.id); if (!ids.length) return;
+  const ids = lista.filter((c) => c.n_ads || c.video_url).map((c) => c.id); if (!ids.length) return;
   try {
     const r = await api("creativos_transcribir", { body: { ids } });
     toast(r.en_cola ? `Transcribiendo ${r.en_cola} creativo${r.en_cola === 1 ? "" : "s"} al español. Te aviso en la tarjeta («guion»).` : "Ya se estaban transcribiendo");

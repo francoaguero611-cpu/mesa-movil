@@ -94,7 +94,29 @@ button.cr-miga:hover { background: var(--papel-2); }
 
 /* Diálogos */
 .cr-dlg .cr-m-tit { margin: 0 34px 10px 0; font: 700 19px/1.25 var(--f-titulo); overflow-wrap: anywhere; }
-.cr-video { position: relative; display: grid; place-items: center; width: min(100%, 360px); aspect-ratio: 9 / 16; max-height: 64vh; margin: 0 auto 12px; overflow: hidden; border: 2.5px solid var(--tinta); border-radius: var(--r-card); background: #111; }
+/* Reproductor vertical 9:16: la altura manda (entra entero en la pantalla) y el ancho sale de la proporción */
+.dialogo.cr-dlg-ver { width: min(920px, calc(100vw - 24px)); max-width: none; }
+.cr-ver { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: start; }
+.cr-ver-izq { display: grid; gap: 8px; justify-items: center; }
+.cr-ver-der { display: grid; gap: 12px; align-content: start; min-width: 0; }
+@media (max-width: 760px) { .cr-ver { grid-template-columns: minmax(0, 1fr); } }
+.cr-video { position: relative; display: grid; place-items: center; height: min(70vh, 720px, calc((100vw - 72px) * 16 / 9)); aspect-ratio: 9 / 16; width: auto; max-width: 100%; overflow: hidden; border: 2.5px solid var(--tinta); border-radius: var(--r-card); background: #111; }
+@media (max-width: 760px) { .cr-video { height: min(64vh, calc((100vw - 72px) * 16 / 9)); } }
+.cr-video video { cursor: pointer; }
+.cr-ctrl { display: grid; gap: 6px; width: 100%; max-width: calc(min(70vh, 720px) * 9 / 16 + 120px); }
+.cr-ctrl-fila { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; }
+.cr-play { min-width: 46px; }
+.cr-t { min-width: 112px; text-align: center; font: 700 14px var(--f-titulo); font-variant-numeric: tabular-nums; }
+.cr-barra { width: 100%; height: 30px; accent-color: var(--tinta); cursor: pointer; }
+.cr-corr { display: grid; gap: 8px; padding: 12px; border: 2px solid var(--tinta); border-radius: var(--r-card); background: var(--papel-2); }
+.cr-corr-tit { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cr-corr textarea { width: 100%; min-height: 110px; resize: vertical; font: 500 15px/1.45 var(--f-texto); }
+/* Tarjeta mientras Claude la corrige: no se puede ver, se reemplaza por la versión nueva */
+.cr-card.corrigiendo .cr-poster { cursor: progress; }
+.cr-card.corrigiendo .cr-poster img { filter: grayscale(.6) brightness(.55); }
+.cr-corrigiendo { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 6px; padding: 10px; color: #fff; font: 700 14px/1.25 var(--f-titulo); text-align: center; }
+.cr-corrigiendo small { font: 500 11.5px/1.3 var(--f-texto); opacity: .85; }
+.cr-corrigiendo .cargador { width: 26px; height: 26px; margin: 0; border-color: #fff; border-right-color: transparent; }
 .cr-video img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .45; }
 .cr-video video { width: 100%; height: 100%; object-fit: contain; background: #000; }
 .cr-video p { position: relative; padding: 16px; color: #eee; text-align: center; }
