@@ -49,7 +49,7 @@ const ICO = {
 
 const C = {
   raiz: null, ctx: {}, montado: false,
-  g: null, f: null,                       // ruta: grupo y fecha
+  o: null, g: null, f: null,              // ruta: oferta, grupo (oferta|mercado) y fecha
   raizD: null, oferta: {}, carpeta: {},   // datos
   buscar: "",
   metr: ls.get("cr_metr", "0") === "1",   // switch «Ver métricas»
@@ -73,15 +73,22 @@ async function api(accion, { q = "", body = null } = {}) {
 const falla = (e) => { if (e.code === 401) { desmontar(); C.ctx.login?.("Clave incorrecta"); return true; } return false; };
 const toast = (m, t) => C.ctx.toast ? C.ctx.toast(esc(m), t) : null;
 
-// ---------------------------------------------------------------- ruta (#creativos/<grupo>/<fecha>)
+// ---------------------------------------------------------------- ruta (#creativos · #creativos/of/<oferta> · #creativos/<grupo>/<fecha>)
+// (13/10) Oferta → Mercado → Fecha. El grupo es «oferta|mercado»: la oferta sale de la primera parte.
+// Si el nombre trae el mercado («Moldes de vestidos (EN)», «Cocina antiinflamatoria DACH», «(MX) Niños felices»), se saca para juntarlas
+const MERC_RE = "en|fr|de|it|pt|br|mx|ar|es|co|cl|pe|uk|us|dach|francia|italia|alemania|anglo|latam|brasil|mexico|argentina|espana|portugal";
+const ofertaDe = (g) => { const o = String(g || "").split("|")[0]; return o.replace(new RegExp(`^(${MERC_RE})-(?=.)`), "").replace(new RegExp(`(-(${MERC_RE}))+$`), "") || o || null; };
+const nombreOferta = (n) => String(n || "").replace(new RegExp(`^\\((${MERC_RE})\\)\\s*`, "i"), "").replace(new RegExp(`\\s*(\\((${MERC_RE})\\)|\\b(${MERC_RE}))\\s*$`, "i"), "").trim() || n;
 function leerRuta() {
   const p = location.hash.slice(1).split("/");
   if (p[0] !== "creativos") return {};
+  if (p[1] === "of") return { o: p[2] ? decodeURIComponent(p[2]) : null };
   return { g: p[1] ? decodeURIComponent(p[1]) : null, f: /^\d{4}-\d{2}-\d{2}$/.test(p[2] || "") ? p[2] : null, chat: /^chat-(\d+)$/.exec(p[3] || "")?.[1] ?? null };
 }
-function ir(g = null, f = null, { empujar = true } = {}) {
-  C.g = g; C.f = f; C.m = null; C.mErr = null;
-  const h = "#creativos" + (g ? "/" + encodeURIComponent(g) + (f ? "/" + f : "") : "");
+function ponerRuta(r) { C.g = r.g || null; C.f = r.f || null; C.o = r.o || ofertaDe(C.g); }
+function ir(g = null, f = null, { empujar = true, o = null } = {}) {
+  ponerRuta({ g, f, o }); C.m = null; C.mErr = null;
+  const h = "#creativos" + (g ? "/" + encodeURIComponent(g) + (f ? "/" + f : "") : C.o ? "/of/" + encodeURIComponent(C.o) : "");
   try { if (empujar && location.hash !== h) history.pushState(null, "", location.pathname + location.search + h); else history.replaceState(null, "", location.pathname + location.search + h); } catch {}
   pintar(); window.scrollTo(0, 0);
   cargar();
@@ -91,7 +98,7 @@ function ir(g = null, f = null, { empujar = true } = {}) {
 function montar(raiz, ctx = {}) {
   C.raiz = raiz; C.ctx = ctx; C.montado = true;
   const r = ctx.ruta || leerRuta();
-  C.g = r.g || null; C.f = r.f || null;
+  ponerRuta(r);
   addEventListener("popstate", alVolver);
   document.addEventListener("click", cerrarMenusFuera);
   document.addEventListener("keydown", teclaMenus);
@@ -104,7 +111,7 @@ function desmontar() {
   document.removeEventListener("click", cerrarMenusFuera);
   document.removeEventListener("keydown", teclaMenus);
 }
-function alVolver() { if (!C.montado) return; const r = leerRuta(); if (!location.hash.startsWith("#creativos")) return; C.g = r.g || null; C.f = r.f || null; C.m = null; pintar(); cargar(); }
+function alVolver() { if (!C.montado) return; const r = leerRuta(); if (!location.hash.startsWith("#creativos")) return; ponerRuta(r); C.m = null; pintar(); cargar(); }
 // desde un aviso: abrir la carpeta y el chat
 function abrir({ g = null, f = null, chat = null } = {}) {
   if (!C.montado) return;
@@ -119,6 +126,7 @@ async function cargar({ sync = false } = {}) {
   try {
     if (sync) { const r = await api("creativos_sync", { body: {} }); toast(r.nuevos ? `Listo: ${r.nuevos} creativos nuevos` : "Al día: no hay creativos nuevos"); }
     if (!g) C.raizD = await api("creativos");
+    else if (!C.raizD) api("creativos").then((r) => { C.raizD = r; if (C.montado && C.g === g) pintar(); }).catch(() => {}); // nombre de la oferta en las migas
     else if (!f) C.oferta[g] = await api("creativos", { q: `&grupo=${encodeURIComponent(g)}` });
     else C.carpeta[g + "|" + f] = await api("creativos", { q: `&grupo=${encodeURIComponent(g)}&fecha=${f}` });
   } catch (e) {
@@ -148,9 +156,14 @@ async function cargarMetricas({ forzar = false } = {}) {
 // ---------------------------------------------------------------- pintar
 function migas() {
   const partes = [`<button type="button" class="cr-miga" data-ir="">${ICO.carpeta}Creativos</button>`];
+  if (C.o) {
+    const of = ofertas().find((x) => x.o === C.o);
+    partes.push(`<button type="button" class="cr-miga" data-ir-o="${esc(C.o)}" ${C.g ? "" : 'aria-current="page"'}>${esc(of?.nombre || C.o)}</button>`);
+  }
   if (C.g) {
     const d = C.oferta[C.g] || C.carpeta[C.g + "|" + C.f] || {};
-    const etq = d.etiqueta || (C.raizD?.carpetas || []).find((x) => x.grupo === C.g)?.etiqueta || C.g;
+    const cg = (C.raizD?.carpetas || []).find((x) => x.grupo === C.g);
+    const etq = cg?.mercado || d.etiqueta || C.g;
     const ban = d.bandera || (C.raizD?.carpetas || []).find((x) => x.grupo === C.g)?.bandera || "";
     partes.push(`<button type="button" class="cr-miga" data-ir="${esc(C.g)}" ${C.f ? "" : 'aria-current="page"'}>${ban ? `<span aria-hidden="true">${esc(ban)}</span> ` : ""}${esc(etq)}</button>`);
   }
@@ -163,15 +176,16 @@ function migas() {
 
 function pintar() {
   if (!C.montado || !C.raiz) return;
-  const acciones = !C.g
+  const acciones = !C.g && !C.o
     ? `<button type="button" class="btn chico" data-sync title="Trae de Meta los anuncios que salieron recién">↻ Buscar nuevos</button>`
     : C.f ? `<div class="cr-menu-wrap"><button type="button" class="btn icono cr-puntos" data-menu="carpeta" aria-haspopup="true" aria-expanded="false" aria-label="Opciones de la carpeta">${ICO.puntos}</button></div>` : "";
   C.raiz.innerHTML = `<div class="cr-cab">${migas()}<div class="cr-acc">${acciones}</div></div><div class="cr-cuerpo" id="cr-cuerpo"></div>`;
   $$("[data-ir]", C.raiz).forEach((b) => b.onclick = () => ir(b.dataset.ir || null, null));
+  $$("[data-ir-o]", C.raiz).forEach((b) => b.onclick = () => ir(null, null, { o: b.dataset.irO }));
   const s = $("[data-sync]", C.raiz);
   if (s) s.onclick = async () => { s.classList.add("cargando"); s.disabled = true; await cargar({ sync: true }); };
   const p = $('[data-menu="carpeta"]', C.raiz); if (p) p.onclick = (e) => { e.stopPropagation(); menuCarpeta(p); };
-  if (!C.g) pintarRaiz(); else if (!C.f) pintarOferta(); else pintarCarpeta();
+  if (!C.g && !C.o) pintarRaiz(); else if (!C.g) pintarMercados(); else if (!C.f) pintarOferta(); else pintarCarpeta();
 }
 function pintarError(msg) {
   const c = $("#cr-cuerpo", C.raiz); if (!c) return;
@@ -181,30 +195,68 @@ function pintarError(msg) {
 const cargando = (t) => `<p class="vacio"><span class="cargador"></span>${esc(t)}</p>`;
 const collage = (ps) => `<div class="cr-collage n${Math.min(3, ps.length)}" aria-hidden="true">${ps.slice(0, 3).map((p) => `<img src="${esc(url(p))}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`).join("") || ICO.carpeta}</div>`;
 
+// Ofertas: junta los grupos (oferta|mercado) de la misma oferta
+function ofertas() {
+  const m = new Map();
+  for (const x of C.raizD?.carpetas || []) {
+    const o = ofertaDe(x.grupo); const e = m.get(o) ?? { o, nombre: nombreOferta(x.oferta) || o, mercados: [], n: 0, fechas: 0, ultima: x.ultima, portadas: [] };
+    e.mercados.push(x); e.n += x.n; e.fechas += x.fechas; if (x.ultima > e.ultima) e.ultima = x.ultima;
+    m.set(o, e);
+  }
+  for (const e of m.values()) {
+    e.mercados.sort((a, b) => b.ultima.localeCompare(a.ultima) || b.n - a.n);
+    for (const x of e.mercados) for (const p of x.portadas) if (e.portadas.length < 3 && !e.portadas.includes(p)) e.portadas.push(p);
+  }
+  return [...m.values()].sort((a, b) => b.ultima.localeCompare(a.ultima) || b.n - a.n);
+}
+const plural = (n, s, p = s + "s") => `${n} ${n === 1 ? s : p}`;
+
 function pintarRaiz() {
   const c = $("#cr-cuerpo", C.raiz); const d = C.raizD;
   if (!d) { c.innerHTML = cargando("Abriendo las carpetas…"); return; }
   if (!d.carpetas.length) {
     c.innerHTML = `<p class="vacio">Todavía no hay creativos. Tocá «↻ Buscar nuevos» para traerlos de Meta.</p>`; return;
   }
+  const todas = ofertas();
   const q = C.buscar.trim();
-  const lista = d.carpetas.filter((x) => !q || coincide(q, x.etiqueta, x.oferta, x.mercado, x.grupo));
+  const lista = todas.filter((x) => !q || coincide(q, x.nombre, x.o, ...x.mercados.map((m) => m.mercado)));
   c.innerHTML = `
     <div class="cr-filtro">
       <label class="sr" for="cr-buscar">Buscar oferta o país</label>
       <input class="campo" id="cr-buscar" type="search" placeholder="Buscar oferta o país" value="${esc(C.buscar)}" autocomplete="off">
-      <span class="cr-mut">${d.carpetas.length} ofertas · ${d.carpetas.reduce((s, x) => s + x.n, 0)} creativos${d.sync ? ` · actualizado ${esc(horaCorta(d.sync))}` : ""}</span>
+      <span class="cr-mut">${plural(todas.length, "oferta")} · ${plural(d.carpetas.length, "mercado")} · ${plural(d.carpetas.reduce((s, x) => s + x.n, 0), "creativo")}${d.sync ? ` · actualizado ${esc(horaCorta(d.sync))}` : ""}</span>
     </div>
     <div class="cr-carpetas">${lista.map((x) => `
-      <button type="button" class="cr-carpeta boceto" data-g="${esc(x.grupo)}">
+      <button type="button" class="cr-carpeta boceto" data-o="${esc(x.o)}">
         <span class="cr-pestana" aria-hidden="true"></span>
         ${collage(x.portadas)}
-        <span class="cr-c-tit">${x.bandera ? `<span aria-hidden="true">${esc(x.bandera)}</span> ` : ""}${esc(x.etiqueta)}</span>
-        <span class="cr-c-meta">${x.n} creativo${x.n === 1 ? "" : "s"} · ${x.fechas} fecha${x.fechas === 1 ? "" : "s"} · último ${esc(dm(x.ultima))}</span>
+        <span class="cr-c-tit">${esc(x.nombre)}</span>
+        <span class="cr-c-ban" aria-hidden="true">${x.mercados.slice(0, 12).map((m) => esc(m.bandera || "")).join(" ")}${x.mercados.length > 12 ? " …" : ""}</span>
+        <span class="cr-c-meta">${plural(x.mercados.length, "mercado")} · ${plural(x.n, "creativo")} · último ${esc(dm(x.ultima))}</span>
       </button>`).join("") || `<p class="vacio chico">Nada coincide con «${esc(C.buscar)}».</p>`}
     </div>`;
   const inp = $("#cr-buscar", c);
   inp.oninput = () => { C.buscar = inp.value; const pos = inp.selectionStart; pintarRaiz(); const n = $("#cr-buscar", C.raiz); n.focus(); try { n.setSelectionRange(pos, pos); } catch {} };
+  $$("[data-o]", c).forEach((b) => b.onclick = () => {
+    const of = lista.find((x) => x.o === b.dataset.o);
+    // con un solo mercado se entra directo a sus fechas
+    if (of?.mercados.length === 1) ir(of.mercados[0].grupo, null); else ir(null, null, { o: b.dataset.o });
+  });
+}
+
+function pintarMercados() {
+  const c = $("#cr-cuerpo", C.raiz);
+  if (!C.raizD) { c.innerHTML = cargando("Abriendo la oferta…"); return; }
+  const of = ofertas().find((x) => x.o === C.o);
+  if (!of) { c.innerHTML = `<p class="vacio">No encontré esa oferta.</p>`; return; }
+  const rep = (m) => of.mercados.filter((y) => y.mercado === m).length > 1; // mismo mercado dos veces: se aclara con el nombre original
+  c.innerHTML = `<div class="cr-carpetas">${of.mercados.map((x) => `
+      <button type="button" class="cr-carpeta boceto" data-g="${esc(x.grupo)}">
+        <span class="cr-pestana" aria-hidden="true"></span>
+        ${collage(x.portadas)}
+        <span class="cr-c-tit">${x.bandera ? `<span aria-hidden="true">${esc(x.bandera)}</span> ` : ""}${esc(x.mercado || x.etiqueta)}${rep(x.mercado) ? ` <small class="cr-mut">· ${esc(x.oferta)}</small>` : ""}</span>
+        <span class="cr-c-meta">${plural(x.n, "creativo")} · ${plural(x.fechas, "fecha")} · último ${esc(dm(x.ultima))}</span>
+      </button>`).join("")}</div>`;
   $$("[data-g]", c).forEach((b) => b.onclick = () => ir(b.dataset.g, null));
 }
 const horaCorta = (iso) => { try { const d = new Date(iso); const f = hoyAR(d) === hoyAR() ? "" : dm(hoyAR(d)) + " "; return f + d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: TZ_AR }); } catch { return ""; } };

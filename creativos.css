@@ -27,6 +27,7 @@ button.cr-miga:hover { background: var(--papel-2); }
 .cr-collage img { width: 100%; height: 100%; object-fit: cover; }
 .cr-collage svg { width: 34px; height: 34px; grid-column: 1 / -1; }
 .cr-c-tit { font: 700 16.5px/1.25 var(--f-titulo); overflow-wrap: anywhere; }
+.cr-c-ban { font-size: 15px; line-height: 1.3; overflow-wrap: anywhere; }
 .cr-c-meta, .cr-f-meta { font-size: 13px; color: var(--mut); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .cr-f-tit b { font: 700 22px/1 var(--f-titulo); } .cr-f-tit small { color: var(--mut); font-weight: 600; }
 .cr-tipo { padding: 1px 7px; border: 2px solid var(--tinta); border-radius: var(--r-chip); font-size: 12px; font-weight: 700; color: var(--tinta); }
