@@ -70,8 +70,8 @@ const SVG_PLAY = `<svg viewBox="0 0 48 48" aria-hidden="true"><path class="pl-c"
 const FORMATO_TX = { vsl: "VSL", vsl_tsl: "VSL + TSL", tsl: "TSL", quiz: "Quiz", quiz_vsl: "Quiz + VSL", desconocido: "Sin dato" };
 const FORMATO_VIEJO = { landing: "tsl", whatsapp: "desconocido" };        // datos de antes del contrato nuevo
 const ORDEN_MK = ["anglo", "latam", "br", "ar", "eu", "es", "fr", "it", "de", "mx", "us"];
-const NOMBRE_MK = { anglo: "Anglo", latam: "LATAM", br: "Brasil", ar: "Argentina", eu: "Europa", es: "España", fr: "Francia", it: "Italia", de: "Alemania", mx: "México", us: "EE. UU.", nordicos: "Nórdicos" };
-const CORTO = { anglo: "Anglo", latam: "LATAM", br: "BR", ar: "AR", eu: "EU", es: "ES", fr: "FR", it: "IT", de: "DE", mx: "MX", us: "US", nordicos: "Nórdicos" };
+const NOMBRE_MK = { anglo: "Anglo", latam: "LATAM", br: "Brasil", ar: "Argentina", eu: "Europa", es: "España", fr: "Francia", it: "Italia", de: "Alemania", mx: "México", us: "EE. UU." };
+const CORTO = { anglo: "Anglo", latam: "LATAM", br: "BR", ar: "AR", eu: "EU", es: "ES", fr: "FR", it: "IT", de: "DE", mx: "MX", us: "US" };
 // destinos para modelar: [clave, nombre, países, idioma, moneda, precio] (precio: memoria precio-principal-por-poder-adquisitivo)
 const MERCADOS_MOD = [
   ["anglo", "Anglo", ["US", "GB", "CA", "AU", "NZ", "IE"], "en", "USD", 24.99],
@@ -82,20 +82,19 @@ const MERCADOS_MOD = [
   ["fr", "Francia", ["FR"], "fr", "EUR", 24.99],
   ["it", "Italia", ["IT"], "it", "EUR", 24.99],
   ["de", "Alemania", ["DE"], "de", "EUR", 24.99],
-  ["nordicos", "Nórdicos", ["SE", "NO", "DK", "FI"], "sv", "USD", 24.99], // (13/10) como en cazador_comun.py (sueco); se puede cambiar a inglés o al idioma local
 ];
 const MOD = Object.fromEntries(MERCADOS_MOD.map((m) => [m[0], m]));
-const PAIS_MK = { US: "anglo", GB: "anglo", CA: "anglo", AU: "anglo", NZ: "anglo", IE: "anglo", BR: "br", AR: "ar", FR: "fr", IT: "it", DE: "de", AT: "de", CH: "de", ES: "es", SE: "nordicos", NO: "nordicos", DK: "nordicos", FI: "nordicos" };
-const BANDERA = { anglo: "🌎", latam: "🌎", eu: "🇪🇺", br: "🇧🇷", ar: "🇦🇷", es: "🇪🇸", fr: "🇫🇷", it: "🇮🇹", de: "🇩🇪", mx: "🇲🇽", us: "🇺🇸", gb: "🇬🇧", pt: "🇵🇹", nordicos: "🇸🇪" };
+const PAIS_MK = { US: "anglo", GB: "anglo", CA: "anglo", AU: "anglo", NZ: "anglo", IE: "anglo", BR: "br", AR: "ar", FR: "fr", IT: "it", DE: "de", AT: "de", CH: "de", ES: "es" };
+const BANDERA = { anglo: "🌎", latam: "🌎", eu: "🇪🇺", br: "🇧🇷", ar: "🇦🇷", es: "🇪🇸", fr: "🇫🇷", it: "🇮🇹", de: "🇩🇪", mx: "🇲🇽", us: "🇺🇸", gb: "🇬🇧", pt: "🇵🇹" };
 const bandera = (k) => BANDERA[k] || (/^[a-z]{2}$/.test(k) ? String.fromCodePoint(...[...k.toUpperCase()].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)) : "");
-const IDIOMAS = [["en", "Inglés"], ["es", "Español"], ["pt", "Portugués"], ["fr", "Francés"], ["it", "Italiano"], ["de", "Alemán"], ["sv", "Sueco"], ["no", "Noruego"], ["da", "Danés"], ["fi", "Finés"]];
+const IDIOMAS = [["en", "Inglés"], ["es", "Español"], ["pt", "Portugués"], ["fr", "Francés"], ["it", "Italiano"], ["de", "Alemán"]];
 const ESTRUCTURAS = [
   ["cbo_115", "CBO madre 1-1-5", "1 campaña CBO, 1 conjunto con todos los creativos. Lo de hoy para cada testeo.", true],
   ["cbo_madre", "CBO madre", "1 campaña CBO con un conjunto por creativo: Meta reparte el presupuesto entre conjuntos.", false],
   ["abo_151", "ABO 1-5-1", "1 campaña ABO, un conjunto por creativo con 1 anuncio cada uno. El presupuesto va por conjunto.", false],
 ];
 const PRES_DEF = { cbo_115: 30.55, cbo_madre: 30.55, abo_151: 10.55 };
-const CUENTAS = [["testeos", "TESTEOS"], ["galileo", "Galileo"], ["latam", "LATAM"]]; // latam = LATAM Ecom Leiva 2992990974209825 (13/10)
+const CUENTAS = [["testeos", "TESTEOS"], ["galileo", "Galileo"]];
 const ZONA = {
   US: "America/New_York", GB: "Europe/London", CA: "America/Toronto", AU: "Australia/Sydney", NZ: "Pacific/Auckland", IE: "Europe/Dublin",
   BR: "America/Sao_Paulo", AR: TZ_AR, MX: "America/Mexico_City", CO: "America/Bogota", CL: "America/Santiago", PE: "America/Lima",
@@ -103,7 +102,6 @@ const ZONA = {
   DO: "America/Santo_Domingo", GT: "America/Guatemala", HN: "America/Tegucigalpa", NI: "America/Managua", PA: "America/Panama",
   SV: "America/El_Salvador", VE: "America/Caracas", ES: "Europe/Madrid", FR: "Europe/Paris", IT: "Europe/Rome", DE: "Europe/Berlin",
   PT: "Europe/Lisbon", NL: "Europe/Amsterdam", BE: "Europe/Brussels", AT: "Europe/Vienna", CH: "Europe/Zurich",
-  SE: "Europe/Stockholm", NO: "Europe/Oslo", DK: "Europe/Copenhagen", FI: "Europe/Helsinki",
 };
 const ESTADOS = {
   pendiente: ["En cola", ""], trabajando: ["Trabajando", "amarillo"], listo_revisar: ["Esperando tu dale", "verde-fuerte"],
@@ -319,7 +317,6 @@ function destinoDe(o, preferido = null) {
   if (k === "mx" || ["co", "cl", "pe", "ec", "uy", "py", "bo", "cr", "do", "gt", "hn", "ni", "pa", "sv", "ve"].includes(k)) return "latam";
   if (["gb", "ca", "au", "nz", "ie"].includes(k)) return "anglo";
   if (k === "at" || k === "ch") return "de";
-  if (["se", "no", "dk", "fi", "nordics"].includes(k)) return "nordicos";
   if (k === "us") return "anglo";
   for (const p of o.paises) if (PAIS_MK[p]) return PAIS_MK[p];
   return o.idioma && /^(es|espa)/i.test(o.idioma) ? "latam" : /^(pt|portu)/i.test(o.idioma) ? "br" : "anglo";

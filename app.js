@@ -639,14 +639,65 @@ function ubicarCabFlotante() {
   ft.style.transform = `translateX(${-sc.scrollLeft}px)`;
   if (fth[0]) fth[0].style.transform = `translateX(${sc.scrollLeft}px)`; // la columna «Campaña» queda fija a la izquierda
 }
-window.addEventListener("scroll", () => ubicarCabFlotante(), { passive: true });
-window.addEventListener("resize", () => ubicarCabFlotante());
+// (14/10, Lorenzo) Fila de resultados totales al final, como en Meta, y pegada abajo de la pantalla (celu y compu).
+// Suma las campañas que se ven (respeta grupo y «ver apagadas»); las tasas se recalculan con los totales.
+function totalesDe(xs) {
+  const t = {};
+  for (const k of ["gasto", "facturacion", "ganancia", "ventas", "presupuesto", "pagos_iniciados", "carritos", "visitas", "clics", "impresiones"])
+    t[k] = xs.some((x) => !nulo(x[k])) ? xs.reduce((s, x) => s + (+x[k] || 0), 0) : null;
+  const div = (a, b, f = 1) => nulo(a) || !b ? null : (a / b) * f;
+  t.roas = div(t.facturacion, t.gasto);
+  t.margen = div(t.ganancia, t.facturacion);
+  t.cpa = div(t.gasto, t.ventas);
+  t.ticket_promedio = div(t.facturacion, t.ventas);
+  t.costo_pago_iniciado = div(t.gasto, t.pagos_iniciados);
+  t.costo_carrito = div(t.gasto, t.carritos);
+  t.conv_visitas = div(t.ventas, t.visitas);
+  t.ctr = div(t.clics, t.impresiones);
+  t.cpc = div(t.gasto, t.clics);
+  t.cpm = div(t.gasto, t.impresiones, 1000);
+  t.frecuencia = null; // el alcance no se puede sumar entre campañas
+  return t;
+}
+function filaTotal(xs) {
+  const n = xs.length;
+  return `<tr class="fila-total"><td class="nom"><div class="nomwrap"><div class="txt"><div class="n">Resultados totales</div><div class="sub">${n} campaña${n === 1 ? "" : "s"}</div></div></div></td>${celdas(totalesDe(xs))}</tr>`;
+}
+function armarPieFlotante() {
+  const sc = $("#tabla-scroll"), tf = sc && $("table.camp tfoot", sc);
+  let f = $("#pie-flotante");
+  if (!tf) { if (f) f.hidden = true; return; }
+  if (!f) { f = document.createElement("div"); f.id = "pie-flotante"; f.className = "pie-flotante"; f.setAttribute("aria-hidden", "true"); document.body.appendChild(f); }
+  f.innerHTML = `<table class="camp"><tfoot>${tf.innerHTML}</tfoot></table>`;
+  if (!sc.dataset.pieFlot) { sc.dataset.pieFlot = "1"; sc.addEventListener("scroll", ubicarPieFlotante, { passive: true }); }
+  ubicarPieFlotante();
+}
+function ubicarPieFlotante() {
+  const f = $("#pie-flotante"), sc = $("#tabla-scroll"), tb = sc && $("table.camp", sc), tf = tb && $("tfoot", tb);
+  if (!f || !tf || S.vista !== "dash") { if (f) f.hidden = true; return; }
+  const barra = $("#barra");
+  const segura = parseFloat(getComputedStyle(document.documentElement).paddingBottom) || 0;
+  const abajo = barra && !barra.hidden ? window.innerHeight - barra.getBoundingClientRect().top + 8 : segura;
+  const limite = window.innerHeight - abajo;
+  const rf = tf.getBoundingClientRect(), rt = tb.getBoundingClientRect(), r = sc.getBoundingClientRect();
+  const visible = rf.bottom > limite && rt.top + 80 < limite; // la fila real todavía no entró en pantalla
+  f.hidden = !visible; if (!visible) return;
+  f.style.bottom = abajo + "px"; f.style.left = r.left + "px"; f.style.width = sc.clientWidth + "px";
+  const ft = $("table", f), td = $$("td", tf), ftd = $$("td", f);
+  ft.style.width = rt.width + "px";
+  td.forEach((x, i) => { if (ftd[i]) { const w = x.getBoundingClientRect().width + "px"; ftd[i].style.width = w; ftd[i].style.minWidth = w; ftd[i].style.maxWidth = w; } });
+  ft.style.transform = `translateX(${-sc.scrollLeft}px)`;
+  if (ftd[0]) ftd[0].style.transform = `translateX(${sc.scrollLeft}px)`;
+}
+window.addEventListener("scroll", () => { ubicarCabFlotante(); ubicarPieFlotante(); }, { passive: true });
+window.addEventListener("resize", () => { ubicarCabFlotante(); ubicarPieFlotante(); });
 function pintarTabla() {
   const cont = $("#tabla-scroll"); if (!cont) return;
   const d = S.datos[S.periodo];
   const { xs, ocultas } = campanasVisibles();
   $("#n-camp").textContent = d ? `${xs.length} ${S.verApagadas ? "" : "prendida" + (xs.length === 1 ? "" : "s")}`.trim() : "";
   $("#t-apagadas-tx").textContent = `ver apagadas${ocultas ? ` (${ocultas})` : ""}`;
+  if (!d || !xs.length) { const pf = $("#pie-flotante"); if (pf) pf.hidden = true; }
   if (!d) { cont.innerHTML = `<div class="vacio">${S.cargando ? `<span class="cargador"></span>Cargando campañas…` : "Sin datos."}</div>`; return; }
   if (!xs.length) { cont.innerHTML = `<div class="vacio">${ocultas ? `No hay campañas prendidas en este grupo. <button class="link" type="button" id="b-ver-ap">Ver las ${ocultas} apagadas</button>` : "No hay campañas en este grupo para este período."}</div>`; const b = $("#b-ver-ap"); if (b) b.onclick = () => $("#t-apagadas").click(); return; }
   let h = `<table class="camp"><thead><tr><th class="nom" scope="col">Campaña</th>${colsVisibles().map(([k, t]) => `<th scope="col" class="c-${k}">${esc(t)}</th>`).join("")}</tr></thead><tbody>`;
@@ -672,8 +723,8 @@ function pintarTabla() {
       }
     }
   }
-  cont.innerHTML = h + `</tbody></table>`;
-  armarCabFlotante();
+  cont.innerHTML = h + `</tbody><tfoot>${filaTotal(xs)}</tfoot></table>`;
+  armarCabFlotante(); armarPieFlotante();
 }
 function buscarItem(k) {
   const [nivel, id] = [k.slice(0, k.indexOf(":")), k.slice(k.indexOf(":") + 1)];
@@ -731,7 +782,8 @@ function resumenNiveles(its) {
   its.forEach((i) => c[i.nivel]++);
   return Object.entries(c).filter(([, n]) => n).map(([k, n]) => plural(n, k)).join(" · ");
 }
-function pintarBarra() {
+function pintarBarra() { pintarBarraBase(); requestAnimationFrame(ubicarPieFlotante); }
+function pintarBarraBase() {
   if (S.vista === "ranking" && $("#rk")) return pintarBarraRanking();
   if (S.vista === "cazador") { const b = $("#barra"); b.hidden = true; b.innerHTML = ""; return window.Cazador?.pintarBarra(); }
   if (S.vista === "workspace") { const b = $("#barra"); b.hidden = true; b.innerHTML = ""; return; }
@@ -2140,7 +2192,7 @@ function cargarCazador() {
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "buscador.js?v=10";
+    const sc = document.createElement("script"); sc.src = "buscador.js?v=9";
     sc.onload = () => window.Cazador ? ok() : mal(new Error("El Cazador no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar el Cazador. ¿Hay conexión?")); };
     document.head.appendChild(sc);
@@ -2291,7 +2343,7 @@ function buscarRk(k) {
   return RK.sel.get(k) || null;
 }
 // (11/10) también desmonta el Cazador: todo cambio de sección pasa por acá.
-function pararRanking() { clearInterval(RK.timer); RK.timer = null; window.Cazador?.desmontar(); window.Workspace?.desmontar(); window.Creativos?.desmontar(); }
+function pararRanking() { const pf = $("#pie-flotante"); if (pf) pf.hidden = true; clearInterval(RK.timer); RK.timer = null; window.Cazador?.desmontar(); window.Workspace?.desmontar(); window.Creativos?.desmontar(); }
 
 function montarRanking({ pedido = null } = {}) {
   cerrarMenu(); pararRanking();

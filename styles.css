@@ -1051,3 +1051,13 @@ table.camp tbody tr.fila.sel td { background: var(--marca); }
 .dialogo-ev .botones { flex-wrap: wrap; gap: 8px; }
 .dialogo-ev .botones .btn[data-cap] { min-width: 0; flex: 1 1 0; }
 @media (max-width: 520px) { .dialogo-ev .botones .btn[data-cap] { width: auto; } }
+
+/* Fila de resultados totales (14/10): al final de la tabla y copia pegada abajo de la pantalla */
+.camp tfoot td { font-weight: 700; border-top: 2px solid var(--tinta); border-bottom: 0; background: var(--papel-2); }
+.camp tfoot td.nom { background: var(--papel-2); }
+.camp tfoot .nomwrap .n { font-family: var(--f-titulo); font-weight: 700; }
+.fila-total { cursor: default; }
+.pie-flotante { position: fixed; z-index: 19; overflow: hidden; background: var(--papel-2); border-top: 2px solid var(--tinta); box-shadow: 0 -6px 10px -8px color-mix(in srgb, var(--tinta) 45%, transparent); pointer-events: none; }
+.pie-flotante table.camp { border-collapse: collapse; table-layout: fixed; min-width: 0; }
+.pie-flotante td { border-top: 0; position: relative; }
+.pie-flotante td.nom { z-index: 2; box-shadow: 6px 0 6px -6px color-mix(in srgb, var(--tinta) 30%, transparent); }
