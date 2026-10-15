@@ -489,6 +489,18 @@
       LOG.unshift({ creado: new Date().toISOString(), accion: "estado", dry, resumen: `${body.estado === "ACTIVE" ? "Prender" : "Apagar"} ${resultados.length}: ${(body.items || []).map((i) => i.nombre).join(", ")}` });
       return { dry, resultados };
     }
+    if (accion === "presupuesto") { // (14/10) lapicito y +% en lote, siempre terminado en ,55
+      const a55 = (n, min = 0) => { let x = Math.floor(n) + 0.55; if (min && x <= min) x = Math.floor(min) + 1.55; return r2(x); };
+      const resultados = (body.items || []).map((it) => {
+        const c = ESTR.find((x) => x.id === it.id), s = !c && ESTR.flatMap((x) => x.conjuntos).find((x) => x.id === it.id);
+        const objs = c ? (c.presupuesto ? [c] : body.pct ? c.conjuntos.filter((x) => x.presupuesto) : []) : s && s.presupuesto ? [s] : [];
+        if (!objs.length) return { id: it.id, nivel: it.nivel, nombre: it.nombre, ok: false, error: c ? "es ABO: el presupuesto vive en los conjuntos, editá cada conjunto" : "no tiene presupuesto propio", cambios: [] };
+        const cambios = objs.map((o) => { const antes = o.presupuesto, despues = body.pct ? a55(antes * (1 + body.pct / 100), antes) : a55(+String(it.monto).replace(",", ".")); if (!dry) o.presupuesto = despues; return { id: o.id, nombre: o.nombre, antes, despues, ok: true }; });
+        return { id: it.id, nivel: it.nivel, nombre: it.nombre, ok: true, error: null, moneda: "USD", cambios, despues: r2(cambios.reduce((x, y) => x + y.despues, 0)) };
+      });
+      LOG.unshift({ creado: new Date().toISOString(), accion: "presupuesto", dry, resumen: `${body.pct ? `+${body.pct} %` : "Fijar"} presupuesto ${resultados.length}: ${(body.items || []).map((i) => i.nombre).join(", ")}` });
+      return { dry, pct: body.pct ?? null, resultados };
+    }
     if (accion === "metricas") { // (11/10) hoy y ayer de los items de un aviso
       const de = (n, id, per) => {
         let xs = [];

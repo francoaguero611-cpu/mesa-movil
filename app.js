@@ -134,7 +134,7 @@ async function api(accion, { q = "", body = null, escritura = false } = {}) {
 let demoP = null;
 function cargarDemo() {
   if (window.DemoAPI) return Promise.resolve();
-  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=30"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=31"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
   return demoP;
 }
 
@@ -551,7 +551,7 @@ const COLS = [
   ["ventas", "Ventas", (x) => entN(x.ventas)],
   ["ticket_promedio", "AOV", (x) => usdG(aovDe(x))],
   ["gasto", "Importe gastado", (x) => usdG(x.gasto)],
-  ["presupuesto", "Presupuesto", (x) => `${usdG(x.presupuesto)}${x.tipo_presupuesto ? ` <span class="chip-tp">${esc(x.tipo_presupuesto)}</span>` : ""}`],
+  ["presupuesto", "Presupuesto", (x, nivel) => `${usdG(x.presupuesto)}${x.tipo_presupuesto ? ` <span class="chip-tp">${esc(x.tipo_presupuesto)}</span>` : ""}${editaPres(x, nivel) ? ` <button type="button" class="lapiz" data-pres="${esc(nivel + ":" + x.id)}" aria-label="Cambiar presupuesto de ${esc(x.nombre)}" title="Cambiar presupuesto"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z M14 6l4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg></button>` : ""}`],
   ["cpa", "CPA", (x) => usdG(cpaDe(x))],
   ["costo_pago_iniciado", "Costo x pago iniciado", (x) => usdG(x.costo_pago_iniciado)],
   ["costo_carrito", "Costo x carrito", (x) => usdG(x.costo_carrito)],
@@ -569,8 +569,10 @@ const COLS = [
 const colsOcultas = (() => { try { return new Set(JSON.parse(ls.get("dash_cols_ocultas", "[]"))); } catch { return new Set(); } })();
 const colsVisibles = () => COLS.filter((c) => !colsOcultas.has(c[0]));
 const nCols = () => 1 + colsVisibles().length;
-function celdas(x) {
-  return colsVisibles().map(([k, , f, cl]) => `<td class="num c-${k} ${cl ? cl(x) : ""}">${f(x)}</td>`).join("");
+// (14/10) lapicito: campaña CBO o conjunto ABO (donde vive el presupuesto diario)
+const editaPres = (x, nivel) => x.presupuesto != null && ((nivel === "campana" && x.tipo_presupuesto === "CBO") || (nivel === "conjunto" && x.tipo_presupuesto === "ABO"));
+function celdas(x, nivel) {
+  return colsVisibles().map(([k, , f, cl]) => `<td class="num c-${k} ${cl ? cl(x) : ""}">${f(x, nivel)}</td>`).join("");
 }
 function elegirColumnas() {
   const pinta = () => `<h3>Columnas</h3><p class="mut">Se recuerda en este dispositivo. La de nombre queda siempre.</p>
@@ -596,7 +598,7 @@ function fila({ nivel, n, x, act, sub, abrible, abierto, extraEstado }) {
       ${abrible ? `<button type="button" class="tg" data-tg="${esc((nivel === "campana" ? "c:" : "s:") + x.id)}" aria-expanded="${abierto}" aria-label="${abierto ? "Ocultar" : "Ver"} ${etiquetaTg} de ${esc(x.nombre)}"><span aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9.5 5.5 C 12 8, 14 10.5, 15.5 12.2 C 13.6 14, 11.6 16.4, 9.2 18.6" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>` : `<span class="tg-hueco" aria-hidden="true"></span>`}
       ${dotEstado(x.estado)}
       <div class="txt"><span class="niv-tag niv-${nivel}">${NIVEL[nivel][0]}</span><div class="n">${esc(x.nombre)}${raro}</div>${sub ? `<div class="sub">${sub}</div>` : ""}</div>
-    </div></td>${celdas(x)}</tr>`;
+    </div></td>${celdas(x, nivel)}</tr>`;
 }
 function subCampana(c) {
   const p = [];
@@ -750,6 +752,8 @@ function alternarSel(tr) {
 function clickTabla(e) {
   const reint = e.target.closest("[data-reint]");
   if (reint) { const c = campanaPorId(reint.dataset.reint); if (c) cargarDetalle(c, true); return; }
+  const lp = e.target.closest("[data-pres]");
+  if (lp) { const it = buscarItem(lp.dataset.pres); if (it) editarPresupuesto(it); return; }
   const tg = e.target.closest("[data-tg]");
   if (tg) {
     const k = tg.dataset.tg;
@@ -792,6 +796,8 @@ function pintarBarraBase() {
   if (!its.length || !$("#carr")) { b.hidden = true; b.innerHTML = ""; return; }
   const est = estadoSel();
   const soloAds = its.every((i) => i.nivel === "anuncio");
+  const conPres = its.some((i) => i.nivel !== "anuncio");
+  const conCamp = its.some((i) => i.nivel === "campana");
   const lbl = est === "true" ? "Prendido" : est === "false" ? "Apagado" : "Mixto";
   const yaVisible = !b.hidden;
   b.hidden = false;
@@ -802,12 +808,16 @@ function pintarBarraBase() {
     <button type="button" class="btn chico" id="b-limpiar">limpiar</button>
     <span class="sp"></span>
     <div class="acciones-sel">
+    ${conPres ? `<button type="button" class="btn chico" id="b-pres">Subir presupuesto</button>` : ""}
+    ${conCamp ? `<button type="button" class="btn chico" id="b-hz" title="CBO 1-1 con los anuncios que elijas en otras cuentas">Escala horizontal</button>` : ""}
     ${soloAds ? `<span class="caps">${its.length === 1 ? `<button type="button" class="btn chico" id="b-aislada">Aislada</button>` : ""}<button type="button" class="btn chico" id="b-bidcap">BidCap</button><button type="button" class="btn chico" id="b-costcap">CostCap</button><button type="button" class="btn chico" id="b-horizontal" title="Madre topada: CBO 1-1-winners en otra cuenta">Escala</button></span>` : ""}
     <div class="grupo-sw"><span class="sw-lbl" id="sw-lbl">${lbl}</span>
       <button type="button" class="switch" role="switch" id="sw" aria-checked="${est}" aria-labelledby="sw-lbl" aria-describedby="sw-ayuda"><span class="perilla" aria-hidden="true"></span></button>
       <span class="sr" id="sw-ayuda">Deslizá o tocá para ${est === "true" ? "apagar" : est === "false" ? "prender" : "prender o apagar"} lo seleccionado en Meta. Pide confirmación.</span>
     </div></div>`;
   $("#b-limpiar").onclick = () => { S.sel.clear(); pintarTabla(); pintarBarra(); };
+  if (conPres) $("#b-pres").onclick = subirPresupuesto;
+  if (conCamp) $("#b-hz").onclick = escalaCampanas;
   if (soloAds) { $("#b-bidcap").onclick = () => quizCap("bidcap"); $("#b-costcap").onclick = () => quizCap("costcap"); $("#b-horizontal").onclick = () => quizCap("horizontal"); const ba = $("#b-aislada"); if (ba) ba.onclick = () => quizCap("aislada"); }
   switchArrastrable($("#sw"), est);
 }
@@ -893,6 +903,255 @@ function actualizarEstadoLocal(id, estado) {
     if (s.id === id) s.estado = estado;
     for (const a of s.anuncios || []) if (a.id === id) a.estado = estado;
   }
+}
+
+// ---------- presupuesto (14/10, Lorenzo) ----------
+// Lapicito por campaña CBO / conjunto ABO y «Subir presupuesto» en lote (+10/15/30/50/100 %). Siempre terminado en ,55:
+// acá es la vista previa; el monto final lo calcula app-movil (acción presupuesto) con el presupuesto actual de Meta y la moneda de la cuenta.
+const PCTS_PRES = [10, 15, 30, 50, 100];
+const a55 = (n, min = 0) => { let x = Math.floor(n) + 0.55; if (min && x <= min) x = Math.floor(min) + 1.55; return Math.round(x * 100) / 100; };
+const montoTx = (n) => nulo(n) ? "—" : NF2.format(n);
+function itemsPres() {
+  return [...S.sel.keys()].map(buscarItem).filter((i) => i && i.nivel !== "anuncio");
+}
+function previaPres(i, pct) {
+  const r = i.ref || {};
+  if (i.nivel === "conjunto" && r.tipo_presupuesto !== "ABO") return { tx: "sin presupuesto propio (es CBO): se saltea", mal: true };
+  if (r.presupuesto == null) return { tx: "sin presupuesto diario", mal: true };
+  if (i.nivel === "campana" && r.tipo_presupuesto === "ABO") return { tx: `ABO: cada conjunto activo +${pct} % (total hoy ${montoTx(r.presupuesto)})` };
+  return { tx: `${montoTx(r.presupuesto)} → <b>${montoTx(a55(r.presupuesto * (1 + pct / 100), r.presupuesto))}</b>` };
+}
+function subirPresupuesto() {
+  const its = itemsPres();
+  if (!its.length) return toast("Elegí campañas o conjuntos para subirles el presupuesto.", "error");
+  let pct = null, enviando = false;
+  const modoTx = DEMO ? `<p class="mut">Demo: se simula en el navegador, no toca Meta.</p>` : dryOn() ? `<p class="mut"><b>Modo prueba:</b> se manda con dry=1, Meta no se toca.</p>` : "";
+  const lista = () => `<ul class="lista-nombres">${its.map((i) => { const p = pct ? previaPres(i, pct) : null; return `<li><span class="niv">${NIVEL[i.nivel][0]}</span><span>${esc(i.nombre)}${p ? `<br><small class="${p.mal ? "neg" : "mut"}">${p.tx}</small>` : ""}</span></li>`; }).join("")}</ul>`;
+  const m = abrirModal("", { bloqueado: () => enviando });
+  const paso1 = () => {
+    m.set(`<h3>Subir presupuesto</h3><p class="mut">${its.length} seleccionado${its.length === 1 ? "" : "s"}. Elegí cuánto: siempre queda terminado en ,55.</p>
+      <div class="pct-pres" role="radiogroup" aria-label="Porcentaje">${PCTS_PRES.map((p) => `<button type="button" class="btn chico${p === pct ? " pri" : ""}" role="radio" aria-checked="${p === pct}" data-pct="${p}">+${p} %</button>`).join("")}</div>
+      ${lista()}
+      <div class="botones"><button class="btn" data-x>Cancelar</button><button class="btn pri" data-sig ${pct ? "" : "disabled"}>Continuar</button></div>`);
+    $("[data-x]", m.dlg).onclick = m.cerrar;
+    $$("[data-pct]", m.dlg).forEach((b) => b.onclick = () => { pct = +b.dataset.pct; paso1(); $(`[data-pct="${pct}"]`, m.dlg).focus(); });
+    $("[data-sig]", m.dlg).onclick = () => pct && paso2();
+  };
+  const paso2 = () => {
+    m.set(`<h3>¿Seguro que querés subirlo +${pct} %?</h3>${lista()}${modoTx}
+      <div class="botones"><button class="btn" data-atras>Atrás</button><button class="btn pri" data-ok data-foco>Sí, subir +${pct} %</button></div>`);
+    $("[data-atras]", m.dlg).onclick = paso1;
+    $("[data-ok]", m.dlg).onclick = async (e) => {
+      enviando = true;
+      const b = e.currentTarget; b.classList.add("cargando"); b.innerHTML = `<span class="gira">↻</span> Subiendo…`;
+      await aplicarPresupuesto({ pct, items: its });
+      enviando = false; m.cerrar();
+    };
+  };
+  paso1();
+}
+function editarPresupuesto(it) {
+  const r = it.ref || {};
+  let enviando = false;
+  const m = abrirModal(`<h3>Presupuesto diario</h3><p class="mut">${NIVEL[it.nivel][0]} · ${esc(it.nombre)}</p>
+    <label class="w-lbl" for="pres-ed">Nuevo presupuesto (hoy ${montoTx(r.presupuesto)})</label>
+    <input class="campo num" id="pres-ed" inputmode="decimal" autocomplete="off" value="${esc(NF2.format(r.presupuesto ?? 0))}" data-foco>
+    <p class="mut" id="pres-queda"></p>
+    ${DEMO ? `<p class="mut">Demo: se simula en el navegador, no toca Meta.</p>` : dryOn() ? `<p class="mut"><b>Modo prueba:</b> Meta no se toca.</p>` : ""}
+    <div class="botones"><button class="btn" data-x>Cancelar</button><button class="btn pri" data-ok>Guardar</button></div>`, { bloqueado: () => enviando });
+  const inp = $("#pres-ed", m.dlg), ok = $("[data-ok]", m.dlg), queda = $("#pres-queda", m.dlg);
+  const valor = () => { const v = parseFloat(inp.value.replace(/\./g, "").replace(",", ".")); return v >= 1 ? a55(v) : null; };
+  const pinta = () => { const v = valor(); queda.innerHTML = v ? `Queda en <b>${montoTx(v)}</b> (siempre termina en ,55)` : `<span class="neg">Poné un monto válido (ej. 45,55)</span>`; ok.disabled = !v; ok.textContent = v ? `Guardar ${montoTx(v)}` : "Guardar"; };
+  inp.oninput = pinta; pinta(); inp.select();
+  inp.onkeydown = (e) => { if (e.key === "Enter" && valor()) ok.click(); };
+  $("[data-x]", m.dlg).onclick = m.cerrar;
+  ok.onclick = async () => {
+    const v = valor(); if (!v) return;
+    enviando = true; ok.classList.add("cargando"); ok.innerHTML = `<span class="gira">↻</span> Guardando…`;
+    await aplicarPresupuesto({ items: [{ ...it, monto: v }] });
+    enviando = false; m.cerrar();
+  };
+}
+async function aplicarPresupuesto({ pct = null, items }) {
+  try {
+    const r = await api("presupuesto", { body: { ...(pct ? { pct } : {}), items: items.map(({ id, act, nivel, nombre, monto }) => ({ id, act, nivel, nombre, ...(monto ? { monto } : {}) })) }, escritura: true });
+    const res = r.resultados || [], ok = res.filter((x) => x.ok), mal = res.filter((x) => !x.ok);
+    const simulado = r.dry || res.some((x) => (x.cambios || []).some((c) => c.simulado));
+    const det = (x) => (x.cambios || []).filter((c) => c.ok).map((c) => `${montoTx(c.antes)} → ${montoTx(c.despues)}`).join(", ");
+    const errTx = mal.length ? ` Fallaron ${mal.length}: ${esc(mal.map((x) => `${x.nombre}: ${x.error}`).join(" · "))}` : "";
+    if (simulado) toast(`<b>Modo prueba${DEMO ? " (demo)" : ""}:</b> Meta no se tocó. Habría quedado: ${esc(ok.map((x) => `${x.nombre} ${det(x)}`).join(" · "))}.${errTx}`, mal.length ? "error" : "ok", 9000);
+    else {
+      for (const x of ok) actualizarPresLocal(x);
+      toast(`${ok.length ? `✓ Presupuesto ${pct ? `+${pct} %` : "cambiado"} en ${ok.length}: ${esc(ok.map((x) => `${x.nombre} ${det(x)}`).join(" · "))}.` : ""}${errTx}`, mal.length ? "error" : "ok", 9000);
+    }
+    if (pct && !mal.length) S.sel.clear();
+  } catch (e) {
+    if (e.code === 401) { ls.del("dash_clave"); return login("Clave incorrecta"); }
+    toast(`No se pudo: ${esc(e.message)}`, "error", 8000);
+  }
+  pintarTabla(); pintarBarra();
+}
+// Refleja en pantalla lo que cambió (todas las copias del período y del detalle).
+function actualizarPresLocal(x) {
+  const nuevo = new Map((x.cambios || []).filter((c) => c.ok).map((c) => [String(c.id), c]));
+  const delta = [...nuevo.values()].reduce((s, c) => s + (c.despues - c.antes), 0);
+  for (const per of Object.keys(S.datos)) for (const c of S.datos[per].campanas || []) {
+    if (c.id === x.id) c.presupuesto = c.tipo_presupuesto === "CBO" ? x.despues : Math.round(((c.presupuesto || 0) + delta) * 100) / 100;
+  }
+  for (const [k, v] of S.det) for (const s of v.data?.conjuntos || []) {
+    const cid = k.slice(k.indexOf("|") + 1);
+    if (x.nivel === "campana" && cid === x.id && s.tipo_presupuesto === "CBO") { s.presupuesto = x.despues; (s.anuncios || []).forEach((a) => a.presupuesto = x.despues); }
+    const c = nuevo.get(String(s.id));
+    if (c && s.tipo_presupuesto === "ABO") { s.presupuesto = c.despues; (s.anuncios || []).forEach((a) => a.presupuesto = c.despues); }
+    if (x.nivel === "conjunto" && s.id === x.id) for (const per of Object.keys(S.datos)) { const cp = (S.datos[per].campanas || []).find((y) => y.id === cid); if (cp && cp.tipo_presupuesto === "ABO") cp.presupuesto = Math.round(((cp.presupuesto || 0) + delta) * 100) / 100; }
+  }
+}
+
+// ---------- escala horizontal desde campañas (14/10, Lorenzo) ----------
+// Una o varias campañas → por cada una: anuncios por Post ID (de mejor a peor ROAS, con métricas; vienen tildados los winners o los
+// 10 mejores), presupuesto (US$/día, queda en ,55) y una o varias cuentas con pago andando. Al final: plan de cada campaña × cuenta
+// (cap_plan, tipo horizontal) → «¿Seguro?» → cap_crear de a uno. Misma lógica Santi que el botón «Escala» de anuncios.
+const HZ_MAX = 10;
+const esperarDetalleHz = async (c) => {
+  await cargarDetalle(c);
+  for (let i = 0; i < 120; i++) { const d = S.det.get(`${S.periodo}|${c.id}`); if (d && d.st !== "cargando") return d; await new Promise((ok) => setTimeout(ok, 500)); }
+  return S.det.get(`${S.periodo}|${c.id}`);
+};
+function postsDeCampana(det) {
+  const por = new Map();
+  for (const s of det?.data?.conjuntos || []) for (const a of s.anuncios || []) {
+    const k = a.post || "sin-post:" + a.id;
+    const e = por.get(k) || { post: a.post, ad: a, nombre: a.nombre, gasto: 0, ventas: 0, facturacion: 0, estado: a.estado, nAds: 0 };
+    e.gasto += a.gasto || 0; e.ventas += a.ventas || 0; e.facturacion += a.facturacion || 0; e.nAds++;
+    if ((a.gasto || 0) > (e.ad.gasto || 0)) { e.ad = a; e.nombre = a.nombre; }
+    if (prendido(a.estado)) e.estado = "ACTIVE";
+    por.set(k, e);
+  }
+  return [...por.values()].map((e) => ({ ...e, roas: e.gasto ? e.facturacion / e.gasto : null, cpa: e.ventas ? e.gasto / e.ventas : null }))
+    .sort((x, y) => (y.roas ?? -1) - (x.roas ?? -1) || y.ventas - x.ventas || y.gasto - x.gasto);
+}
+const esWinner = (p) => p.ventas > 4 && (p.roas ?? 0) > 2; // definicion-winner
+function escalaCampanas() {
+  const camps = [...S.sel.keys()].filter((k) => k.startsWith("campana:")).map((k) => campanaPorId(k.slice(8))).filter(Boolean);
+  if (!camps.length) return toast("Elegí una o varias campañas.", "error");
+  const PER = (PERIODOS.find(([k]) => k === S.periodo) || [])[1] || String(S.periodo).replace(/^r:/, "").replace(":", " a ");
+  // estado por campaña: { c, posts, elegidos:Set(ad_id), pres, cuentas:Set(act), lista }
+  const E = camps.map((c) => ({ c, posts: null, elegidos: new Set(), pres: 50.55, cuentas: new Set(), lista: null }));
+  let ocupado = false;
+  const m = abrirModal("", { ancho: true, bloqueado: () => ocupado });
+  const err = (h, volver) => { ocupado = false; m.set(`<h3>No se pudo</h3><div class="err-box">${esc(h)}</div><div class="botones">${volver ? `<button class="btn" data-v>Volver</button>` : ""}<button class="btn pri" data-x>Cerrar</button></div>`); $("[data-x]", m.dlg).onclick = m.cerrar; if (volver) $("[data-v]", m.dlg).onclick = volver; };
+  const cab = (i, paso) => `<h3>Escala horizontal${E.length > 1 ? ` · campaña ${i + 1} de ${E.length}` : ""}</h3><p class="mut"><b>${esc(E[i].c.nombre)}</b> · ${esc(E[i].c.cuenta || E[i].c.act)} · paso ${paso} de 3</p>`;
+  // Paso A: anuncios
+  const pasoAnuncios = async (i) => {
+    const e = E[i];
+    if (!e.posts) {
+      ocupado = true; m.set(`${cab(i, 1)}<p class="mut"><span class="cargador"></span>Cargando anuncios…</p>`);
+      const d = await esperarDetalleHz(e.c);
+      ocupado = false;
+      if (!d || d.st !== "ok") return err(`No pude cargar los anuncios: ${d?.error || "sin datos"}`, i ? () => pasoCuentas(i - 1) : null);
+      e.posts = postsDeCampana(d);
+      const w = e.posts.filter((p) => p.post && esWinner(p));
+      const base = w.length ? w : e.posts.filter((p) => p.post && p.ventas >= 1);
+      base.slice(0, HZ_MAX).forEach((p) => e.elegidos.add(p.ad.id));
+    }
+    const fila = (p) => { const id = p.ad.id, on = e.elegidos.has(id), sinPost = !p.post;
+      return `<label class="hz-ad${on ? " on" : ""}${sinPost ? " off" : ""}"><input type="checkbox" data-ad="${esc(id)}" ${on ? "checked" : ""} ${sinPost ? "disabled" : ""}>
+        <span class="hz-nom">${dotEstado(p.estado)} ${esc(p.nombre)}${esWinner(p) ? ` <span class="chip-tp">WINNER</span>` : ""}${sinPost ? ` <span class="neg">sin Post ID</span>` : ""}${p.nAds > 1 ? ` <span class="mut">(${p.nAds} anuncios, mismo post)</span>` : ""}</span>
+        <span class="hz-met num">${chipRoas(p.roas)} · ${entN(p.ventas)} ventas · gasto ${usdG(p.gasto)} · CPA ${usdG(p.cpa)}</span></label>`; };
+    m.set(`${cab(i, 1)}<p class="mut">Anuncios por Post ID de mejor a peor ROAS (período: ${esc(String(PER))}). Vienen tildados ${e.posts.some((p) => p.post && esWinner(p)) ? "los winners" : "los mejores con ventas"} (hasta ${HZ_MAX}).</p>
+      <div class="hz-acc"><button type="button" class="btn chico" data-top>Los ${HZ_MAX} mejores</button><button type="button" class="btn chico" data-nada>Ninguno</button><span class="mut" id="hz-n"></span></div>
+      <div class="hz-lista">${e.posts.map(fila).join("") || `<p class="mut">Sin anuncios con datos en este período.</p>`}</div>
+      <div class="mut" id="hz-err" role="alert"></div>
+      <div class="botones"><button class="btn" data-v>${i ? "Volver" : "Cancelar"}</button><button class="btn pri" data-sig>Siguiente</button></div>`);
+    const cuenta = () => { $("#hz-n", m.dlg).textContent = `${e.elegidos.size} elegido${e.elegidos.size === 1 ? "" : "s"}`; };
+    cuenta();
+    $$("[data-ad]", m.dlg).forEach((x) => x.onchange = () => { x.checked ? e.elegidos.add(x.dataset.ad) : e.elegidos.delete(x.dataset.ad); x.closest(".hz-ad").classList.toggle("on", x.checked); cuenta(); });
+    $("[data-top]", m.dlg).onclick = () => { e.elegidos.clear(); e.posts.filter((p) => p.post).slice(0, HZ_MAX).forEach((p) => e.elegidos.add(p.ad.id)); pasoAnuncios(i); };
+    $("[data-nada]", m.dlg).onclick = () => { e.elegidos.clear(); pasoAnuncios(i); };
+    $("[data-v]", m.dlg).onclick = i ? () => pasoCuentas(i - 1) : m.cerrar;
+    $("[data-sig]", m.dlg).onclick = () => { if (!e.elegidos.size) { $("#hz-err", m.dlg).textContent = "Elegí al menos un anuncio."; return; } if (e.elegidos.size > 50) { $("#hz-err", m.dlg).textContent = "Máximo 50 anuncios."; return; } pasoPres(i); };
+  };
+  // Paso B: presupuesto
+  const pasoPres = (i) => {
+    const e = E[i];
+    m.set(`${cab(i, 2)}<label class="w-lbl" for="hz-pres">Presupuesto diario de la escala (US$/día, en cada cuenta)</label>
+      <input class="campo num" id="hz-pres" inputmode="decimal" autocomplete="off" value="${esc(NF2.format(e.pres))}" data-foco>
+      <p class="mut" id="hz-queda"></p><p class="mut">Si la cuenta es en otra moneda, se convierte y también queda en ,55.</p>
+      <div class="botones"><button class="btn" data-v>Volver</button><button class="btn pri" data-sig>Siguiente</button></div>`);
+    const inp = $("#hz-pres", m.dlg), sig = $("[data-sig]", m.dlg);
+    const val = () => { const v = parseFloat(inp.value.replace(/\./g, "").replace(",", ".")); return v >= 1 ? a55(v) : null; };
+    const pinta = () => { const v = val(); $("#hz-queda", m.dlg).innerHTML = v ? `Queda en <b>US$ ${montoTx(v)}</b> por día` : `<span class="neg">Poné un monto válido (ej. 100,55)</span>`; sig.disabled = !v; };
+    inp.oninput = pinta; pinta(); inp.select();
+    inp.onkeydown = (ev) => { if (ev.key === "Enter" && val()) sig.click(); };
+    $("[data-v]", m.dlg).onclick = () => pasoAnuncios(i);
+    sig.onclick = () => { e.pres = val(); pasoCuentas(i); };
+  };
+  // Paso C: cuentas (una o varias)
+  const pasoCuentas = async (i) => {
+    const e = E[i];
+    if (!e.lista) {
+      ocupado = true; m.set(`${cab(i, 3)}<p class="mut"><span class="cargador"></span>Buscando cuentas activas con método de pago…</p>`);
+      try { e.lista = (await api("cap_cuentas", { q: `&act=${encodeURIComponent(e.c.act)}` })).cuentas || []; }
+      catch (x) { if (x.code === 401) { ocupado = false; m.cerrar(); ls.del("dash_clave"); return login("Clave incorrecta"); } return err(x.message, () => pasoPres(i)); }
+      ocupado = false;
+    }
+    const ok = e.lista.filter((c) => c.elegible), no = e.lista.filter((c) => !c.elegible);
+    const op = (c) => `<label class="hz-ad${e.cuentas.has(c.act) ? " on" : ""}"><input type="checkbox" data-cta="${esc(c.act)}" ${e.cuentas.has(c.act) ? "checked" : ""}>
+      <span class="hz-nom"><b>${esc(c.nombre)}</b></span><span class="hz-met">${esc(c.act)}${c.moneda ? ` · ${esc(c.moneda)}` : ""}${c.pago ? ` · ${esc(c.pago)}` : ""}${c.vigilada ? " · ya vigilada" : ""}${c.aviso ? ` · ${esc(c.aviso)}` : ""}</span></label>`;
+    m.set(`${cab(i, 3)}<p class="mut">Elegí una o varias cuentas (activas y con pago; nunca la de la madre). En cada una sale una CBO 1-1 con ${plural(e.elegidos.size, "anuncio")} por Post ID y US$ ${montoTx(e.pres)}/día.</p>
+      <div class="hz-lista">${ok.map(op).join("") || `<p class="mut">No hay cuentas elegibles.</p>`}</div>
+      ${no.length ? `<details class="log"><summary>${no.length} cuenta${no.length === 1 ? "" : "s"} que no sirven</summary><ul class="lista-nombres">${no.map((c) => `<li><span>${esc(c.nombre)} <span class="mut">· ${esc(c.motivo || "")}</span></span></li>`).join("")}</ul></details>` : ""}
+      <div class="mut" id="hz-err" role="alert"></div>
+      <div class="botones"><button class="btn" data-v>Volver</button><button class="btn pri" data-sig>${i < E.length - 1 ? "Siguiente campaña" : "Ver resumen"}</button></div>`);
+    $$("[data-cta]", m.dlg).forEach((x) => x.onchange = () => { x.checked ? e.cuentas.add(x.dataset.cta) : e.cuentas.delete(x.dataset.cta); x.closest(".hz-ad").classList.toggle("on", x.checked); });
+    $("[data-v]", m.dlg).onclick = () => pasoPres(i);
+    $("[data-sig]", m.dlg).onclick = () => { if (!e.cuentas.size) { $("#hz-err", m.dlg).textContent = "Elegí al menos una cuenta."; return; } i < E.length - 1 ? pasoAnuncios(i + 1) : resumen(); };
+  };
+  const cuerpo = (e, act) => ({ tipo: "horizontal", act: e.c.act, ads: [...e.elegidos], act_destino: act, presupuesto: e.pres });
+  const nomCta = (e, act) => (e.lista || []).find((c) => c.act === act)?.nombre || act;
+  // Resumen: plan de cada campaña × cuenta
+  const resumen = async () => {
+    const pares = E.flatMap((e) => [...e.cuentas].map((act) => ({ e, act })));
+    ocupado = true; m.set(`<h3>Escala horizontal · resumen</h3><p class="mut"><span class="cargador"></span>Calculando ${pares.length} plan${pares.length === 1 ? "" : "es"} con los datos reales…</p>`);
+    for (let k = 0; k < pares.length; k += 3) await Promise.all(pares.slice(k, k + 3).map(async (p) => { try { p.plan = await api("cap_plan", { body: cuerpo(p.e, p.act) }); } catch (x) { p.error = x.message; } }));
+    ocupado = false;
+    const buenos = pares.filter((p) => p.plan), real = !DEMO && !dryOn();
+    m.set(`<h3>¿Seguro que querés escalar?</h3><p class="mut">${buenos.length} de ${pares.length} campaña${pares.length === 1 ? "" : "s"} nueva${pares.length === 1 ? "" : "s"} listas para crear.</p>
+      <div class="hz-lista">${pares.map((p) => { const P = p.plan || {}, pm = P.presupuesto_moneda;
+        return `<div class="hz-res ${p.error ? "mal" : ""}"><b>${esc(p.e.c.nombre)}</b> → <b>${esc(nomCta(p.e, p.act))}</b>
+          ${p.error ? `<div class="neg">✕ ${esc(p.error)}</div>` : `<div class="mut">${esc(P.nombre_campana)} · US$ ${montoTx(P.presupuesto_campana)}/día${pm && pm.moneda !== "USD" ? ` (${NF2.format(pm.monto)} ${esc(pm.moneda)})` : ""} · ${plural((P.origen?.posts || []).length, "anuncio")} por Post ID · inicio ${esc(P.inicio?.ar || "")}</div>
+          ${(P.avisos || []).filter((a) => !/ciclo de vida/.test(a)).length ? `<ul class="avisos">${P.avisos.filter((a) => !/ciclo de vida/.test(a)).map((a) => `<li>${esc(a)}</li>`).join("")}</ul>` : ""}`}</div>`; }).join("")}</div>
+      ${DEMO ? `<p class="mut">Demo: se simula, no toca Meta.</p>` : dryOn() ? `<p class="mut"><b>Modo prueba:</b> manda dry=1, no crea nada.</p>` : ""}
+      ${real && buenos.length ? `<div class="confirmar-escrito"><label for="conf-crear">Esto crea y activa ${buenos.length} campaña${buenos.length === 1 ? "" : "s"} real${buenos.length === 1 ? "" : "es"}. Escribí <b>crear</b> para confirmar:</label><input class="campo" id="conf-crear" autocomplete="off" autocapitalize="off" spellcheck="false" data-foco></div>` : ""}
+      <div class="botones"><button class="btn" data-v>Volver</button>${buenos.length ? `<button class="btn pri" data-crear ${real ? "disabled" : ""}>Sí, crear ${buenos.length}</button>` : ""}</div>`);
+    $("[data-v]", m.dlg).onclick = () => pasoCuentas(E.length - 1);
+    const bc = $("[data-crear]", m.dlg);
+    if (bc && real) $("#conf-crear").oninput = (ev) => { bc.disabled = ev.target.value.trim().toLowerCase() !== "crear"; };
+    if (bc) bc.onclick = () => crear(buenos);
+  };
+  const crear = async (pares) => {
+    ocupado = true;
+    for (let k = 0; k < pares.length; k++) {
+      const p = pares[k];
+      m.set(`<h3>Creando ${k + 1} de ${pares.length}…</h3><p class="mut"><span class="cargador"></span>${esc(p.e.c.nombre)} → ${esc(nomCta(p.e, p.act))}</p>`);
+      try { p.r = await api("cap_crear", { body: { ...cuerpo(p.e, p.act), confirmar: true }, escritura: true }); } catch (x) { if (x.code === 401) { ocupado = false; m.cerrar(); ls.del("dash_clave"); return login("Clave incorrecta"); } p.r = { ok: false, error: x.message }; }
+    }
+    ocupado = false;
+    const bien = pares.filter((p) => p.r?.ok || p.r?.dry);
+    m.set(`<h3>${bien.length === pares.length ? (pares[0].r?.dry ? "Modo prueba: no se creó nada" : "Escalas creadas") : "Terminó con problemas"}</h3>
+      <div class="hz-lista">${pares.map((p) => { const r = p.r || {};
+        return `<div class="hz-res ${r.ok || r.dry ? "" : "mal"}"><b>${esc(p.e.c.nombre)}</b> → <b>${esc(nomCta(p.e, p.act))}</b>
+          <div class="${r.ok || r.dry ? "mut" : "neg"}">${r.dry ? "✓ validada (dry)" : r.ok ? `✓ ${esc(r.nombre_campana || "")} · ${plural((r.ads || []).length, "anuncio")}${r.activa ? " · activa" : " · quedó en pausa"}` : `✕ ${esc(r.error || "falló")}`}</div>
+          ${r.link_ads_manager ? `<a class="link" href="${esc(r.link_ads_manager)}" target="_blank" rel="noopener">Abrir en el Administrador ↗</a>` : ""}
+          ${(r.issues || []).length ? `<ul class="avisos">${r.issues.map((x) => `<li>${esc(x.nombre)}: ${esc(x.problemas.join(" / ") || x.estado)}</li>`).join("")}</ul>` : ""}
+          ${(r.log || []).length ? `<details class="log"><summary>Log</summary><pre>${esc(r.log.join("\n"))}</pre></details>` : ""}</div>`; }).join("")}</div>
+      ${bien.some((p) => p.r?.falta_ciclo_de_vida) ? `<ul class="avisos"><li>Falta «todos los públicos» (ciclo de vida): lo aplica el proceso local.</li></ul>` : ""}
+      <div class="botones"><button class="btn pri" data-x data-foco>Listo</button></div>`);
+    $("[data-x]", m.dlg).onclick = m.cerrar;
+    toast(`${bien.length} de ${pares.length} escala${pares.length === 1 ? "" : "s"} ${pares[0].r?.dry ? "validadas (modo prueba)" : "creadas"}.`, bien.length === pares.length ? "ok" : "error", 8000);
+    if (bien.length === pares.length && !pares[0].r?.dry) { S.sel.clear(); pintarTabla(); pintarBarra(); }
+  };
+  pasoAnuncios(0);
 }
 
 // ---------- quiz BidCap / CostCap ----------
@@ -2227,11 +2486,11 @@ function cargarCreativos() {
   if (crCarga) return crCarga;
   const css = new Promise((ok) => {
     if ($('link[href^="creativos.css"]')) return ok();
-    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "creativos.css?v=6";
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "creativos.css?v=7";
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "creativos.js?v=7";
+    const sc = document.createElement("script"); sc.src = "creativos.js?v=8";
     sc.onload = () => window.Creativos ? ok() : mal(new Error("Creativos no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar Creativos. ¿Hay conexión?")); };
     document.head.appendChild(sc);

@@ -19,6 +19,9 @@ const ls = {
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const url = (u) => /^https?:\/\//i.test(String(u || "")) ? String(u) : "";
 const clave = () => ls.get("dash_clave", "");
+// (14/10) quién mira (para «sin ver»): sale del mail con que entró; el servidor prefiere el de la contraseña
+const USUARIO_ID = { "lorenleiva7@gmail.com": "lorenzo", "francoaguero611@gmail.com": "franco" };
+const usuarioId = () => USUARIO_ID[String(ls.get("dash_usuario", "")).toLowerCase()] || "";
 const hoyAR = (d = new Date()) => new Intl.DateTimeFormat("en-CA", { timeZone: TZ_AR }).format(d);
 const DIAS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
 const dm = (f) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(f || ""); return m ? `${+m[3]}/${+m[2]}` : f; };
@@ -82,11 +85,12 @@ function selOrden(id, valor, sinAlfa = false) {
 }
 // estrellita «sin ver» en la esquina de la carpeta
 const estrella = (n) => n > 0 ? `<span class="cr-sinver" title="${n} creativo${n === 1 ? "" : "s"} sin ver" aria-label="${n} sin ver">★</span>` : "";
+const claseSinVer = (n) => n > 0 ? " sinver" : "";
 
 async function api(accion, { q = "", body = null } = {}) {
   const r = await fetch(`${API}?accion=${accion}${q}`, {
     method: body ? "POST" : "GET",
-    headers: { "x-app-clave": clave(), ...(body ? { "content-type": "application/json" } : {}) },
+    headers: { "x-app-clave": clave(), ...(usuarioId() ? { "x-app-usuario": usuarioId() } : {}), ...(body ? { "content-type": "application/json" } : {}) },
     body: body ? JSON.stringify(body) : undefined,
   });
   const j = await r.json().catch(() => ({}));
@@ -312,7 +316,7 @@ function pintarRaiz() {
       <span class="cr-mut">${plural(todas.length, "oferta")} · ${plural(d.carpetas.length, "mercado")} · ${plural(d.carpetas.reduce((s, x) => s + x.n, 0), "creativo")}${d.sync ? ` · actualizado ${esc(horaCorta(d.sync))}` : ""}</span>
     </div>
     <div class="cr-carpetas">${lista.map((x) => `
-      <button type="button" class="cr-carpeta boceto" data-o="${esc(x.o)}">
+      <button type="button" class="cr-carpeta boceto${claseSinVer(x.sin_ver)}" data-o="${esc(x.o)}">
         <span class="cr-pestana" aria-hidden="true"></span>${estrella(x.sin_ver)}
         ${collage(x.portadas)}
         <span class="cr-c-tit">${esc(x.nombre)}</span>
@@ -337,7 +341,7 @@ function pintarMercados() {
   if (!of) { c.innerHTML = `<p class="vacio">No encontré esa oferta.</p>`; return; }
   const rep = (m) => of.mercados.filter((y) => y.mercado === m).length > 1; // mismo mercado dos veces: se aclara con el nombre original
   c.innerHTML = `<div class="cr-filtro cr-filtro-orden">${selOrden("cr-orden", C.orden)}</div><div class="cr-carpetas">${of.mercados.map((x) => `
-      <button type="button" class="cr-carpeta boceto" data-g="${esc(x.grupo)}">
+      <button type="button" class="cr-carpeta boceto${claseSinVer(x.sin_ver)}" data-g="${esc(x.grupo)}">
         <span class="cr-pestana" aria-hidden="true"></span>${estrella(x.sin_ver)}
         ${collage(x.portadas)}
         <span class="cr-c-tit">${x.bandera ? `<span aria-hidden="true">${esc(x.bandera)}</span> ` : ""}${esc(x.mercado || x.etiqueta)}${rep(x.mercado) ? ` <small class="cr-mut">· ${esc(x.oferta)}</small>` : ""}</span>
@@ -354,7 +358,7 @@ function pintarOferta() {
   if (!d.fechas.length) { c.innerHTML = `<p class="vacio">Esta carpeta está vacía.</p>`; return; }
   const fechas = ordenar(d.fechas.map((x) => ({ ...x, primera: x.fecha, ultima: x.fecha })), C.ordenF, (x) => x.fecha);
   c.innerHTML = `<div class="cr-filtro cr-filtro-orden">${selOrden("cr-orden-f", C.ordenF, true)}</div><div class="cr-fechas">${fechas.map((x) => `
-    <button type="button" class="cr-fecha boceto" data-f="${esc(x.fecha)}">
+    <button type="button" class="cr-fecha boceto${claseSinVer(x.sin_ver)}" data-f="${esc(x.fecha)}">
       <span class="cr-pestana" aria-hidden="true"></span>${estrella(x.sin_ver)}
       ${collage(x.portadas)}
       <span class="cr-f-tit"><b>${esc(dm(x.fecha))}</b> <small>${esc(diaSem(x.fecha))}</small></span>
@@ -446,7 +450,6 @@ function pintarTarjetas() {
           : `<span class="cr-playico" aria-hidden="true">${ICO.play}</span>`}
       </button>
       <div class="cr-menu-wrap cr-card-menu"><button type="button" class="cr-puntos-card" data-menu="card" aria-haspopup="true" aria-expanded="false" aria-label="Opciones de ${esc(c.nombre || "este creativo")}">${ICO.puntos}</button></div>
-      ${c.nuevo ? `<span class="cr-sinver cr-sinver-card" title="Nuevo: todavía no lo viste" aria-label="Nuevo, sin ver">★</span>` : ""}
       <div class="cr-badges">
         ${c.origen === "fabrica" && !c.n_ads ? `<span class="cr-badge b-nuevo">sin salir</span>` : ""}
         ${c.version_de ? `<span class="cr-badge b-ver">corregido${/\sv(\d+)$/i.test(c.nombre || "") ? " " + esc(/\s(v\d+)$/i.exec(c.nombre)[1]) : ""}</span>` : ""}

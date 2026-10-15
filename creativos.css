@@ -197,7 +197,16 @@ button.cr-miga:hover { background: var(--papel-2); }
 .cr-orden select.campo { width: auto; max-width: 230px; flex: 0 0 auto; }
 .cr-filtro .cr-orden .campo { flex: 0 0 auto; }
 .cr-filtro-orden { justify-content: flex-end; margin-bottom: 10px; }
-.cr-sinver { position: absolute; top: -9px; right: -9px; z-index: 2; display: grid; place-items: center; width: 22px; height: 22px; border: 2px solid var(--tinta); border-radius: 50%;
-  background: #f3c93a; color: #1f1d19; font-size: 12.5px; line-height: 1; box-shadow: 2px 2px 0 var(--sombra); pointer-events: none; }
-.cr-sinver-card { top: -8px; left: -8px; right: auto; width: 20px; height: 20px; font-size: 11.5px; }
+.cr-sinver { position: absolute; top: -11px; right: -11px; z-index: 3; display: grid; place-items: center; width: 26px; height: 26px; border: 2.5px solid var(--tinta); border-radius: 50%;
+  background: #f5c518; color: #1f1d19; font-size: 14px; line-height: 1; box-shadow: 0 0 0 3px rgba(245, 197, 24, .35), 2px 2px 0 var(--sombra); pointer-events: none; }
+/* (14/10) carpeta con creativos sin ver: borde dorado en todo el contorno con brillo suave que respira */
+.cr-carpeta.sinver, .cr-fecha.sinver { border-color: #c99a06; animation: cr-brillo 2.4s ease-in-out infinite; }
+.cr-carpeta.sinver .cr-pestana, .cr-fecha.sinver .cr-pestana { border-color: #c99a06; background: #f5c518; }
+@keyframes cr-brillo {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(245, 197, 24, .55), 0 0 10px 2px rgba(245, 197, 24, .35), 4px 4px 0 var(--sombra); }
+  50%      { box-shadow: 0 0 0 3px rgba(245, 197, 24, .9), 0 0 22px 6px rgba(245, 197, 24, .55), 4px 4px 0 var(--sombra); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cr-carpeta.sinver, .cr-fecha.sinver { animation: none; box-shadow: 0 0 0 3px rgba(245, 197, 24, .85), 0 0 14px 3px rgba(245, 197, 24, .45), 4px 4px 0 var(--sombra); }
+}
 @media (max-width: 520px) { .cr-orden { flex: 1 1 100%; } .cr-orden select.campo { width: 100%; max-width: none; } .cr-filtro-orden { justify-content: stretch; } }

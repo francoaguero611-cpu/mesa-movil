@@ -1061,3 +1061,21 @@ table.camp tbody tr.fila.sel td { background: var(--marca); }
 .pie-flotante table.camp { border-collapse: collapse; table-layout: fixed; min-width: 0; }
 .pie-flotante td { border-top: 0; position: relative; }
 .pie-flotante td.nom { z-index: 2; box-shadow: 6px 0 6px -6px color-mix(in srgb, var(--tinta) 30%, transparent); }
+
+/* (14/10) presupuesto: lapicito y +% en lote */
+.lapiz { display: inline-grid; place-items: center; width: 24px; height: 24px; margin-left: 4px; padding: 0; border: 1.5px solid var(--linea); border-radius: 7px; background: transparent; color: var(--mut); cursor: pointer; vertical-align: -6px; }
+.lapiz:hover, .lapiz:focus-visible { color: inherit; border-color: currentColor; }
+.pct-pres { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; }
+.pct-pres .btn { min-width: 64px; }
+
+/* (14/10) escala horizontal desde campañas */
+.hz-acc { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.hz-lista { display: flex; flex-direction: column; gap: 6px; max-height: 52vh; overflow-y: auto; margin: 8px 0; padding-right: 2px; }
+.hz-ad { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-items: start; padding: 8px 10px; border: 1.5px solid var(--linea); border-radius: 10px; cursor: pointer; }
+.hz-ad input { grid-row: span 2; margin-top: 3px; width: 18px; height: 18px; }
+.hz-ad.on { border-color: currentColor; }
+.hz-ad.off { opacity: .55; cursor: default; }
+.hz-nom { font-weight: 600; overflow-wrap: anywhere; }
+.hz-met { font-size: 12.5px; color: var(--mut); }
+.hz-res { padding: 8px 10px; border: 1.5px solid var(--linea); border-radius: 10px; overflow-wrap: anywhere; }
+.hz-res.mal { border-color: var(--neg, #c0392b); }
