@@ -568,7 +568,7 @@ const COLS = [
 ];
 const colsOcultas = (() => { try { return new Set(JSON.parse(ls.get("dash_cols_ocultas", "[]"))); } catch { return new Set(); } })();
 const colsVisibles = () => COLS.filter((c) => !colsOcultas.has(c[0]));
-const nCols = () => 2 + colsVisibles().length; // nombre + métricas + «Hora allá»
+const nCols = () => 1 + colsVisibles().length;
 // (14/10) lapicito: campaña CBO o conjunto ABO (donde vive el presupuesto diario)
 const editaPres = (x, nivel) => x.presupuesto != null && ((nivel === "campana" && x.tipo_presupuesto === "CBO") || (nivel === "conjunto" && x.tipo_presupuesto === "ABO"));
 function celdas(x, nivel) {
@@ -598,13 +598,14 @@ function fila({ nivel, n, x, act, sub, abrible, abierto, extraEstado }) {
       ${abrible ? `<button type="button" class="tg" data-tg="${esc((nivel === "campana" ? "c:" : "s:") + x.id)}" aria-expanded="${abierto}" aria-label="${abierto ? "Ocultar" : "Ver"} ${etiquetaTg} de ${esc(x.nombre)}"><span aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9.5 5.5 C 12 8, 14 10.5, 15.5 12.2 C 13.6 14, 11.6 16.4, 9.2 18.6" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>` : `<span class="tg-hueco" aria-hidden="true"></span>`}
       ${dotEstado(x.estado)}
       <div class="txt"><span class="niv-tag niv-${nivel}">${NIVEL[nivel][0]}</span><div class="n">${esc(x.nombre)}${raro}</div>${sub ? `<div class="sub">${sub}</div>` : ""}</div>
-    </div></td>${celdas(x, nivel)}${nivel === "campana" ? celdaHora(x).replace("<td ", `<td data-c="${esc(x.id)}" `) : `<td class="hora-loc"></td>`}</tr>`;
+    </div></td>${celdas(x, nivel)}</tr>`;
 }
 function subCampana(c) {
   const p = [];
   if (c.cuenta) p.push(esc(c.cuenta));
   if (c.estrategia) p.push(estrat(c.estrategia));
-  return p.join(" · ");
+  const h = chipHora(c);
+  return p.join(" · ") + (h ? `<br>${h}` : "");
 }
 function subConjunto(s) {
   const p = [];
@@ -640,7 +641,6 @@ function ubicarCabFlotante() {
   th.forEach((x, i) => { if (fth[i]) { const w = x.getBoundingClientRect().width + "px"; fth[i].style.width = w; fth[i].style.minWidth = w; fth[i].style.maxWidth = w; } });
   ft.style.transform = `translateX(${-sc.scrollLeft}px)`;
   if (fth[0]) fth[0].style.transform = `translateX(${sc.scrollLeft}px)`; // la columna «Campaña» queda fija a la izquierda
-  const ult = fth[fth.length - 1]; if (ult && fth.length > 1) ult.style.transform = `translateX(${-(tb.getBoundingClientRect().width - sc.clientWidth - sc.scrollLeft)}px)`; // «Hora allá» fija a la derecha
 }
 // (14/10, Lorenzo) Fila de resultados totales al final, como en Meta, y pegada abajo de la pantalla (celu y compu).
 // Suma las campañas que se ven (respeta grupo y «ver apagadas»); las tasas se recalculan con los totales.
@@ -662,8 +662,8 @@ function totalesDe(xs) {
   t.frecuencia = null; // el alcance no se puede sumar entre campañas
   return t;
 }
-// (15/10, Lorenzo) «Hora allá»: columna fija a la derecha con la hora local del mercado de cada campaña, del país más temprano
-// al más tarde, para no leer como «viene mal» algo que allá es de madrugada. Países = banderas del nombre de la campaña
+// (15/10, Lorenzo) Hora local del mercado de cada campaña: línea chiquita «ahora 22:10–05:10 ›» debajo del nombre (del país más
+// temprano al más tarde) y al tocarla la hora de cada país, para no leer como «viene mal» algo que allá es de madrugada. Países = banderas del nombre de la campaña
 // (🌎 = LATAM); si no tiene, la bandera del grupo (oferta × mercado). Países grandes con varias zonas: la del este y la del oeste.
 const ZONAS_PAIS = {
   AR: ["America/Argentina/Buenos_Aires"], MX: ["America/Mexico_City"], CO: ["America/Bogota"], PE: ["America/Lima"], CL: ["America/Santiago"], EC: ["America/Guayaquil"],
@@ -697,27 +697,34 @@ const horaEn = (zona, d) => { let f = FMT_HORA.get(zona); if (!f) { f = new Intl
 const minutosEn = (zona, d) => { const [h, m] = horaEn(zona, d).split(":").map(Number); return h * 60 + m; };
 // diferencia en minutos con la hora de AR (puede cruzar el día: se ordena por diferencia, no por reloj)
 function difConAR(zona, d) { const ar = minutosEn("America/Argentina/Buenos_Aires", d); let x = minutosEn(zona, d) - ar; if (x > 720) x -= 1440; if (x < -720) x += 1440; return x; }
-const NOCHE = (min) => min < 6 * 60; // 00:00 a 05:59
-function celdaHora(c) {
-  const ps = paisesCampana(c); if (!ps.length) return `<td class="hora-loc"><span class="mut">—</span></td>`;
+const NOMBRE_PAIS = (() => { try { return new Intl.DisplayNames(["es"], { type: "region" }); } catch { return null; } })();
+const nomPais = (p) => { try { return NOMBRE_PAIS?.of(p) || p; } catch { return p; } };
+function horasCampana(c) {
+  const ps = paisesCampana(c); if (!ps.length) return null;
   const d = new Date();
-  const zs = ps.flatMap((p) => ZONAS_PAIS[p].map((z) => ({ p, z, dif: difConAR(z, d), h: horaEn(z, d), min: minutosEn(z, d) }))).sort((a, b) => a.dif - b.dif);
-  const ini = zs[0], fin = zs[zs.length - 1];
-  const noches = zs.filter((x) => NOCHE(x.min)).length;
-  const ico = noches === zs.length ? "🌙" : noches ? "🌗" : "";
-  const detalle = [...new Map(zs.map((x) => [x.p + x.h, `${x.p} ${x.h}`])).values()].join(" · ");
-  const rango = ini.h === fin.h ? ini.h : `${ini.h}–${fin.h}`;
-  return `<td class="hora-loc${noches === zs.length ? " noche" : ""}" title="Hora local: ${esc(detalle)}"><span class="hl-r">${ico ? `<span aria-hidden="true">${ico}</span> ` : ""}${rango}</span><span class="hl-p">${ini.p === fin.p ? esc(ini.p) : `${esc(ini.p)}→${esc(fin.p)}`}</span></td>`;
+  const zs = ps.flatMap((p) => ZONAS_PAIS[p].map((z) => ({ p, z, dif: difConAR(z, d), h: horaEn(z, d) }))).sort((a, b) => a.dif - b.dif);
+  return { zs, ini: zs[0], fin: zs[zs.length - 1] };
 }
-// refresco cada minuto sin repintar la tabla
+// línea chiquita debajo del nombre: «ahora 22:10–05:10 ›»; al tocarla, la hora de cada país
+function txtHora(c) { const H = horasCampana(c); if (!H) return ""; return `ahora ${H.ini.h === H.fin.h ? H.ini.h : `${H.ini.h}–${H.fin.h}`}`; }
+function chipHora(c) { const t = txtHora(c); return t ? `<button type="button" class="hora-chip" data-hora="${esc(c.id)}" aria-label="Hora en cada país de ${esc(c.nombre)}">${t} ›</button>` : ""; }
+function verHoras(c) {
+  const H = horasCampana(c); if (!H) return;
+  const zona = (z) => z.split("/").pop().replace(/_/g, " ");
+  const multi = new Set(H.zs.map((x) => x.p)).size < H.zs.length;
+  const m = abrirModal(`<h3>Hora en cada país</h3><p class="mut">${esc(c.nombre)}</p>
+    <ul class="lista-horas">${H.zs.map((x) => `<li><span>${esc(nomPais(x.p))}${multi && ZONAS_PAIS[x.p].length > 1 ? ` <small class="mut">(${esc(zona(x.z))})</small>` : ""}</span><b class="num">${x.h}</b></li>`).join("")}</ul>
+    <p class="mut">En Argentina: ${horaEn("America/Argentina/Buenos_Aires", new Date())}</p>
+    <div class="botones"><button class="btn pri" data-x>Listo</button></div>`);
+  $("[data-x]", m.dlg).onclick = m.cerrar;
+}
 setInterval(() => {
   if (document.hidden || S.vista !== "dash") return;
-  for (const td of $$("#tabla-scroll td.hora-loc[data-c]")) { const c = campanaPorId(td.dataset.c); if (c) { const t = document.createElement("tbody"); t.innerHTML = `<tr>${celdaHora(c)}</tr>`; const n = t.querySelector("td"); n.dataset.c = td.dataset.c; td.replaceWith(n); } }
-  ubicarCabFlotante(); ubicarPieFlotante();
+  for (const b of $$("#tabla-scroll .hora-chip")) { const c = campanaPorId(b.dataset.hora); if (c) b.textContent = `${txtHora(c)} ›`; }
 }, 60000);
 function filaTotal(xs) {
   const n = xs.length;
-  return `<tr class="fila-total"><td class="nom"><div class="nomwrap"><div class="txt"><div class="n">Resultados totales</div><div class="sub">${n} campaña${n === 1 ? "" : "s"}</div></div></div></td>${celdas(totalesDe(xs))}<td class="hora-loc"></td></tr>`;
+  return `<tr class="fila-total"><td class="nom"><div class="nomwrap"><div class="txt"><div class="n">Resultados totales</div><div class="sub">${n} campaña${n === 1 ? "" : "s"}</div></div></div></td>${celdas(totalesDe(xs))}</tr>`;
 }
 function armarPieFlotante() {
   const sc = $("#tabla-scroll"), tf = sc && $("table.camp tfoot", sc);
@@ -744,7 +751,6 @@ function ubicarPieFlotante() {
   td.forEach((x, i) => { if (ftd[i]) { const w = x.getBoundingClientRect().width + "px"; ftd[i].style.width = w; ftd[i].style.minWidth = w; ftd[i].style.maxWidth = w; } });
   ft.style.transform = `translateX(${-sc.scrollLeft}px)`;
   if (ftd[0]) ftd[0].style.transform = `translateX(${sc.scrollLeft}px)`;
-  const ult = ftd[ftd.length - 1]; if (ult && ftd.length > 1) ult.style.transform = `translateX(${-(rt.width - sc.clientWidth - sc.scrollLeft)}px)`;
 }
 window.addEventListener("scroll", () => { ubicarCabFlotante(); ubicarPieFlotante(); }, { passive: true });
 window.addEventListener("resize", () => { ubicarCabFlotante(); ubicarPieFlotante(); });
@@ -757,7 +763,7 @@ function pintarTabla() {
   if (!d || !xs.length) { const pf = $("#pie-flotante"); if (pf) pf.hidden = true; }
   if (!d) { cont.innerHTML = `<div class="vacio">${S.cargando ? `<span class="cargador"></span>Cargando campañas…` : "Sin datos."}</div>`; return; }
   if (!xs.length) { cont.innerHTML = `<div class="vacio">${ocultas ? `No hay campañas prendidas en este grupo. <button class="link" type="button" id="b-ver-ap">Ver las ${ocultas} apagadas</button>` : "No hay campañas en este grupo para este período."}</div>`; const b = $("#b-ver-ap"); if (b) b.onclick = () => $("#t-apagadas").click(); return; }
-  let h = `<table class="camp"><thead><tr><th class="nom" scope="col">Campaña</th>${colsVisibles().map(([k, t]) => `<th scope="col" class="c-${k}">${esc(t)}</th>`).join("")}<th scope="col" class="hora-loc" title="Hora local del mercado: del país más temprano al más tarde. 🌙 = allá es de madrugada">Hora allá</th></tr></thead><tbody>`;
+  let h = `<table class="camp"><thead><tr><th class="nom" scope="col">Campaña</th>${colsVisibles().map(([k, t]) => `<th scope="col" class="c-${k}">${esc(t)}</th>`).join("")}</tr></thead><tbody>`;
   for (const c of xs) {
     const ab = S.open.has("c:" + c.id);
     h += fila({ nivel: "campana", n: 0, x: c, act: c.act, sub: subCampana(c), abrible: true, abierto: ab });
@@ -807,6 +813,8 @@ function alternarSel(tr) {
 function clickTabla(e) {
   const reint = e.target.closest("[data-reint]");
   if (reint) { const c = campanaPorId(reint.dataset.reint); if (c) cargarDetalle(c, true); return; }
+  const hb = e.target.closest("[data-hora]");
+  if (hb) { const c = campanaPorId(hb.dataset.hora); if (c) verHoras(c); return; }
   const lp = e.target.closest("[data-pres]");
   if (lp) { const it = buscarItem(lp.dataset.pres); if (it) editarPresupuesto(it); return; }
   const tg = e.target.closest("[data-tg]");
