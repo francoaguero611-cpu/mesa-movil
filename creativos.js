@@ -58,7 +58,30 @@ const C = {
   timer: null, chatTimer: null,
   fila: null, filaTimer: null, abrirLuego: null,   // (13/10) fila «Correcciones» de arriba
   quien: ls.get("ws_persona", "lorenzo"),
+  orden: ls.get("cr_orden", "mod"), ordenF: ls.get("cr_orden_f", "nuevas"),   // (14/10) orden de las carpetas (se recuerda)
+  vistoP: null,                           // (14/10) marca de «vistos» en camino (la raíz espera a que termine)
 };
+
+// (14/10) Orden de carpetas: ofertas y mercados (con Alfabético) y fechas (sin Alfabético). «Más nuevas/antiguas» = cuándo arrancó la carpeta;
+// «Últimas modificaciones» = la que tiene el creativo agregado o corregido más reciente; «Sin ver primero» = las de estrellita arriba.
+const ORDENES = [["mod", "Últimas modificaciones"], ["nuevas", "Más nuevas"], ["antiguas", "Más antiguas"], ["alfa", "Alfabético (A→Z)"], ["sinver", "Sin ver primero"]];
+const cmpS = (a, b) => String(a ?? "").localeCompare(String(b ?? ""));
+function ordenar(xs, ord, nombre) {
+  const F = {
+    mod: (a, b) => cmpS(b.mod || b.ultima, a.mod || a.ultima),
+    nuevas: (a, b) => cmpS(b.primera, a.primera) || cmpS(b.ultima, a.ultima),
+    antiguas: (a, b) => cmpS(a.primera, b.primera) || cmpS(a.ultima, b.ultima),
+    alfa: (a, b) => String(nombre(a) || "").localeCompare(String(nombre(b) || ""), "es", { sensitivity: "base", numeric: true }),
+    sinver: (a, b) => ((b.sin_ver > 0) - (a.sin_ver > 0)) || cmpS(b.mod || b.ultima, a.mod || a.ultima),
+  };
+  return [...xs].sort((a, b) => (F[ord] || F.mod)(a, b) || cmpS(b.ultima, a.ultima) || (b.n || 0) - (a.n || 0));
+}
+function selOrden(id, valor, sinAlfa = false) {
+  return `<label class="cr-orden"><span class="sr">Ordenar carpetas</span><select class="campo" id="${id}" aria-label="Ordenar carpetas">${ORDENES.filter(([k]) => !(sinAlfa && k === "alfa"))
+    .map(([k, t]) => `<option value="${k}" ${k === valor ? "selected" : ""}>${t}</option>`).join("")}</select></label>`;
+}
+// estrellita «sin ver» en la esquina de la carpeta
+const estrella = (n) => n > 0 ? `<span class="cr-sinver" title="${n} creativo${n === 1 ? "" : "s"} sin ver" aria-label="${n} sin ver">★</span>` : "";
 
 async function api(accion, { q = "", body = null } = {}) {
   const r = await fetch(`${API}?accion=${accion}${q}`, {
@@ -88,6 +111,7 @@ function leerRuta() {
 }
 function ponerRuta(r) { C.g = r.g || null; C.f = r.f || null; C.o = r.o || ofertaDe(C.g); }
 function ir(g = null, f = null, { empujar = true, o = null } = {}) {
+  salirDeFecha(g, f);
   ponerRuta({ g, f, o }); C.m = null; C.mErr = null;
   const h = "#creativos" + (g ? "/" + encodeURIComponent(g) + (f ? "/" + f : "") : C.o ? "/of/" + encodeURIComponent(C.o) : "");
   try { if (empujar && location.hash !== h) history.pushState(null, "", location.pathname + location.search + h); else history.replaceState(null, "", location.pathname + location.search + h); } catch {}
@@ -112,7 +136,18 @@ function desmontar() {
   document.removeEventListener("click", cerrarMenusFuera);
   document.removeEventListener("keydown", teclaMenus);
 }
-function alVolver() { if (!C.montado) return; const r = leerRuta(); if (!location.hash.startsWith("#creativos")) return; ponerRuta(r); C.m = null; pintar(); cargar(); }
+// (14/10) «sin ver»: al entrar a una fecha se marcan vistos en el backend (por usuario); al salir se apagan las estrellitas de esas tarjetas
+function marcarVistos(g, f) {
+  const d = C.carpeta[g + "|" + f]; if (!d || !d.creativos.some((c) => c.nuevo)) return;
+  C.vistoP = api("creativos_visto", { body: { grupo: g, fecha: f } }).catch(() => {}).finally(() => { C.vistoP = null; });
+  const cg = (C.raizD?.carpetas || []).find((x) => x.grupo === g); const fo = (C.oferta[g]?.fechas || []).find((x) => x.fecha === f);
+  const n = fo?.sin_ver || 0; if (fo) fo.sin_ver = 0; if (cg) cg.sin_ver = Math.max(0, (cg.sin_ver || 0) - n);
+}
+function salirDeFecha(g, f) {
+  if (!C.g || !C.f || (C.g === g && C.f === f)) return;
+  const d = C.carpeta[C.g + "|" + C.f]; if (d) d.creativos.forEach((c) => { c.nuevo = false; });
+}
+function alVolver() { if (!C.montado) return; const r = leerRuta(); if (!location.hash.startsWith("#creativos")) return; salirDeFecha(r.g, r.f); ponerRuta(r); C.m = null; pintar(); cargar(); }
 // desde un aviso: abrir la carpeta y el chat
 function abrir({ g = null, f = null, chat = null } = {}) {
   if (!C.montado) return;
@@ -127,8 +162,8 @@ async function cargar({ sync = false } = {}) {
   try {
     if (sync) { const r = await api("creativos_sync", { body: {} }); toast(r.nuevos ? `Listo: ${r.nuevos} creativos nuevos` : "Al día: no hay creativos nuevos"); }
     if (g && !C.raizD) api("creativos").then((r) => { C.raizD = r; if (C.montado && C.g === g) pintar(); }).catch(() => {}); // nombre de la oferta en las migas
-    if (!g) C.raizD = await api("creativos");
-    else if (!f) C.oferta[g] = await api("creativos", { q: `&grupo=${encodeURIComponent(g)}` });
+    if (!g) { if (C.vistoP) await C.vistoP; C.raizD = await api("creativos"); }
+    else if (!f) { if (C.vistoP) await C.vistoP; C.oferta[g] = await api("creativos", { q: `&grupo=${encodeURIComponent(g)}` }); }
     else C.carpeta[g + "|" + f] = await api("creativos", { q: `&grupo=${encodeURIComponent(g)}&fecha=${f}` });
   } catch (e) {
     if (falla(e)) return;
@@ -136,6 +171,7 @@ async function cargar({ sync = false } = {}) {
     return;
   }
   if (!C.montado || C.g !== g || C.f !== f) return;
+  if (f) marcarVistos(g, f);
   pintar();
   if (f && C.metr && !C.m && !C.mCargando) cargarMetricas();
   if (f && C.abrirLuego) { const q = C.abrirLuego; C.abrirLuego = null; const d0 = C.carpeta[g + "|" + f];
@@ -246,15 +282,16 @@ const collage = (ps) => `<div class="cr-collage n${Math.min(3, ps.length)}" aria
 function ofertas() {
   const m = new Map();
   for (const x of C.raizD?.carpetas || []) {
-    const o = ofertaDe(x.grupo); const e = m.get(o) ?? { o, nombre: nombreOferta(x.oferta) || o, mercados: [], n: 0, fechas: 0, ultima: x.ultima, portadas: [] };
+    const o = ofertaDe(x.grupo); const e = m.get(o) ?? { o, nombre: nombreOferta(x.oferta) || o, mercados: [], n: 0, fechas: 0, ultima: x.ultima, primera: x.primera, mod: x.mod, sin_ver: 0, portadas: [] };
     e.mercados.push(x); e.n += x.n; e.fechas += x.fechas; if (x.ultima > e.ultima) e.ultima = x.ultima;
+    if (x.primera < e.primera) e.primera = x.primera; if (cmpS(x.mod, e.mod) > 0) e.mod = x.mod; e.sin_ver += x.sin_ver || 0;
     m.set(o, e);
   }
   for (const e of m.values()) {
-    e.mercados.sort((a, b) => b.ultima.localeCompare(a.ultima) || b.n - a.n);
+    e.mercados = ordenar(e.mercados, C.orden, (x) => x.mercado || x.etiqueta);
     for (const x of e.mercados) for (const p of x.portadas) if (e.portadas.length < 3 && !e.portadas.includes(p)) e.portadas.push(p);
   }
-  return [...m.values()].sort((a, b) => b.ultima.localeCompare(a.ultima) || b.n - a.n);
+  return ordenar([...m.values()], C.orden, (x) => x.nombre);
 }
 const plural = (n, s, p = s + "s") => `${n} ${n === 1 ? s : p}`;
 
@@ -271,11 +308,12 @@ function pintarRaiz() {
     <div class="cr-filtro">
       <label class="sr" for="cr-buscar">Buscar oferta o país</label>
       <input class="campo" id="cr-buscar" type="search" placeholder="Buscar oferta o país" value="${esc(C.buscar)}" autocomplete="off">
+      ${selOrden("cr-orden", C.orden)}
       <span class="cr-mut">${plural(todas.length, "oferta")} · ${plural(d.carpetas.length, "mercado")} · ${plural(d.carpetas.reduce((s, x) => s + x.n, 0), "creativo")}${d.sync ? ` · actualizado ${esc(horaCorta(d.sync))}` : ""}</span>
     </div>
     <div class="cr-carpetas">${lista.map((x) => `
       <button type="button" class="cr-carpeta boceto" data-o="${esc(x.o)}">
-        <span class="cr-pestana" aria-hidden="true"></span>
+        <span class="cr-pestana" aria-hidden="true"></span>${estrella(x.sin_ver)}
         ${collage(x.portadas)}
         <span class="cr-c-tit">${esc(x.nombre)}</span>
         <span class="cr-c-ban" aria-hidden="true">${x.mercados.slice(0, 12).map((m) => esc(m.bandera || "")).join(" ")}${x.mercados.length > 12 ? " …" : ""}</span>
@@ -283,6 +321,7 @@ function pintarRaiz() {
       </button>`).join("") || `<p class="vacio chico">Nada coincide con «${esc(C.buscar)}».</p>`}
     </div>`;
   const inp = $("#cr-buscar", c);
+  $("#cr-orden", c).onchange = (e) => { C.orden = e.target.value; ls.set("cr_orden", C.orden); pintarRaiz(); };
   inp.oninput = () => { C.buscar = inp.value; const pos = inp.selectionStart; pintarRaiz(); const n = $("#cr-buscar", C.raiz); n.focus(); try { n.setSelectionRange(pos, pos); } catch {} };
   $$("[data-o]", c).forEach((b) => b.onclick = () => {
     const of = lista.find((x) => x.o === b.dataset.o);
@@ -297,14 +336,15 @@ function pintarMercados() {
   const of = ofertas().find((x) => x.o === C.o);
   if (!of) { c.innerHTML = `<p class="vacio">No encontré esa oferta.</p>`; return; }
   const rep = (m) => of.mercados.filter((y) => y.mercado === m).length > 1; // mismo mercado dos veces: se aclara con el nombre original
-  c.innerHTML = `<div class="cr-carpetas">${of.mercados.map((x) => `
+  c.innerHTML = `<div class="cr-filtro cr-filtro-orden">${selOrden("cr-orden", C.orden)}</div><div class="cr-carpetas">${of.mercados.map((x) => `
       <button type="button" class="cr-carpeta boceto" data-g="${esc(x.grupo)}">
-        <span class="cr-pestana" aria-hidden="true"></span>
+        <span class="cr-pestana" aria-hidden="true"></span>${estrella(x.sin_ver)}
         ${collage(x.portadas)}
         <span class="cr-c-tit">${x.bandera ? `<span aria-hidden="true">${esc(x.bandera)}</span> ` : ""}${esc(x.mercado || x.etiqueta)}${rep(x.mercado) ? ` <small class="cr-mut">· ${esc(x.oferta)}</small>` : ""}</span>
         <span class="cr-c-meta">${plural(x.n, "creativo")} · ${plural(x.fechas, "fecha")} · último ${esc(dm(x.ultima))}</span>
       </button>`).join("")}</div>`;
   $$("[data-g]", c).forEach((b) => b.onclick = () => ir(b.dataset.g, null));
+  $("#cr-orden", c).onchange = (e) => { C.orden = e.target.value; ls.set("cr_orden", C.orden); pintarMercados(); };
 }
 const horaCorta = (iso) => { try { const d = new Date(iso); const f = hoyAR(d) === hoyAR() ? "" : dm(hoyAR(d)) + " "; return f + d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: TZ_AR }); } catch { return ""; } };
 
@@ -312,14 +352,16 @@ function pintarOferta() {
   const c = $("#cr-cuerpo", C.raiz); const d = C.oferta[C.g];
   if (!d) { c.innerHTML = cargando("Abriendo la oferta…"); return; }
   if (!d.fechas.length) { c.innerHTML = `<p class="vacio">Esta carpeta está vacía.</p>`; return; }
-  c.innerHTML = `<div class="cr-fechas">${d.fechas.map((x) => `
+  const fechas = ordenar(d.fechas.map((x) => ({ ...x, primera: x.fecha, ultima: x.fecha })), C.ordenF, (x) => x.fecha);
+  c.innerHTML = `<div class="cr-filtro cr-filtro-orden">${selOrden("cr-orden-f", C.ordenF, true)}</div><div class="cr-fechas">${fechas.map((x) => `
     <button type="button" class="cr-fecha boceto" data-f="${esc(x.fecha)}">
-      <span class="cr-pestana" aria-hidden="true"></span>
+      <span class="cr-pestana" aria-hidden="true"></span>${estrella(x.sin_ver)}
       ${collage(x.portadas)}
       <span class="cr-f-tit"><b>${esc(dm(x.fecha))}</b> <small>${esc(diaSem(x.fecha))}</small></span>
       <span class="cr-f-meta"><span class="cr-tipo ${x.tipo === "testeo" ? "t-test" : "t-reno"}">${x.tipo === "testeo" ? "Testeo" : "Renovaciones"}</span> ${x.n} creativo${x.n === 1 ? "" : "s"}${x.trabajando ? ` <span class="cr-trab" title="Claude está corrigiendo"><span class="cargador mini"></span> corrigiendo</span>` : ""}</span>
     </button>`).join("")}</div>`;
   $$("[data-f]", c).forEach((b) => b.onclick = () => ir(C.g, b.dataset.f));
+  $("#cr-orden-f", c).onchange = (e) => { C.ordenF = e.target.value; ls.set("cr_orden_f", C.ordenF); pintarOferta(); };
 }
 
 function pintarCarpeta() {
@@ -404,6 +446,7 @@ function pintarTarjetas() {
           : `<span class="cr-playico" aria-hidden="true">${ICO.play}</span>`}
       </button>
       <div class="cr-menu-wrap cr-card-menu"><button type="button" class="cr-puntos-card" data-menu="card" aria-haspopup="true" aria-expanded="false" aria-label="Opciones de ${esc(c.nombre || "este creativo")}">${ICO.puntos}</button></div>
+      ${c.nuevo ? `<span class="cr-sinver cr-sinver-card" title="Nuevo: todavía no lo viste" aria-label="Nuevo, sin ver">★</span>` : ""}
       <div class="cr-badges">
         ${c.origen === "fabrica" && !c.n_ads ? `<span class="cr-badge b-nuevo">sin salir</span>` : ""}
         ${c.version_de ? `<span class="cr-badge b-ver">corregido${/\sv(\d+)$/i.test(c.nombre || "") ? " " + esc(/\s(v\d+)$/i.exec(c.nombre)[1]) : ""}</span>` : ""}
