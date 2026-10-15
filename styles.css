@@ -1083,6 +1083,11 @@ table.camp tbody tr.fila.sel td { background: var(--marca); }
 /* (15/10) hora local del mercado: línea chiquita debajo del nombre de la campaña; al tocarla, la hora de cada país */
 .hora-chip { display: inline-block; margin-top: 2px; padding: 0; border: 0; background: none; font: inherit; font-size: 11px; color: var(--mut); font-variant-numeric: tabular-nums; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 2px; }
 .hora-chip:hover, .hora-chip:focus-visible { color: inherit; }
-.lista-horas { list-style: none; margin: 10px 0; padding: 0; }
-.lista-horas li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1.5px dashed var(--linea); }
-.lista-horas li:last-child { border-bottom: 0; }
+.burbuja-horas { position: fixed; z-index: 60; min-width: 180px; max-width: min(300px, calc(100vw - 16px)); padding: 10px 12px 8px; background: var(--tarjeta); color: inherit; border: 2px solid var(--tinta); border-radius: 10px; box-shadow: 0 8px 22px -8px color-mix(in srgb, var(--tinta) 45%, transparent); font-size: 12.5px; }
+.burbuja-horas ul { list-style: none; margin: 0 22px 0 0; padding: 0; }
+.burbuja-horas li { display: flex; justify-content: space-between; gap: 14px; padding: 3px 0; }
+.burbuja-horas li b, .burbuja-horas .bh-ar b { font-variant-numeric: tabular-nums; }
+.burbuja-horas small { color: var(--mut); }
+.burbuja-horas .bh-ar { display: flex; justify-content: space-between; gap: 14px; margin-top: 6px; padding-top: 6px; border-top: 1.5px dashed var(--linea); color: var(--mut); }
+.burbuja-horas .bh-x { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--mut); font-size: 13px; cursor: pointer; }
+.burbuja-horas .bh-x:hover { color: inherit; background: var(--papel-2); }

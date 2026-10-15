@@ -708,16 +708,35 @@ function horasCampana(c) {
 // línea chiquita debajo del nombre: «ahora 22:10–05:10 ›»; al tocarla, la hora de cada país
 function txtHora(c) { const H = horasCampana(c); if (!H) return ""; return `ahora ${H.ini.h === H.fin.h ? H.ini.h : `${H.ini.h}–${H.fin.h}`}`; }
 function chipHora(c) { const t = txtHora(c); return t ? `<button type="button" class="hora-chip" data-hora="${esc(c.id)}" aria-label="Hora en cada país de ${esc(c.nombre)}">${t} ›</button>` : ""; }
-function verHoras(c) {
+// burbuja al lado de la línea: un país por renglón con su hora; se va con la X, al sacar el mouse, tocando afuera, scroll o Escape
+let burbujaHoras = null;
+function cerrarHoras() { if (burbujaHoras) { burbujaHoras.remove(); burbujaHoras = null; } }
+function verHoras(c, ancla) {
+  cerrarHoras();
   const H = horasCampana(c); if (!H) return;
   const zona = (z) => z.split("/").pop().replace(/_/g, " ");
-  const multi = new Set(H.zs.map((x) => x.p)).size < H.zs.length;
-  const m = abrirModal(`<h3>Hora en cada país</h3><p class="mut">${esc(c.nombre)}</p>
-    <ul class="lista-horas">${H.zs.map((x) => `<li><span>${esc(nomPais(x.p))}${multi && ZONAS_PAIS[x.p].length > 1 ? ` <small class="mut">(${esc(zona(x.z))})</small>` : ""}</span><b class="num">${x.h}</b></li>`).join("")}</ul>
-    <p class="mut">En Argentina: ${horaEn("America/Argentina/Buenos_Aires", new Date())}</p>
-    <div class="botones"><button class="btn pri" data-x>Listo</button></div>`);
-  $("[data-x]", m.dlg).onclick = m.cerrar;
+  const filas = H.zs.map((x) => `<li><span>${esc(nomPais(x.p))}${ZONAS_PAIS[x.p].length > 1 ? ` <small>(${esc(zona(x.z))})</small>` : ""}</span><b>${x.h}</b></li>`).join("");
+  const b = document.createElement("div");
+  b.className = "burbuja-horas"; b.setAttribute("role", "dialog"); b.setAttribute("aria-label", "Hora en cada país");
+  b.innerHTML = `<button type="button" class="bh-x" aria-label="Cerrar">✕</button><ul>${filas}</ul>${H.zs.some((x) => x.p === "AR") ? "" : `<div class="bh-ar">Argentina <b>${horaEn("America/Argentina/Buenos_Aires", new Date())}</b></div>`}`;
+  document.body.appendChild(b); burbujaHoras = b;
+  const r = ancla.getBoundingClientRect(), bw = b.offsetWidth, bh = b.offsetHeight;
+  let left = Math.min(Math.max(8, r.left), window.innerWidth - bw - 8);
+  let top = r.bottom + 2; if (top + bh > window.innerHeight - 8) top = Math.max(8, r.top - bh - 2);
+  b.style.left = left + "px"; b.style.top = top + "px";
+  $(".bh-x", b).onclick = (e) => { e.stopPropagation(); cerrarHoras(); };
+  b.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") cerrarHoras(); });
+  b._ancla = ancla;
 }
+// con mouse: si se aleja de la línea y de la burbuja (sin entrar a la burbuja), también se cierra
+document.addEventListener("pointermove", (e) => {
+  if (!burbujaHoras || e.pointerType !== "mouse") return;
+  const dentro = (r, m) => e.clientX >= r.left - m && e.clientX <= r.right + m && e.clientY >= r.top - m && e.clientY <= r.bottom + m;
+  if (!dentro(burbujaHoras.getBoundingClientRect(), 4) && !dentro(burbujaHoras._ancla.getBoundingClientRect(), 8)) cerrarHoras();
+}, { passive: true });
+document.addEventListener("pointerdown", (e) => { if (burbujaHoras && !burbujaHoras.contains(e.target) && !e.target.closest("[data-hora]")) cerrarHoras(); }, true);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") cerrarHoras(); });
+window.addEventListener("scroll", cerrarHoras, { passive: true });
 setInterval(() => {
   if (document.hidden || S.vista !== "dash") return;
   for (const b of $$("#tabla-scroll .hora-chip")) { const c = campanaPorId(b.dataset.hora); if (c) b.textContent = `${txtHora(c)} ›`; }
@@ -814,7 +833,7 @@ function clickTabla(e) {
   const reint = e.target.closest("[data-reint]");
   if (reint) { const c = campanaPorId(reint.dataset.reint); if (c) cargarDetalle(c, true); return; }
   const hb = e.target.closest("[data-hora]");
-  if (hb) { const c = campanaPorId(hb.dataset.hora); if (c) verHoras(c); return; }
+  if (hb) { const c = campanaPorId(hb.dataset.hora); if (c) (burbujaHoras && burbujaHoras.dataset.c === c.id) ? cerrarHoras() : (verHoras(c, hb), burbujaHoras && (burbujaHoras.dataset.c = c.id)); return; }
   const lp = e.target.closest("[data-pres]");
   if (lp) { const it = buscarItem(lp.dataset.pres); if (it) editarPresupuesto(it); return; }
   const tg = e.target.closest("[data-tg]");
