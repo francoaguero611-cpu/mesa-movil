@@ -3431,7 +3431,19 @@ function iniciar() {
   $("#b-menu").onclick = (e) => { e.stopPropagation(); $("#menu").hidden ? abrirMenu() : cerrarMenu(); };
   document.addEventListener("click", (e) => { if (!$("#menu").hidden && !e.target.closest(".menu-wrap")) cerrarMenu(); });
   if ("serviceWorker" in navigator && window.isSecureContext) {
-    navigator.serviceWorker.register("sw.js").catch(() => {});
+    // (15/10) Actualización sola, sin reinstalar: busca versión nueva al volver a la app y cada 15 min;
+    // cuando el service worker nuevo toma el control, recarga una vez (solo si ya había uno, no en la primera instalación).
+    const habiaControl = !!navigator.serviceWorker.controller;
+    let recargando = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (!habiaControl || recargando) return;
+      recargando = true; location.reload();
+    });
+    navigator.serviceWorker.register("sw.js").then((reg) => {
+      const buscar = () => reg.update().catch(() => {});
+      document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") buscar(); });
+      setInterval(buscar, 15 * 60 * 1000);
+    }).catch(() => {});
     // aviso tocado con la app ya abierta: el service worker manda el evento acá
     navigator.serviceWorker.addEventListener("message", (e) => {
       if (e.data?.tipo !== "ev") return;
