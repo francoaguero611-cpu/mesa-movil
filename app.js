@@ -2486,11 +2486,11 @@ function cargarCreativos() {
   if (crCarga) return crCarga;
   const css = new Promise((ok) => {
     if ($('link[href^="creativos.css"]')) return ok();
-    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "creativos.css?v=7";
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "creativos.css?v=8";
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "creativos.js?v=8";
+    const sc = document.createElement("script"); sc.src = "creativos.js?v=9";
     sc.onload = () => window.Creativos ? ok() : mal(new Error("Creativos no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar Creativos. ¿Hay conexión?")); };
     document.head.appendChild(sc);

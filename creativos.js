@@ -211,22 +211,36 @@ function pintarFila() {
   const n = $("#cr-fila", C.raiz); if (!n) return;
   const L = C.fila || [];
   if (!L.length) { n.hidden = true; n.innerHTML = ""; return; }
-  const enMarcha = L.filter((x) => ["en_cola", "trabajando"].includes(x.estado)).length, listas = L.filter((x) => x.estado === "listo").length;
+  const enMarcha = L.filter((x) => ["en_cola", "trabajando"].includes(x.estado)).length, terminadas = L.filter((x) => ["listo", "error"].includes(x.estado)).length;
   const scroll = $(".cr-fila-pista", n)?.scrollLeft || 0;
   n.hidden = false;
-  n.innerHTML = `<div class="cr-fila-cab"><b>Correcciones</b><span class="cr-mut">${enMarcha ? `${enMarcha} en marcha` : ""}${enMarcha && listas ? " · " : ""}${listas ? `${listas} lista${listas === 1 ? "" : "s"} (48 h)` : ""}</span></div>
+  // (14/10) estado claro: Enviada → En proceso (% y paso) → Lista / Error, con el último mensaje; «Limpiar» oculta las terminadas (por usuario)
+  const ETQ = { en_cola: "Enviada", trabajando: "En proceso", listo: "Lista", error: "Error" };
+  n.innerHTML = `<div class="cr-fila-cab"><b>Correcciones</b><span class="cr-mut">${enMarcha ? `${enMarcha} en marcha` : ""}${enMarcha && terminadas ? " · " : ""}${terminadas ? `${terminadas} terminada${terminadas === 1 ? "" : "s"}` : ""}</span>
+      ${terminadas ? `<button type="button" class="btn chico cr-limpiar" data-limpiar title="Saca de esta franja las correcciones terminadas (no borra los chats)">Limpiar</button>` : ""}</div>
     <div class="cr-fila-pista" role="list">${L.map((x, i) => {
       const a = avance(x), vivo = ["en_cola", "trabajando"].includes(x.estado);
-      return `<button type="button" class="cr-fi e-${esc(x.estado)}" role="listitem" data-k="${i}" aria-label="${esc(`${x.etiqueta} ${x.nombre || "carpeta " + dm(x.fecha)}: ${x.estado === "listo" ? "lista" : x.estado === "error" ? "con error" : a.pct + " %"}`)}">
+      const ult = x.ultimo?.texto ? String(x.ultimo.texto).replace(/\s+/g, " ") : "";
+      const detalle = x.estado === "trabajando" ? `${a.txt} · ≈ ${a.resta} min` : x.estado === "en_cola" ? "Esperando turno en la Mac" : ult || (x.estado === "error" ? "Hubo un problema · ver chat" : "");
+      return `<button type="button" class="cr-fi e-${esc(x.estado)}" role="listitem" data-k="${i}" aria-label="${esc(`${x.etiqueta} ${x.nombre || "carpeta " + dm(x.fecha)}: ${ETQ[x.estado] || x.estado}${x.estado === "trabajando" ? " " + a.pct + " %" : ""}`)}">
         <span class="cr-fi-img">${x.thumb ? `<img src="${esc(url(x.thumb))}" alt="" loading="lazy" onerror="this.remove()">` : ""}
           <span class="cr-fi-est">${x.estado === "listo" ? "✓" : x.estado === "error" ? "✕" : x.estado === "en_cola" ? "⋯" : `${a.pct}%`}</span></span>
         <span class="cr-fi-tx">
           <span class="cr-fi-of">${x.bandera ? `${esc(x.bandera)} ` : ""}${esc(x.oferta || x.etiqueta)}${x.mercado ? ` · ${esc(x.mercado)}` : ""}</span>
           <span class="cr-fi-nom">${esc(x.nombre || `Toda la carpeta ${dm(x.fecha)}`)}</span>
-          <span class="cr-fi-sub">${x.estado === "listo" ? `Lista · ${esc(horaCorta(x.actualizado))}` : x.estado === "error" ? "Hubo un problema · ver chat" : x.estado === "en_cola" ? "En cola en la Mac" : `${esc(a.txt)} · ≈ ${a.resta} min`}</span>
+          <span class="cr-fi-paso"><span class="cr-fi-chip c-${esc(x.estado)}">${esc(ETQ[x.estado] || x.estado)}${x.estado === "trabajando" ? ` ${a.pct}%` : ""}</span><span class="cr-fi-hora">${esc(horaCorta(x.actualizado))}</span></span>
           ${vivo && x.estado === "trabajando" ? `<span class="cr-fi-barra"><span style="width:${a.pct}%"></span></span>` : ""}
+          ${detalle ? `<span class="cr-fi-sub" title="${esc(detalle)}">${esc(detalle)}</span>` : ""}
+          ${x.estado === "listo" && x.alcance === "creativo" && x.nuevo_id ? `<span class="cr-fi-ver">▶ Ver video corregido</span>` : x.estado === "listo" ? `<span class="cr-fi-ver">Abrir</span>` : ""}
         </span>
       </button>`; }).join("")}</div>`;
+  const bl = $("[data-limpiar]", n);
+  if (bl) bl.onclick = async () => {
+    const ids = L.filter((x) => ["listo", "error"].includes(x.estado)).map((x) => x.chat);
+    C.fila = L.filter((x) => !ids.includes(x.chat)); pintarFila();
+    try { await api("creativos_correcciones_limpiar", { body: { chats: ids } }); toast(`Listo: ${ids.length} correcci${ids.length === 1 ? "ón" : "ones"} fuera de la franja`); }
+    catch (e) { if (!falla(e)) toast("No se pudo limpiar: " + e.message, "error"); cargarFila(); }
+  };
   const p = $(".cr-fila-pista", n); p.scrollLeft = scroll;
   $$("[data-k]", n).forEach((b) => b.onclick = () => {
     const x = L[Number(b.dataset.k)];
