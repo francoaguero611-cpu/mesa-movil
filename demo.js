@@ -491,11 +491,12 @@
     }
     if (accion === "presupuesto") { // (14/10) lapicito y +% en lote, siempre terminado en ,55
       const a55 = (n, min = 0) => { let x = Math.floor(n) + 0.55; if (min && x <= min) x = Math.floor(min) + 1.55; return r2(x); };
+      const a55b = (n, max) => { let x = Math.floor(n) + 0.55; if (x >= max) x = Math.floor(max) - 0.45; return Math.max(1.55, r2(x)); };
       const resultados = (body.items || []).map((it) => {
         const c = ESTR.find((x) => x.id === it.id), s = !c && ESTR.flatMap((x) => x.conjuntos).find((x) => x.id === it.id);
-        const objs = c ? (c.presupuesto ? [c] : body.pct ? c.conjuntos.filter((x) => x.presupuesto) : []) : s && s.presupuesto ? [s] : [];
-        if (!objs.length) return { id: it.id, nivel: it.nivel, nombre: it.nombre, ok: false, error: c ? "es ABO: el presupuesto vive en los conjuntos, editá cada conjunto" : "no tiene presupuesto propio", cambios: [] };
-        const cambios = objs.map((o) => { const antes = o.presupuesto, despues = body.pct ? a55(antes * (1 + body.pct / 100), antes) : a55(+String(it.monto).replace(",", ".")); if (!dry) o.presupuesto = despues; return { id: o.id, nombre: o.nombre, antes, despues, ok: true }; });
+        const objs = c ? (c.presupuesto ? [c] : []) : s && s.presupuesto ? [s] : [];
+        if (!objs.length) return { id: it.id, nivel: it.nivel, nombre: it.nombre, ok: false, error: c ? "es ABO: el presupuesto es por conjunto, abrí la campaña y elegí los conjuntos" : "no tiene presupuesto propio", cambios: [] };
+        const cambios = objs.map((o) => { const antes = o.presupuesto, despues = body.pct ? (body.pct < 0 ? a55b(antes * (1 + body.pct / 100), antes) : a55(antes * (1 + body.pct / 100), antes)) : a55(+String(it.monto).replace(",", ".")); if (!dry) o.presupuesto = despues; return { id: o.id, nombre: o.nombre, antes, despues, ok: true }; });
         return { id: it.id, nivel: it.nivel, nombre: it.nombre, ok: true, error: null, moneda: "USD", cambios, despues: r2(cambios.reduce((x, y) => x + y.despues, 0)) };
       });
       LOG.unshift({ creado: new Date().toISOString(), accion: "presupuesto", dry, resumen: `${body.pct ? `+${body.pct} %` : "Fijar"} presupuesto ${resultados.length}: ${(body.items || []).map((i) => i.nombre).join(", ")}` });

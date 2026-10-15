@@ -134,7 +134,7 @@ async function api(accion, { q = "", body = null, escritura = false } = {}) {
 let demoP = null;
 function cargarDemo() {
   if (window.DemoAPI) return Promise.resolve();
-  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=31"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=32"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
   return demoP;
 }
 
@@ -551,7 +551,7 @@ const COLS = [
   ["ventas", "Ventas", (x) => entN(x.ventas)],
   ["ticket_promedio", "AOV", (x) => usdG(aovDe(x))],
   ["gasto", "Importe gastado", (x) => usdG(x.gasto)],
-  ["presupuesto", "Presupuesto", (x, nivel) => `${usdG(x.presupuesto)}${x.tipo_presupuesto ? ` <span class="chip-tp">${esc(x.tipo_presupuesto)}</span>` : ""}${editaPres(x, nivel) ? ` <button type="button" class="lapiz" data-pres="${esc(nivel + ":" + x.id)}" aria-label="Cambiar presupuesto de ${esc(x.nombre)}" title="Cambiar presupuesto"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z M14 6l4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg></button>` : ""}`],
+  ["presupuesto", "Presupuesto", (x, nivel) => nivel === "campana" && x.tipo_presupuesto === "ABO" ? `<span class="chip-tp" title="Presupuesto por conjunto: abrí la campaña para verlo y cambiarlo">Presupuesto ABO</span>` : `${usdG(x.presupuesto)}${x.tipo_presupuesto ? ` <span class="chip-tp">${esc(x.tipo_presupuesto)}</span>` : ""}${editaPres(x, nivel) ? ` <button type="button" class="lapiz" data-pres="${esc(nivel + ":" + x.id)}" aria-label="Cambiar presupuesto de ${esc(x.nombre)}" title="Cambiar presupuesto"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z M14 6l4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg></button>` : ""}`],
   ["cpa", "CPA", (x) => usdG(cpaDe(x))],
   ["costo_pago_iniciado", "Costo x pago iniciado", (x) => usdG(x.costo_pago_iniciado)],
   ["costo_carrito", "Costo x carrito", (x) => usdG(x.costo_carrito)],
@@ -808,7 +808,7 @@ function pintarBarraBase() {
     <button type="button" class="btn chico" id="b-limpiar">limpiar</button>
     <span class="sp"></span>
     <div class="acciones-sel">
-    ${conPres ? `<button type="button" class="btn chico" id="b-pres">Subir presupuesto</button>` : ""}
+    ${conPres ? `<button type="button" class="btn chico" id="b-pres">Modificar presupuesto</button>` : ""}
     ${conCamp ? `<button type="button" class="btn chico" id="b-hz" title="CBO 1-1 con los anuncios que elijas en otras cuentas">Escala horizontal</button>` : ""}
     ${soloAds ? `<span class="caps">${its.length === 1 ? `<button type="button" class="btn chico" id="b-aislada">Aislada</button>` : ""}<button type="button" class="btn chico" id="b-bidcap">BidCap</button><button type="button" class="btn chico" id="b-costcap">CostCap</button><button type="button" class="btn chico" id="b-horizontal" title="Madre topada: CBO 1-1-winners en otra cuenta">Escala</button></span>` : ""}
     <div class="grupo-sw"><span class="sw-lbl" id="sw-lbl">${lbl}</span>
@@ -816,7 +816,7 @@ function pintarBarraBase() {
       <span class="sr" id="sw-ayuda">Deslizá o tocá para ${est === "true" ? "apagar" : est === "false" ? "prender" : "prender o apagar"} lo seleccionado en Meta. Pide confirmación.</span>
     </div></div>`;
   $("#b-limpiar").onclick = () => { S.sel.clear(); pintarTabla(); pintarBarra(); };
-  if (conPres) $("#b-pres").onclick = subirPresupuesto;
+  if (conPres) $("#b-pres").onclick = modificarPresupuesto;
   if (conCamp) $("#b-hz").onclick = escalaCampanas;
   if (soloAds) { $("#b-bidcap").onclick = () => quizCap("bidcap"); $("#b-costcap").onclick = () => quizCap("costcap"); $("#b-horizontal").onclick = () => quizCap("horizontal"); const ba = $("#b-aislada"); if (ba) ba.onclick = () => quizCap("aislada"); }
   switchArrastrable($("#sw"), est);
@@ -906,45 +906,70 @@ function actualizarEstadoLocal(id, estado) {
 }
 
 // ---------- presupuesto (14/10, Lorenzo) ----------
-// Lapicito por campaña CBO / conjunto ABO y «Subir presupuesto» en lote (+10/15/30/50/100 %). Siempre terminado en ,55:
-// acá es la vista previa; el monto final lo calcula app-movil (acción presupuesto) con el presupuesto actual de Meta y la moneda de la cuenta.
-const PCTS_PRES = [10, 15, 30, 50, 100];
+// Lapicito por campaña CBO / conjunto ABO y «Modificar presupuesto» en lote: subir (+10/15/30/50/100 %), bajar (−10/15/30/50 %)
+// o un monto fijo igual para todas. Siempre terminado en ,55. Las campañas ABO no se tocan desde la campaña (no se sabe a qué conjunto):
+// se abren y se eligen los conjuntos. Acá es la vista previa; el monto final lo calcula app-movil con el presupuesto actual de Meta.
+const PCTS_PRES = { subir: [10, 15, 30, 50, 100], bajar: [10, 15, 30, 50] };
 const a55 = (n, min = 0) => { let x = Math.floor(n) + 0.55; if (min && x <= min) x = Math.floor(min) + 1.55; return Math.round(x * 100) / 100; };
+const a55Baja = (n, max) => { let x = Math.floor(n) + 0.55; if (x >= max) x = Math.floor(max) - 0.45; return Math.max(1.55, Math.round(x * 100) / 100); };
 const montoTx = (n) => nulo(n) ? "—" : NF2.format(n);
 function itemsPres() {
   return [...S.sel.keys()].map(buscarItem).filter((i) => i && i.nivel !== "anuncio");
 }
-function previaPres(i, pct) {
+// por qué no se puede tocar (null = se puede)
+function motivoNoPres(i) {
   const r = i.ref || {};
-  if (i.nivel === "conjunto" && r.tipo_presupuesto !== "ABO") return { tx: "sin presupuesto propio (es CBO): se saltea", mal: true };
-  if (r.presupuesto == null) return { tx: "sin presupuesto diario", mal: true };
-  if (i.nivel === "campana" && r.tipo_presupuesto === "ABO") return { tx: `ABO: cada conjunto activo +${pct} % (total hoy ${montoTx(r.presupuesto)})` };
-  return { tx: `${montoTx(r.presupuesto)} → <b>${montoTx(a55(r.presupuesto * (1 + pct / 100), r.presupuesto))}</b>` };
+  if (i.nivel === "campana" && r.tipo_presupuesto === "ABO") return "ABO: el presupuesto es por conjunto. Abrí la campaña y elegí los conjuntos";
+  if (i.nivel === "conjunto" && r.tipo_presupuesto !== "ABO") return "sin presupuesto propio (es CBO): se cambia desde la campaña";
+  if (r.presupuesto == null) return "sin presupuesto diario";
+  return null;
 }
-function subirPresupuesto() {
-  const its = itemsPres();
-  if (!its.length) return toast("Elegí campañas o conjuntos para subirles el presupuesto.", "error");
-  let pct = null, enviando = false;
+function nuevoPres(antes, modo, pct, fijo) {
+  if (modo === "fijo") return fijo;
+  return modo === "bajar" ? a55Baja(antes * (1 - pct / 100), antes) : a55(antes * (1 + pct / 100), antes);
+}
+function modificarPresupuesto() {
+  const todos = itemsPres();
+  if (!todos.length) return toast("Elegí campañas o conjuntos para cambiarles el presupuesto.", "error");
+  const its = todos.filter((i) => !motivoNoPres(i)), fuera = todos.filter((i) => motivoNoPres(i));
+  let modo = "subir", pct = null, fijo = null, enviando = false;
+  const listo = () => modo === "fijo" ? !!fijo : !!pct;
+  const verbo = () => modo === "fijo" ? `ponerle ${montoTx(fijo)} a ${its.length === 1 ? "la campaña" : `las ${its.length}`}` : `${modo === "bajar" ? "bajarlo −" : "subirlo +"}${pct} %`;
   const modoTx = DEMO ? `<p class="mut">Demo: se simula en el navegador, no toca Meta.</p>` : dryOn() ? `<p class="mut"><b>Modo prueba:</b> se manda con dry=1, Meta no se toca.</p>` : "";
-  const lista = () => `<ul class="lista-nombres">${its.map((i) => { const p = pct ? previaPres(i, pct) : null; return `<li><span class="niv">${NIVEL[i.nivel][0]}</span><span>${esc(i.nombre)}${p ? `<br><small class="${p.mal ? "neg" : "mut"}">${p.tx}</small>` : ""}</span></li>`; }).join("")}</ul>`;
+  const lista = () => `<ul class="lista-nombres">${its.map((i) => { const a = i.ref.presupuesto;
+      return `<li><span class="niv">${NIVEL[i.nivel][0]}</span><span>${esc(i.nombre)}<br><small class="mut">${listo() ? `${montoTx(a)} → <b>${montoTx(nuevoPres(a, modo, pct, fijo))}</b>` : `hoy ${montoTx(a)}`}</small></span></li>`; }).join("")}
+    ${fuera.map((i) => `<li><span class="niv">${NIVEL[i.nivel][0]}</span><span>${esc(i.nombre)}<br><small class="neg">No se toca: ${esc(motivoNoPres(i))}</small></span></li>`).join("")}</ul>`;
   const m = abrirModal("", { bloqueado: () => enviando });
   const paso1 = () => {
-    m.set(`<h3>Subir presupuesto</h3><p class="mut">${its.length} seleccionado${its.length === 1 ? "" : "s"}. Elegí cuánto: siempre queda terminado en ,55.</p>
-      <div class="pct-pres" role="radiogroup" aria-label="Porcentaje">${PCTS_PRES.map((p) => `<button type="button" class="btn chico${p === pct ? " pri" : ""}" role="radio" aria-checked="${p === pct}" data-pct="${p}">+${p} %</button>`).join("")}</div>
-      ${lista()}
-      <div class="botones"><button class="btn" data-x>Cancelar</button><button class="btn pri" data-sig ${pct ? "" : "disabled"}>Continuar</button></div>`);
+    const ps = PCTS_PRES[modo] || [];
+    m.set(`<h3>Modificar presupuesto</h3><p class="mut">${its.length} para cambiar${fuera.length ? ` · ${fuera.length} no se tocan` : ""}. Siempre queda terminado en ,55.</p>
+      <div class="pct-pres" role="radiogroup" aria-label="Qué hacer">${[["subir", "Subir %"], ["bajar", "Bajar %"], ["fijo", "✏️ Monto fijo"]].map(([k, t]) => `<button type="button" class="btn chico${k === modo ? " pri" : ""}" role="radio" aria-checked="${k === modo}" data-modo="${k}">${t}</button>`).join("")}</div>
+      ${modo === "fijo" ? `<div class="pres-fijo"><label class="w-lbl" for="pres-fijo">Mismo presupuesto para ${its.length === 1 ? "la seleccionada" : `las ${its.length}`}</label>
+        <input class="campo num" id="pres-fijo" inputmode="decimal" autocomplete="off" placeholder="ej. 70" value="${fijo ? esc(NF2.format(fijo)) : ""}"><div class="mut" id="pres-fijo-tx"></div></div>`
+        : `<div class="pct-pres" role="radiogroup" aria-label="Porcentaje">${ps.map((p) => `<button type="button" class="btn chico${p === pct ? " pri" : ""}" role="radio" aria-checked="${p === pct}" data-pct="${p}">${modo === "bajar" ? "−" : "+"}${p} %</button>`).join("")}</div>`}
+      <div id="pres-lista">${lista()}</div>
+      <div class="botones"><button class="btn" data-x>Cancelar</button><button class="btn pri" data-sig ${listo() && its.length ? "" : "disabled"}>Continuar</button></div>`);
     $("[data-x]", m.dlg).onclick = m.cerrar;
+    $$("[data-modo]", m.dlg).forEach((b) => b.onclick = () => { modo = b.dataset.modo; if (pct && !(PCTS_PRES[modo] || []).includes(pct)) pct = null; paso1(); const f = $("#pres-fijo", m.dlg); (f || $(`[data-modo="${modo}"]`, m.dlg)).focus(); });
     $$("[data-pct]", m.dlg).forEach((b) => b.onclick = () => { pct = +b.dataset.pct; paso1(); $(`[data-pct="${pct}"]`, m.dlg).focus(); });
-    $("[data-sig]", m.dlg).onclick = () => pct && paso2();
+    const inp = $("#pres-fijo", m.dlg);
+    if (inp) {
+      const pinta = () => { const v = parseFloat(inp.value.replace(/\./g, "").replace(",", ".")); fijo = v >= 1 ? a55(v) : null;
+        $("#pres-fijo-tx", m.dlg).innerHTML = fijo ? `Queda en <b>${montoTx(fijo)}</b>` : inp.value ? `<span class="neg">Poné un monto válido (ej. 70)</span>` : "";
+        $("#pres-lista", m.dlg).innerHTML = lista(); $("[data-sig]", m.dlg).disabled = !(fijo && its.length); };
+      inp.oninput = pinta; pinta();
+      inp.onkeydown = (e) => { if (e.key === "Enter" && fijo) paso2(); };
+    }
+    $("[data-sig]", m.dlg).onclick = () => listo() && its.length && paso2();
   };
   const paso2 = () => {
-    m.set(`<h3>¿Seguro que querés subirlo +${pct} %?</h3>${lista()}${modoTx}
-      <div class="botones"><button class="btn" data-atras>Atrás</button><button class="btn pri" data-ok data-foco>Sí, subir +${pct} %</button></div>`);
+    m.set(`<h3>¿Seguro que querés ${verbo()}?</h3>${lista()}${modoTx}
+      <div class="botones"><button class="btn" data-atras>Atrás</button><button class="btn pri" data-ok data-foco>Sí, ${modo === "fijo" ? `poner ${montoTx(fijo)}` : `${modo === "bajar" ? "bajar −" : "subir +"}${pct} %`}</button></div>`);
     $("[data-atras]", m.dlg).onclick = paso1;
     $("[data-ok]", m.dlg).onclick = async (e) => {
       enviando = true;
-      const b = e.currentTarget; b.classList.add("cargando"); b.innerHTML = `<span class="gira">↻</span> Subiendo…`;
-      await aplicarPresupuesto({ pct, items: its });
+      const b = e.currentTarget; b.classList.add("cargando"); b.innerHTML = `<span class="gira">↻</span> Guardando…`;
+      await aplicarPresupuesto(modo === "fijo" ? { items: its.map((i) => ({ ...i, monto: fijo })), lote: true } : { pct: modo === "bajar" ? -pct : pct, items: its });
       enviando = false; m.cerrar();
     };
   };
@@ -972,7 +997,7 @@ function editarPresupuesto(it) {
     enviando = false; m.cerrar();
   };
 }
-async function aplicarPresupuesto({ pct = null, items }) {
+async function aplicarPresupuesto({ pct = null, items, lote = false }) {
   try {
     const r = await api("presupuesto", { body: { ...(pct ? { pct } : {}), items: items.map(({ id, act, nivel, nombre, monto }) => ({ id, act, nivel, nombre, ...(monto ? { monto } : {}) })) }, escritura: true });
     const res = r.resultados || [], ok = res.filter((x) => x.ok), mal = res.filter((x) => !x.ok);
@@ -982,9 +1007,9 @@ async function aplicarPresupuesto({ pct = null, items }) {
     if (simulado) toast(`<b>Modo prueba${DEMO ? " (demo)" : ""}:</b> Meta no se tocó. Habría quedado: ${esc(ok.map((x) => `${x.nombre} ${det(x)}`).join(" · "))}.${errTx}`, mal.length ? "error" : "ok", 9000);
     else {
       for (const x of ok) actualizarPresLocal(x);
-      toast(`${ok.length ? `✓ Presupuesto ${pct ? `+${pct} %` : "cambiado"} en ${ok.length}: ${esc(ok.map((x) => `${x.nombre} ${det(x)}`).join(" · "))}.` : ""}${errTx}`, mal.length ? "error" : "ok", 9000);
+      toast(`${ok.length ? `✓ Presupuesto ${pct ? `${pct > 0 ? "+" : "−"}${Math.abs(pct)} %` : "cambiado"} en ${ok.length}: ${esc(ok.map((x) => `${x.nombre} ${det(x)}`).join(" · "))}.` : ""}${errTx}`, mal.length ? "error" : "ok", 9000);
     }
-    if (pct && !mal.length) S.sel.clear();
+    if ((pct || lote) && !mal.length) S.sel.clear();
   } catch (e) {
     if (e.code === 401) { ls.del("dash_clave"); return login("Clave incorrecta"); }
     toast(`No se pudo: ${esc(e.message)}`, "error", 8000);
