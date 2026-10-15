@@ -480,6 +480,12 @@
     const per = p.get("periodo") || "hoy";
     if (accion === "dash") return JSON.parse(JSON.stringify(dash(per)));
     if (accion === "dash_detalle") return JSON.parse(JSON.stringify(detalle(p.get("id"), per)));
+    if (accion === "dash_paises") { // (15/10) ventas por país, inventadas a partir de las banderas del nombre
+      const c = ESTR.find((x) => x.id === p.get("id")); if (!c) return { paises: [] };
+      const ps = [...String(c.nombre).matchAll(/([\u{1F1E6}-\u{1F1FF}])([\u{1F1E6}-\u{1F1FF}])/gu)].map((m) => String.fromCharCode(m[1].codePointAt(0) - 0x1F1E6 + 65, m[2].codePointAt(0) - 0x1F1E6 + 65));
+      const lista = ps.length > 1 ? ps : /🌎/u.test(c.nombre) ? ["MX", "CO", "PE", "CL", "AR", "ES"] : ps;
+      return { periodo: per, paises: lista.map((x, i) => { const g = r2(80 / (i + 1) + (hash(c.id + x) % 9)); const v = i < 2 ? 3 - i : (hash(x) % 3 === 0 ? 1 : 0); const f = r2(v * 24.99); return { pais: x, gasto: g, ventas: v, facturacion: f, roas: g ? r2(f / g) : null }; }) };
+    }
     if (accion === "estado") {
       const resultados = (body.items || []).map((it) => {
         if (!ESTADOS.has(it.id)) return { id: it.id, ok: false, error: "no existe", estado: null };

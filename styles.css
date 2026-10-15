@@ -1091,3 +1091,13 @@ table.camp tbody tr.fila.sel td { background: var(--marca); }
 .burbuja-horas .bh-ar { display: flex; justify-content: space-between; gap: 14px; margin-top: 6px; padding-top: 6px; border-top: 1.5px dashed var(--linea); color: var(--mut); }
 .burbuja-horas .bh-x { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--mut); font-size: 13px; cursor: pointer; }
 .burbuja-horas .bh-x:hover { color: inherit; background: var(--papel-2); }
+/* (15/10) países ›: ventas por país de la campaña */
+.chip-sep { margin: 0 5px; color: var(--mut); font-size: 11px; }
+.burbuja-horas.bh-paises { max-width: min(360px, calc(100vw - 16px)); }
+.bh-cargando { display: flex; align-items: center; gap: 8px; padding-right: 24px; color: var(--mut); }
+.bh-tabla { border-collapse: collapse; width: calc(100% - 22px); font-size: 12.5px; }
+.bh-tabla th { font-weight: 600; font-size: 11px; color: var(--mut); text-align: right; padding: 0 0 4px 10px; }
+.bh-tabla th:first-child, .bh-tabla td:first-child { text-align: left; padding-left: 0; }
+.bh-tabla td { text-align: right; padding: 3px 0 3px 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bh-tabla tr.mal td { color: var(--peligro); }
+.bh-pie { margin-top: 6px; padding-top: 6px; border-top: 1.5px dashed var(--linea); font-size: 11px; color: var(--mut); }

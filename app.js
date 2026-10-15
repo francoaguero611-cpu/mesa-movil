@@ -134,7 +134,7 @@ async function api(accion, { q = "", body = null, escritura = false } = {}) {
 let demoP = null;
 function cargarDemo() {
   if (window.DemoAPI) return Promise.resolve();
-  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=32"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=33"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
   return demoP;
 }
 
@@ -604,7 +604,7 @@ function subCampana(c) {
   const p = [];
   if (c.cuenta) p.push(esc(c.cuenta));
   if (c.estrategia) p.push(estrat(c.estrategia));
-  const h = chipHora(c);
+  const h = [chipHora(c), chipPaises(c)].filter(Boolean).join(`<span class="chip-sep" aria-hidden="true">·</span>`);
   return p.join(" · ") + (h ? `<br>${h}` : "");
 }
 function subConjunto(s) {
@@ -708,25 +708,56 @@ function horasCampana(c) {
 // línea chiquita debajo del nombre: «ahora 22:10–05:10 ›»; al tocarla, la hora de cada país
 function txtHora(c) { const H = horasCampana(c); if (!H) return ""; return `ahora ${H.ini.h === H.fin.h ? H.ini.h : `${H.ini.h}–${H.fin.h}`}`; }
 function chipHora(c) { const t = txtHora(c); return t ? `<button type="button" class="hora-chip" data-hora="${esc(c.id)}" aria-label="Hora en cada país de ${esc(c.nombre)}">${t} ›</button>` : ""; }
-// burbuja al lado de la línea: un país por renglón con su hora; se va con la X, al sacar el mouse, tocando afuera, scroll o Escape
+// burbuja al lado de la línea (horas o países): se va con la X, al sacar el mouse, tocando afuera, scroll o Escape
 let burbujaHoras = null;
 function cerrarHoras() { if (burbujaHoras) { burbujaHoras.remove(); burbujaHoras = null; } }
-function verHoras(c, ancla) {
+function ubicarBurbuja(b) {
+  const r = b._ancla.getBoundingClientRect(), bw = b.offsetWidth, bh = b.offsetHeight;
+  const left = Math.min(Math.max(8, r.left), window.innerWidth - bw - 8);
+  let top = r.bottom + 2; if (top + bh > window.innerHeight - 8) top = Math.max(8, r.top - bh - 2);
+  b.style.left = left + "px"; b.style.top = top + "px";
+}
+function abrirBurbuja(ancla, clave, html, clase = "") {
+  if (burbujaHoras && burbujaHoras.dataset.k === clave) { cerrarHoras(); return null; } // tocar de nuevo la misma línea la cierra
   cerrarHoras();
+  const b = document.createElement("div");
+  b.className = "burbuja-horas " + clase; b.setAttribute("role", "dialog"); b.dataset.k = clave; b._ancla = ancla;
+  b.innerHTML = `<button type="button" class="bh-x" aria-label="Cerrar">✕</button><div class="bh-cuerpo">${html}</div>`;
+  document.body.appendChild(b); burbujaHoras = b; ubicarBurbuja(b);
+  $(".bh-x", b).onclick = (e) => { e.stopPropagation(); cerrarHoras(); };
+  b.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") cerrarHoras(); });
+  return b;
+}
+function verHoras(c, ancla) {
   const H = horasCampana(c); if (!H) return;
   const zona = (z) => z.split("/").pop().replace(/_/g, " ");
   const filas = H.zs.map((x) => `<li><span>${esc(nomPais(x.p))}${ZONAS_PAIS[x.p].length > 1 ? ` <small>(${esc(zona(x.z))})</small>` : ""}</span><b>${x.h}</b></li>`).join("");
-  const b = document.createElement("div");
-  b.className = "burbuja-horas"; b.setAttribute("role", "dialog"); b.setAttribute("aria-label", "Hora en cada país");
-  b.innerHTML = `<button type="button" class="bh-x" aria-label="Cerrar">✕</button><ul>${filas}</ul>${H.zs.some((x) => x.p === "AR") ? "" : `<div class="bh-ar">Argentina <b>${horaEn("America/Argentina/Buenos_Aires", new Date())}</b></div>`}`;
-  document.body.appendChild(b); burbujaHoras = b;
-  const r = ancla.getBoundingClientRect(), bw = b.offsetWidth, bh = b.offsetHeight;
-  let left = Math.min(Math.max(8, r.left), window.innerWidth - bw - 8);
-  let top = r.bottom + 2; if (top + bh > window.innerHeight - 8) top = Math.max(8, r.top - bh - 2);
-  b.style.left = left + "px"; b.style.top = top + "px";
-  $(".bh-x", b).onclick = (e) => { e.stopPropagation(); cerrarHoras(); };
-  b.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") cerrarHoras(); });
-  b._ancla = ancla;
+  const b = abrirBurbuja(ancla, "h:" + c.id, `<ul>${filas}</ul>${H.zs.some((x) => x.p === "AR") ? "" : `<div class="bh-ar">Argentina <b>${horaEn("America/Argentina/Buenos_Aires", new Date())}</b></div>`}`);
+  if (b) b.setAttribute("aria-label", "Hora en cada país");
+}
+// (15/10, Lorenzo) «países ›»: en campañas de varios países, gasto, ventas y ROAS por país (backend dash_paises: Meta por país +
+// ventas reales de Impultienda por país del comprador, la mayor). En rojo los que gastan sin vender o con ROAS < 1.
+const CACHE_PAISES = new Map();
+function chipPaises(c) { return paisesCampana(c).length > 1 ? `<button type="button" class="hora-chip" data-paises="${esc(c.id)}" aria-label="Ventas por país de ${esc(c.nombre)}">países ›</button>` : ""; }
+async function verPaises(c, ancla) {
+  const k = `${S.periodo}|${c.id}`;
+  const b = abrirBurbuja(ancla, "p:" + c.id, `<div class="bh-cargando"><span class="cargador"></span>Cargando países…</div>`, "bh-paises");
+  if (!b) return;
+  b.setAttribute("aria-label", "Ventas por país");
+  let d = CACHE_PAISES.get(k);
+  if (!d || Date.now() - d.t > 5 * 60e3) {
+    try { d = { t: Date.now(), r: await api("dash_paises", { q: `&id=${encodeURIComponent(c.id)}&act=${encodeURIComponent(c.act)}&periodo=${encodeURIComponent(S.periodo)}` }) }; CACHE_PAISES.set(k, d); }
+    catch (e) { if (burbujaHoras === b) { $(".bh-cuerpo", b).innerHTML = `<div class="neg">No se pudo: ${esc(e.message)}</div>`; ubicarBurbuja(b); } return; }
+  }
+  if (burbujaHoras !== b) return;
+  const ps = d.r.paises || [];
+  const mal = (p) => p.gasto > 0 && (!p.ventas || (p.roas ?? 0) < 1);
+  const roasTx2 = (r) => nulo(r) ? "—" : NF2.format(r);
+  $(".bh-cuerpo", b).innerHTML = ps.length ? `<table class="bh-tabla"><thead><tr><th>País</th><th>Gasto</th><th>Ventas</th><th>ROAS</th></tr></thead><tbody>
+      ${ps.map((p) => `<tr class="${mal(p) ? "mal" : ""}"><td>${esc(nomPais(p.pais))}</td><td>${NF2.format(p.gasto)}</td><td>${p.ventas}</td><td>${p.ventas ? roasTx2(p.roas) : "—"}</td></tr>`).join("")}</tbody></table>
+      <div class="bh-pie">En rojo: gasta sin vender o ROAS menor a 1. Ventas: la mayor entre pixel e Impultienda.</div>`
+    : `<div class="mut">Sin gasto por país en este período.</div>`;
+  ubicarBurbuja(b);
 }
 // con mouse: si se aleja de la línea y de la burbuja (sin entrar a la burbuja), también se cierra
 document.addEventListener("pointermove", (e) => {
@@ -734,7 +765,7 @@ document.addEventListener("pointermove", (e) => {
   const dentro = (r, m) => e.clientX >= r.left - m && e.clientX <= r.right + m && e.clientY >= r.top - m && e.clientY <= r.bottom + m;
   if (!dentro(burbujaHoras.getBoundingClientRect(), 4) && !dentro(burbujaHoras._ancla.getBoundingClientRect(), 8)) cerrarHoras();
 }, { passive: true });
-document.addEventListener("pointerdown", (e) => { if (burbujaHoras && !burbujaHoras.contains(e.target) && !e.target.closest("[data-hora]")) cerrarHoras(); }, true);
+document.addEventListener("pointerdown", (e) => { if (burbujaHoras && !burbujaHoras.contains(e.target) && !e.target.closest("[data-hora], [data-paises]")) cerrarHoras(); }, true);
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") cerrarHoras(); });
 window.addEventListener("scroll", cerrarHoras, { passive: true });
 setInterval(() => {
@@ -833,7 +864,9 @@ function clickTabla(e) {
   const reint = e.target.closest("[data-reint]");
   if (reint) { const c = campanaPorId(reint.dataset.reint); if (c) cargarDetalle(c, true); return; }
   const hb = e.target.closest("[data-hora]");
-  if (hb) { const c = campanaPorId(hb.dataset.hora); if (c) (burbujaHoras && burbujaHoras.dataset.c === c.id) ? cerrarHoras() : (verHoras(c, hb), burbujaHoras && (burbujaHoras.dataset.c = c.id)); return; }
+  if (hb) { const c = campanaPorId(hb.dataset.hora); if (c) verHoras(c, hb); return; }
+  const pb = e.target.closest("[data-paises]");
+  if (pb) { const c = campanaPorId(pb.dataset.paises); if (c) verPaises(c, pb); return; }
   const lp = e.target.closest("[data-pres]");
   if (lp) { const it = buscarItem(lp.dataset.pres); if (it) editarPresupuesto(it); return; }
   const tg = e.target.closest("[data-tg]");
