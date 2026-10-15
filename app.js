@@ -568,7 +568,7 @@ const COLS = [
 ];
 const colsOcultas = (() => { try { return new Set(JSON.parse(ls.get("dash_cols_ocultas", "[]"))); } catch { return new Set(); } })();
 const colsVisibles = () => COLS.filter((c) => !colsOcultas.has(c[0]));
-const nCols = () => 1 + colsVisibles().length;
+const nCols = () => 2 + colsVisibles().length; // nombre + métricas + «Hora allá»
 // (14/10) lapicito: campaña CBO o conjunto ABO (donde vive el presupuesto diario)
 const editaPres = (x, nivel) => x.presupuesto != null && ((nivel === "campana" && x.tipo_presupuesto === "CBO") || (nivel === "conjunto" && x.tipo_presupuesto === "ABO"));
 function celdas(x, nivel) {
@@ -598,7 +598,7 @@ function fila({ nivel, n, x, act, sub, abrible, abierto, extraEstado }) {
       ${abrible ? `<button type="button" class="tg" data-tg="${esc((nivel === "campana" ? "c:" : "s:") + x.id)}" aria-expanded="${abierto}" aria-label="${abierto ? "Ocultar" : "Ver"} ${etiquetaTg} de ${esc(x.nombre)}"><span aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9.5 5.5 C 12 8, 14 10.5, 15.5 12.2 C 13.6 14, 11.6 16.4, 9.2 18.6" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>` : `<span class="tg-hueco" aria-hidden="true"></span>`}
       ${dotEstado(x.estado)}
       <div class="txt"><span class="niv-tag niv-${nivel}">${NIVEL[nivel][0]}</span><div class="n">${esc(x.nombre)}${raro}</div>${sub ? `<div class="sub">${sub}</div>` : ""}</div>
-    </div></td>${celdas(x, nivel)}</tr>`;
+    </div></td>${celdas(x, nivel)}${nivel === "campana" ? celdaHora(x).replace("<td ", `<td data-c="${esc(x.id)}" `) : `<td class="hora-loc"></td>`}</tr>`;
 }
 function subCampana(c) {
   const p = [];
@@ -640,6 +640,7 @@ function ubicarCabFlotante() {
   th.forEach((x, i) => { if (fth[i]) { const w = x.getBoundingClientRect().width + "px"; fth[i].style.width = w; fth[i].style.minWidth = w; fth[i].style.maxWidth = w; } });
   ft.style.transform = `translateX(${-sc.scrollLeft}px)`;
   if (fth[0]) fth[0].style.transform = `translateX(${sc.scrollLeft}px)`; // la columna «Campaña» queda fija a la izquierda
+  const ult = fth[fth.length - 1]; if (ult && fth.length > 1) ult.style.transform = `translateX(${-(tb.getBoundingClientRect().width - sc.clientWidth - sc.scrollLeft)}px)`; // «Hora allá» fija a la derecha
 }
 // (14/10, Lorenzo) Fila de resultados totales al final, como en Meta, y pegada abajo de la pantalla (celu y compu).
 // Suma las campañas que se ven (respeta grupo y «ver apagadas»); las tasas se recalculan con los totales.
@@ -661,9 +662,62 @@ function totalesDe(xs) {
   t.frecuencia = null; // el alcance no se puede sumar entre campañas
   return t;
 }
+// (15/10, Lorenzo) «Hora allá»: columna fija a la derecha con la hora local del mercado de cada campaña, del país más temprano
+// al más tarde, para no leer como «viene mal» algo que allá es de madrugada. Países = banderas del nombre de la campaña
+// (🌎 = LATAM); si no tiene, la bandera del grupo (oferta × mercado). Países grandes con varias zonas: la del este y la del oeste.
+const ZONAS_PAIS = {
+  AR: ["America/Argentina/Buenos_Aires"], MX: ["America/Mexico_City"], CO: ["America/Bogota"], PE: ["America/Lima"], CL: ["America/Santiago"], EC: ["America/Guayaquil"],
+  BO: ["America/La_Paz"], VE: ["America/Caracas"], UY: ["America/Montevideo"], PY: ["America/Asuncion"], GT: ["America/Guatemala"], CR: ["America/Costa_Rica"],
+  SV: ["America/El_Salvador"], HN: ["America/Tegucigalpa"], NI: ["America/Managua"], PA: ["America/Panama"], DO: ["America/Santo_Domingo"], PR: ["America/Puerto_Rico"],
+  CU: ["America/Havana"], ES: ["Europe/Madrid"], US: ["America/New_York", "America/Los_Angeles"], CA: ["America/Toronto", "America/Vancouver"], GB: ["Europe/London"],
+  IE: ["Europe/Dublin"], AU: ["Australia/Sydney", "Australia/Perth"], NZ: ["Pacific/Auckland"], ZA: ["Africa/Johannesburg"], KE: ["Africa/Nairobi"], GH: ["Africa/Accra"],
+  NG: ["Africa/Lagos"], UG: ["Africa/Kampala"], TZ: ["Africa/Dar_es_Salaam"], ZM: ["Africa/Lusaka"], BW: ["Africa/Gaborone"], NA: ["Africa/Windhoek"], RW: ["Africa/Kigali"],
+  ZW: ["Africa/Harare"], MW: ["Africa/Blantyre"], ET: ["Africa/Addis_Ababa"], SA: ["Asia/Riyadh"], AE: ["Asia/Dubai"], KW: ["Asia/Kuwait"], QA: ["Asia/Qatar"], BH: ["Asia/Bahrain"],
+  OM: ["Asia/Muscat"], EG: ["Africa/Cairo"], MA: ["Africa/Casablanca"], DZ: ["Africa/Algiers"], TN: ["Africa/Tunis"], JO: ["Asia/Amman"], LB: ["Asia/Beirut"], IQ: ["Asia/Baghdad"],
+  FR: ["Europe/Paris"], BE: ["Europe/Brussels"], LU: ["Europe/Luxembourg"], MC: ["Europe/Monaco"], CH: ["Europe/Zurich"], IT: ["Europe/Rome"], SM: ["Europe/San_Marino"], MT: ["Europe/Malta"],
+  DE: ["Europe/Berlin"], AT: ["Europe/Vienna"], LI: ["Europe/Vaduz"], BR: ["America/Sao_Paulo"], PT: ["Europe/Lisbon"], AO: ["Africa/Luanda"], MZ: ["Africa/Maputo"], NL: ["Europe/Amsterdam"],
+  SE: ["Europe/Stockholm"], DK: ["Europe/Copenhagen"], NO: ["Europe/Oslo"], FI: ["Europe/Helsinki"], IS: ["Atlantic/Reykjavik"], PH: ["Asia/Manila"], MY: ["Asia/Kuala_Lumpur"],
+  SG: ["Asia/Singapore"], ID: ["Asia/Jakarta"], TH: ["Asia/Bangkok"], IN: ["Asia/Kolkata"], PL: ["Europe/Warsaw"], RO: ["Europe/Bucharest"], GR: ["Europe/Athens"], TR: ["Europe/Istanbul"],
+  IL: ["Asia/Jerusalem"], JP: ["Asia/Tokyo"], KR: ["Asia/Seoul"], CN: ["Asia/Shanghai"], TW: ["Asia/Taipei"], HK: ["Asia/Hong_Kong"], CZ: ["Europe/Prague"], HU: ["Europe/Budapest"],
+};
+const LATAM_PAISES = ["MX", "CO", "PE", "CL", "AR", "ES"];
+const banderasDe = (txt) => {
+  const out = [];
+  for (const m of String(txt || "").matchAll(/([\u{1F1E6}-\u{1F1FF}])([\u{1F1E6}-\u{1F1FF}])/gu)) out.push(String.fromCharCode(m[1].codePointAt(0) - 0x1F1E6 + 65, m[2].codePointAt(0) - 0x1F1E6 + 65));
+  if (/🌎|🌍|🌏/u.test(String(txt || ""))) out.push(...LATAM_PAISES);
+  return [...new Set(out)];
+};
+function paisesCampana(c) {
+  let ps = banderasDe(c.nombre).filter((p) => ZONAS_PAIS[p]);
+  if (!ps.length) { const g = (S.datos[S.periodo]?.grupos || []).find((x) => x.clave === c.grupo); ps = banderasDe(g?.bandera).filter((p) => ZONAS_PAIS[p]); }
+  return ps;
+}
+const FMT_HORA = new Map();
+const horaEn = (zona, d) => { let f = FMT_HORA.get(zona); if (!f) { f = new Intl.DateTimeFormat("es-AR", { timeZone: zona, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }); FMT_HORA.set(zona, f); } return f.format(d); };
+const minutosEn = (zona, d) => { const [h, m] = horaEn(zona, d).split(":").map(Number); return h * 60 + m; };
+// diferencia en minutos con la hora de AR (puede cruzar el día: se ordena por diferencia, no por reloj)
+function difConAR(zona, d) { const ar = minutosEn("America/Argentina/Buenos_Aires", d); let x = minutosEn(zona, d) - ar; if (x > 720) x -= 1440; if (x < -720) x += 1440; return x; }
+const NOCHE = (min) => min < 6 * 60; // 00:00 a 05:59
+function celdaHora(c) {
+  const ps = paisesCampana(c); if (!ps.length) return `<td class="hora-loc"><span class="mut">—</span></td>`;
+  const d = new Date();
+  const zs = ps.flatMap((p) => ZONAS_PAIS[p].map((z) => ({ p, z, dif: difConAR(z, d), h: horaEn(z, d), min: minutosEn(z, d) }))).sort((a, b) => a.dif - b.dif);
+  const ini = zs[0], fin = zs[zs.length - 1];
+  const noches = zs.filter((x) => NOCHE(x.min)).length;
+  const ico = noches === zs.length ? "🌙" : noches ? "🌗" : "";
+  const detalle = [...new Map(zs.map((x) => [x.p + x.h, `${x.p} ${x.h}`])).values()].join(" · ");
+  const rango = ini.h === fin.h ? ini.h : `${ini.h}–${fin.h}`;
+  return `<td class="hora-loc${noches === zs.length ? " noche" : ""}" title="Hora local: ${esc(detalle)}"><span class="hl-r">${ico ? `<span aria-hidden="true">${ico}</span> ` : ""}${rango}</span><span class="hl-p">${ini.p === fin.p ? esc(ini.p) : `${esc(ini.p)}→${esc(fin.p)}`}</span></td>`;
+}
+// refresco cada minuto sin repintar la tabla
+setInterval(() => {
+  if (document.hidden || S.vista !== "dash") return;
+  for (const td of $$("#tabla-scroll td.hora-loc[data-c]")) { const c = campanaPorId(td.dataset.c); if (c) { const t = document.createElement("tbody"); t.innerHTML = `<tr>${celdaHora(c)}</tr>`; const n = t.querySelector("td"); n.dataset.c = td.dataset.c; td.replaceWith(n); } }
+  ubicarCabFlotante(); ubicarPieFlotante();
+}, 60000);
 function filaTotal(xs) {
   const n = xs.length;
-  return `<tr class="fila-total"><td class="nom"><div class="nomwrap"><div class="txt"><div class="n">Resultados totales</div><div class="sub">${n} campaña${n === 1 ? "" : "s"}</div></div></div></td>${celdas(totalesDe(xs))}</tr>`;
+  return `<tr class="fila-total"><td class="nom"><div class="nomwrap"><div class="txt"><div class="n">Resultados totales</div><div class="sub">${n} campaña${n === 1 ? "" : "s"}</div></div></div></td>${celdas(totalesDe(xs))}<td class="hora-loc"></td></tr>`;
 }
 function armarPieFlotante() {
   const sc = $("#tabla-scroll"), tf = sc && $("table.camp tfoot", sc);
@@ -690,6 +744,7 @@ function ubicarPieFlotante() {
   td.forEach((x, i) => { if (ftd[i]) { const w = x.getBoundingClientRect().width + "px"; ftd[i].style.width = w; ftd[i].style.minWidth = w; ftd[i].style.maxWidth = w; } });
   ft.style.transform = `translateX(${-sc.scrollLeft}px)`;
   if (ftd[0]) ftd[0].style.transform = `translateX(${sc.scrollLeft}px)`;
+  const ult = ftd[ftd.length - 1]; if (ult && ftd.length > 1) ult.style.transform = `translateX(${-(rt.width - sc.clientWidth - sc.scrollLeft)}px)`;
 }
 window.addEventListener("scroll", () => { ubicarCabFlotante(); ubicarPieFlotante(); }, { passive: true });
 window.addEventListener("resize", () => { ubicarCabFlotante(); ubicarPieFlotante(); });
@@ -702,7 +757,7 @@ function pintarTabla() {
   if (!d || !xs.length) { const pf = $("#pie-flotante"); if (pf) pf.hidden = true; }
   if (!d) { cont.innerHTML = `<div class="vacio">${S.cargando ? `<span class="cargador"></span>Cargando campañas…` : "Sin datos."}</div>`; return; }
   if (!xs.length) { cont.innerHTML = `<div class="vacio">${ocultas ? `No hay campañas prendidas en este grupo. <button class="link" type="button" id="b-ver-ap">Ver las ${ocultas} apagadas</button>` : "No hay campañas en este grupo para este período."}</div>`; const b = $("#b-ver-ap"); if (b) b.onclick = () => $("#t-apagadas").click(); return; }
-  let h = `<table class="camp"><thead><tr><th class="nom" scope="col">Campaña</th>${colsVisibles().map(([k, t]) => `<th scope="col" class="c-${k}">${esc(t)}</th>`).join("")}</tr></thead><tbody>`;
+  let h = `<table class="camp"><thead><tr><th class="nom" scope="col">Campaña</th>${colsVisibles().map(([k, t]) => `<th scope="col" class="c-${k}">${esc(t)}</th>`).join("")}<th scope="col" class="hora-loc" title="Hora local del mercado: del país más temprano al más tarde. 🌙 = allá es de madrugada">Hora allá</th></tr></thead><tbody>`;
   for (const c of xs) {
     const ab = S.open.has("c:" + c.id);
     h += fila({ nivel: "campana", n: 0, x: c, act: c.act, sub: subCampana(c), abrible: true, abierto: ab });

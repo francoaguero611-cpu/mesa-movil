@@ -1079,3 +1079,16 @@ table.camp tbody tr.fila.sel td { background: var(--marca); }
 .hz-met { font-size: 12.5px; color: var(--mut); }
 .hz-res { padding: 8px 10px; border: 1.5px solid var(--linea); border-radius: 10px; overflow-wrap: anywhere; }
 .hz-res.mal { border-color: var(--neg, #c0392b); }
+
+/* (15/10) «Hora allá»: hora local del mercado, columna fija a la derecha */
+.camp td.hora-loc, .camp th.hora-loc { position: sticky; right: 0; z-index: 1; text-align: center; padding-left: 10px; padding-right: 10px; min-width: 92px; box-shadow: -6px 0 6px -6px color-mix(in srgb, var(--tinta) 30%, transparent); }
+.camp th.hora-loc { z-index: 2; }
+.camp td.hora-loc .hl-r { display: block; font-variant-numeric: tabular-nums; font-weight: 700; font-size: 13px; }
+.camp td.hora-loc .hl-p { display: block; font-size: 10.5px; color: var(--mut); letter-spacing: .3px; }
+.camp td.hora-loc.noche .hl-r { color: var(--mut); }
+@media (max-width: 520px) {
+  .camp td.hora-loc, .camp th.hora-loc { min-width: 70px; padding-left: 6px; padding-right: 6px; }
+  .camp th.hora-loc { font-size: 12px; white-space: normal; }
+  .camp td.hora-loc .hl-r { font-size: 11.5px; }
+}
+.pie-flotante td.hora-loc, .cab-flotante th.hora-loc { position: relative; right: auto; z-index: 2; }
