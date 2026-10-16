@@ -1101,3 +1101,7 @@ table.camp tbody tr.fila.sel td { background: var(--marca); }
 .bh-tabla td { text-align: right; padding: 3px 0 3px 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .bh-tabla tr.mal td { color: var(--peligro); }
 .bh-pie { margin-top: 6px; padding-top: 6px; border-top: 1.5px dashed var(--linea); font-size: 11px; color: var(--mut); }
+
+/* (16/10) filtros de la tabla: búsqueda por nombre y «solo seleccionadas» */
+.filtro-camp { margin: -4px 0 12px; }
+input.campo.f-buscar { font-size: 16px; padding: 9px 12px; max-width: 460px; }

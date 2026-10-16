@@ -101,6 +101,8 @@ const S = {
   open: new Set(),           // "c:id" | "s:id"
   sel: new Map(),            // "nivel:id" -> {id, act, nivel, nombre, estado}
   verApagadas: ls.get("dash_ver_apagadas") === "1",
+  buscar: "",                // (16/10) filtro por nombre (campaña, conjunto o anuncio)
+  soloSel: false,            // (16/10) mostrar solo lo seleccionado
   dir: 0,
   vista: "dash",             // "dash" | "reglas" | "ranking" | "login"
 };
@@ -329,6 +331,7 @@ async function cargar(forzar = false) {
   pintarTodo();
   // recargar detalles abiertos
   for (const k of S.open) if (k.startsWith("c:")) { const c = campanaPorId(k.slice(2)); if (c) cargarDetalle(c); }
+  if (S.soloSel) { abrirPadresSel(); pintarTabla(); }
 }
 function grupos() {
   const d = S.datos[S.periodo];
@@ -385,8 +388,9 @@ function montar() {
     <section class="seccion-camp" aria-labelledby="t-camp">
       <div class="cab-tabla">
         <h2 id="t-camp">Campañas <small id="n-camp"></small></h2>
-        <span class="cab-der"><button type="button" class="btn chico" id="b-cols" aria-haspopup="dialog">Columnas</button><button type="button" class="toggle-chico" role="switch" id="t-apagadas" aria-checked="${S.verApagadas}"><span class="mini" aria-hidden="true"></span><span id="t-apagadas-tx">ver apagadas</span></button></span>
+        <span class="cab-der"><button type="button" class="toggle-chico" role="switch" id="t-solosel" aria-checked="${S.soloSel}"><span class="mini" aria-hidden="true"></span><span id="t-solosel-tx">solo seleccionadas</span></button><button type="button" class="btn chico" id="b-cols" aria-haspopup="dialog">Columnas</button><button type="button" class="toggle-chico" role="switch" id="t-apagadas" aria-checked="${S.verApagadas}"><span class="mini" aria-hidden="true"></span><span id="t-apagadas-tx">ver apagadas</span></button></span>
       </div>
+      <div class="filtro-camp"><label class="sr" for="f-buscar">Buscar por nombre</label><input type="search" id="f-buscar" class="campo f-buscar" placeholder="Buscar campaña, conjunto o anuncio…" autocomplete="off" value="${esc(S.buscar)}"></div>
       <div class="tabla-caja boceto"><div class="tabla-scroll" id="tabla-scroll"></div></div>
     </section>`;
   $$("[data-per]").forEach((b) => b.onclick = () => cambiarPeriodo(b.dataset.per));
@@ -395,6 +399,9 @@ function montar() {
   $("#b-next").onclick = () => paso(1);
   $("#b-cols").onclick = elegirColumnas; pintarBotonCols();
   $("#t-apagadas").onclick = () => { S.verApagadas = !S.verApagadas; ls.set("dash_ver_apagadas", S.verApagadas ? "1" : "0"); $("#t-apagadas").setAttribute("aria-checked", S.verApagadas); pintarTabla(); };
+  $("#t-solosel").onclick = alternarSoloSel;
+  let tb = null;
+  $("#f-buscar").oninput = (e) => { clearTimeout(tb); tb = setTimeout(() => { S.buscar = e.target.value; pintarTabla(); }, 150); };
   gestosCarrusel($("#carr"));
   $("#tabla-scroll").addEventListener("click", clickTabla);
   $("#tabla-scroll").addEventListener("keydown", teclaTabla);
@@ -510,10 +517,11 @@ document.addEventListener("keydown", (e) => {
 async function cambiarPeriodo(p) {
   if (p === "rango") { const r = await elegirRango(S.periodo); if (!r) return; p = r; }
   if (p === S.periodo) return;
-  S.periodo = p; S.sel.clear();
+  S.periodo = p;   // (16/10) la selección se mantiene al cambiar de fecha
   if (S.datos[p]) { ajustarIdx(); pintarTodo(); }
   else { pintarTodo(); cargar(); }
   for (const k of S.open) if (k.startsWith("c:") && S.datos[p]) { const c = campanaPorId(k.slice(2)); if (c) cargarDetalle(c); }
+  if (S.soloSel && S.datos[p]) { abrirPadresSel(); pintarTabla(); }
 }
 
 // ---------- tabla ----------
@@ -527,12 +535,51 @@ function dotEstado(e) {
   const cls = on ? "on" : (e === "PAUSED" || e === "CAMPAIGN_PAUSED" || e === "ADSET_PAUSED" || e === "ARCHIVED") ? "off" : "raro";
   return `<span class="dot ${cls}" role="img" aria-label="${on ? "prendido" : esc(ESTADOS[e] || String(e || "").toLowerCase())}" title="${on ? "Prendido" : esc(ESTADOS[e] || e)}"></span>`;
 }
+// (16/10) Filtros: «solo seleccionadas» (ignora grupo y apagadas: muestra todo lo tildado) y búsqueda por nombre.
+const normTx = (t) => String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+const coincide = (x) => !S.buscar.trim() || normTx(x.nombre).includes(normTx(S.buscar.trim()));
+const detDe = (c) => S.det.get(`${S.periodo}|${c.id}`)?.data?.conjuntos || [];
+const selAd = (a) => S.sel.has("anuncio:" + a.id);
+const selCj = (s) => S.sel.has("conjunto:" + s.id) || [...S.sel.values()].some((v) => v.nivel === "anuncio" && v.cj === s.id) || (s.anuncios || []).some(selAd);
+const selCamp = (c) => S.sel.has("campana:" + c.id) || [...S.sel.values()].some((v) => v.camp === c.id) || detDe(c).some(selCj);
+// conjuntos/anuncios a mostrar dentro de una campaña/conjunto abiertos
+function filtrarConjuntos(c, cjs) {
+  if (S.soloSel && !S.sel.has("campana:" + c.id)) cjs = cjs.filter(selCj);
+  if (S.buscar.trim() && !coincide(c)) cjs = cjs.filter((s) => coincide(s) || (s.anuncios || []).some(coincide));
+  return cjs;
+}
+function filtrarAnuncios(c, s, ads) {
+  if (S.soloSel && !S.sel.has("campana:" + c.id) && !S.sel.has("conjunto:" + s.id)) ads = ads.filter(selAd);
+  if (S.buscar.trim() && !coincide(c) && !coincide(s)) ads = ads.filter(coincide);
+  return ads;
+}
+function alternarSoloSel() {
+  if (!S.soloSel && !S.sel.size) return toast("Primero tocá las campañas, conjuntos o anuncios que querés ver.", "error");
+  S.soloSel = !S.soloSel;
+  if (S.soloSel) abrirPadresSel();
+  pintarSoloSel(); pintarTabla();
+}
+// abre las campañas/conjuntos que tienen algo tildado adentro, para que se vea
+function abrirPadresSel() {
+  for (const c of S.datos[S.periodo]?.campanas || []) {
+    if (S.sel.has("campana:" + c.id) || !selCamp(c)) continue;
+    if (!S.open.has("c:" + c.id)) { S.open.add("c:" + c.id); cargarDetalle(c); }
+    for (const s of detDe(c)) if (!S.sel.has("conjunto:" + s.id) && (s.anuncios || []).some(selAd)) S.open.add("s:" + s.id);
+  }
+}
+function pintarSoloSel() {
+  if (S.soloSel && !S.sel.size) S.soloSel = false;
+  const t = $("#t-solosel"); if (!t) return;
+  t.setAttribute("aria-checked", S.soloSel);
+  $("#t-solosel-tx").textContent = `solo seleccionadas${S.sel.size ? ` (${S.sel.size})` : ""}`;
+}
 function campanasVisibles() {
   const d = S.datos[S.periodo]; if (!d) return { xs: [], ocultas: 0 };
+  if (S.soloSel) return { xs: (d.campanas || []).filter(selCamp).filter((c) => !S.buscar.trim() || coincide(c) || detDe(c).some((s) => coincide(s) || (s.anuncios || []).some(coincide))).sort(ordenRoas), ocultas: 0, filtro: true };
   const g = grupoActual();
   const delGrupo = (d.campanas || []).filter((c) => g.clave === "todas" || c.grupo === g.clave);
-  const xs = delGrupo.filter((c) => S.verApagadas || prendido(c.estado)).sort(ordenRoas);
-  return { xs, ocultas: delGrupo.length - delGrupo.filter((c) => prendido(c.estado)).length };
+  const xs = delGrupo.filter((c) => S.verApagadas || prendido(c.estado)).filter((c) => !S.buscar.trim() || coincide(c) || detDe(c).some((s) => coincide(s) || (s.anuncios || []).some(coincide))).sort(ordenRoas);
+  return { xs, ocultas: delGrupo.length - delGrupo.filter((c) => prendido(c.estado)).length, filtro: !!S.buscar.trim() };
 }
 const NF1 = new Intl.NumberFormat("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const nulo = (n) => n == null || (typeof n === "number" && isNaN(n));
@@ -807,11 +854,13 @@ window.addEventListener("resize", () => { ubicarCabFlotante(); ubicarPieFlotante
 function pintarTabla() {
   const cont = $("#tabla-scroll"); if (!cont) return;
   const d = S.datos[S.periodo];
-  const { xs, ocultas } = campanasVisibles();
-  $("#n-camp").textContent = d ? `${xs.length} ${S.verApagadas ? "" : "prendida" + (xs.length === 1 ? "" : "s")}`.trim() : "";
+  const { xs, ocultas, filtro } = campanasVisibles();
+  pintarSoloSel();
+  $("#n-camp").textContent = d ? (S.soloSel ? `${xs.length} seleccionada${xs.length === 1 ? "" : "s"}` : `${xs.length} ${S.verApagadas ? "" : "prendida" + (xs.length === 1 ? "" : "s")}`.trim()) : "";
   $("#t-apagadas-tx").textContent = `ver apagadas${ocultas ? ` (${ocultas})` : ""}`;
   if (!d || !xs.length) { const pf = $("#pie-flotante"); if (pf) pf.hidden = true; }
   if (!d) { cont.innerHTML = `<div class="vacio">${S.cargando ? `<span class="cargador"></span>Cargando campañas…` : "Sin datos."}</div>`; return; }
+  if (!xs.length && (filtro || S.soloSel)) { cont.innerHTML = `<div class="vacio">${S.soloSel ? "Lo seleccionado no tiene datos en este período." : "Ninguna campaña coincide con la búsqueda."} <button class="link" type="button" id="b-sin-filtro">Quitar filtros</button></div>`; $("#b-sin-filtro").onclick = quitarFiltros; return; }
   if (!xs.length) { cont.innerHTML = `<div class="vacio">${ocultas ? `No hay campañas prendidas en este grupo. <button class="link" type="button" id="b-ver-ap">Ver las ${ocultas} apagadas</button>` : "No hay campañas en este grupo para este período."}</div>`; const b = $("#b-ver-ap"); if (b) b.onclick = () => $("#t-apagadas").click(); return; }
   let h = `<table class="camp"><thead><tr><th class="nom" scope="col">Campaña</th>${colsVisibles().map(([k, t]) => `<th scope="col" class="c-${k}">${esc(t)}</th>`).join("")}</tr></thead><tbody>`;
   for (const c of xs) {
@@ -822,13 +871,13 @@ function pintarTabla() {
     if (!det || det.st === "cargando") { h += `<tr class="fila-info"><td colspan="${nCols()}"><div class="nomwrap"><span class="cargador"></span>Cargando conjuntos…</div></td></tr>`; continue; }
     if (det.st === "error") { const lim = /limit|cupo|too many|request limit/i.test(det.error || ""); h += `<tr class="fila-info"><td colspan="${nCols()}"><div class="nomwrap"><span class="neg">${lim ? "Meta está sin cupo de consultas en esta cuenta. Probá en unos minutos." : "No se pudo cargar: " + esc(det.error)}</span> <button class="link" type="button" data-reint="${esc(c.id)}">Reintentar</button></div></td></tr>`; continue; }
     if (det.data?.aviso) h += `<tr class="fila-info"><td colspan="${nCols()}"><div class="nomwrap"><span class="mut">⚠ ${esc(det.data.aviso)}${det.data.cache?.hora && !/datos de las/i.test(det.data.aviso) ? ` · datos de las ${esc(String(det.data.cache.hora))}` : ""}</span> <button class="link" type="button" data-reint="${esc(c.id)}">Reintentar</button></div></td></tr>`;
-    const cjs = [...(det.data.conjuntos || [])].sort(ordenRoas);
+    const cjs = filtrarConjuntos(c, [...(det.data.conjuntos || [])]).sort(ordenRoas);
     if (!cjs.length) h += `<tr class="fila-info"><td colspan="${nCols()}"><div class="nomwrap">Sin conjuntos con datos en este período.</div></td></tr>`;
     for (const s of cjs) {
       const abS = S.open.has("s:" + s.id);
       h += fila({ nivel: "conjunto", n: 1, x: s, act: c.act, sub: subConjunto(s), abrible: true, abierto: abS });
       if (!abS) continue;
-      const ads = [...(s.anuncios || [])].sort(ordenRoas);
+      const ads = filtrarAnuncios(c, s, [...(s.anuncios || [])]).sort(ordenRoas);
       if (!ads.length) h += `<tr class="fila-info"><td colspan="${nCols()}"><div class="nomwrap">Sin anuncios con datos.</div></td></tr>`;
       for (const a of ads) {
         const sub = a.post ? `<a href="https://www.facebook.com/${esc(a.post)}" target="_blank" rel="noopener" data-nosel>ver post ↗</a>` : "";
@@ -839,6 +888,7 @@ function pintarTabla() {
   cont.innerHTML = h + `</tbody><tfoot>${filaTotal(xs)}</tfoot></table>`;
   armarCabFlotante(); armarPieFlotante();
 }
+function quitarFiltros() { S.soloSel = false; S.buscar = ""; const f = $("#f-buscar"); if (f) f.value = ""; pintarTabla(); }
 function buscarItem(k) {
   const [nivel, id] = [k.slice(0, k.indexOf(":")), k.slice(k.indexOf(":") + 1)];
   const d = S.datos[S.periodo];
@@ -846,8 +896,8 @@ function buscarItem(k) {
   for (const c of d?.campanas || []) {
     const det = S.det.get(`${S.periodo}|${c.id}`);
     for (const s of det?.data?.conjuntos || []) {
-      if (nivel === "conjunto" && s.id === id) return { nivel, id, act: c.act, nombre: s.nombre, estado: s.estado, ref: s };
-      if (nivel === "anuncio") { const a = (s.anuncios || []).find((y) => y.id === id); if (a) return { nivel, id, act: c.act, nombre: a.nombre, estado: a.estado, ref: a }; }
+      if (nivel === "conjunto" && s.id === id) return { nivel, id, act: c.act, nombre: s.nombre, estado: s.estado, ref: s, camp: c.id };
+      if (nivel === "anuncio") { const a = (s.anuncios || []).find((y) => y.id === id); if (a) return { nivel, id, act: c.act, nombre: a.nombre, estado: a.estado, ref: a, camp: c.id, cj: s.id }; }
     }
   }
   return null;
@@ -855,9 +905,10 @@ function buscarItem(k) {
 function alternarSel(tr) {
   const k = tr.dataset.k;
   if (S.sel.has(k)) S.sel.delete(k);
-  else { const it = buscarItem(k); if (it) S.sel.set(k, { id: it.id, act: it.act, nivel: it.nivel, nombre: it.nombre, estado: it.estado }); }
+  else { const it = buscarItem(k); if (it) S.sel.set(k, { id: it.id, act: it.act, nivel: it.nivel, nombre: it.nombre, estado: it.estado, camp: it.camp, cj: it.cj }); }
   const sel = S.sel.has(k);
   tr.classList.toggle("sel", sel); tr.setAttribute("aria-selected", sel);
+  if (S.soloSel) pintarTabla(); else pintarSoloSel();
   pintarBarra();
 }
 function clickTabla(e) {
@@ -2463,7 +2514,7 @@ async function prepararEvento(ev, its) {
     S.open.add("s:" + sid);
     claves.push(i.n === "conjunto" ? "conjunto:" + sid : "anuncio:" + i.id);
   }
-  for (const k of claves) { const it = buscarItem(k); if (it) S.sel.set(k, { id: it.id, act: it.act, nivel: it.nivel, nombre: it.nombre, estado: it.estado }); else faltan.push({ nom: k }); }
+  for (const k of claves) { const it = buscarItem(k); if (it) S.sel.set(k, { id: it.id, act: it.act, nivel: it.nivel, nombre: it.nombre, estado: it.estado, camp: it.camp, cj: it.cj }); else faltan.push({ nom: k }); }
   if (!eventoAbierto) pintarTodo(); else { pintarCarrusel(); pintarTabla(); }
   return { claves: claves.filter((k) => S.sel.has(k)), faltan };
 }
