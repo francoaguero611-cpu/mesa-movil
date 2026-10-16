@@ -1103,5 +1103,8 @@ table.camp tbody tr.fila.sel td { background: var(--marca); }
 .bh-pie { margin-top: 6px; padding-top: 6px; border-top: 1.5px dashed var(--linea); font-size: 11px; color: var(--mut); }
 
 /* (16/10) filtros de la tabla: búsqueda por nombre y «solo seleccionadas» */
-.filtro-camp { margin: -4px 0 12px; }
+.filtro-camp { margin: -4px 0 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.filtro-camp .f-buscar { flex: 1 1 240px; }
+select.campo.f-cuenta { width: auto; flex: 0 1 260px; max-width: 100%; font-size: 16px; }
+select.campo.f-cuenta.activo { background: var(--marca); }
 input.campo.f-buscar { font-size: 16px; padding: 9px 12px; max-width: 460px; }

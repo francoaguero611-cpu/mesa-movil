@@ -103,6 +103,7 @@ const S = {
   verApagadas: ls.get("dash_ver_apagadas") === "1",
   buscar: "",                // (16/10) filtro por nombre (campaña, conjunto o anuncio)
   soloSel: false,            // (16/10) mostrar solo lo seleccionado
+  cuenta: ls.get("dash_cuenta", ""),   // (16/10) filtro por cuenta publicitaria (act); "" = todas
   dir: 0,
   vista: "dash",             // "dash" | "reglas" | "ranking" | "login"
 };
@@ -390,7 +391,7 @@ function montar() {
         <h2 id="t-camp">Campañas <small id="n-camp"></small></h2>
         <span class="cab-der"><button type="button" class="toggle-chico" role="switch" id="t-solosel" aria-checked="${S.soloSel}"><span class="mini" aria-hidden="true"></span><span id="t-solosel-tx">solo seleccionadas</span></button><button type="button" class="btn chico" id="b-cols" aria-haspopup="dialog">Columnas</button><button type="button" class="toggle-chico" role="switch" id="t-apagadas" aria-checked="${S.verApagadas}"><span class="mini" aria-hidden="true"></span><span id="t-apagadas-tx">ver apagadas</span></button></span>
       </div>
-      <div class="filtro-camp"><label class="sr" for="f-buscar">Buscar por nombre</label><input type="search" id="f-buscar" class="campo f-buscar" placeholder="Buscar campaña, conjunto o anuncio…" autocomplete="off" value="${esc(S.buscar)}"></div>
+      <div class="filtro-camp"><label class="sr" for="f-buscar">Buscar por nombre</label><input type="search" id="f-buscar" class="campo f-buscar" placeholder="Buscar campaña, conjunto o anuncio…" autocomplete="off" value="${esc(S.buscar)}"><label class="sr" for="f-cuenta">Cuenta publicitaria</label><select id="f-cuenta" class="campo f-cuenta"></select></div>
       <div class="tabla-caja boceto"><div class="tabla-scroll" id="tabla-scroll"></div></div>
     </section>`;
   $$("[data-per]").forEach((b) => b.onclick = () => cambiarPeriodo(b.dataset.per));
@@ -400,6 +401,7 @@ function montar() {
   $("#b-cols").onclick = elegirColumnas; pintarBotonCols();
   $("#t-apagadas").onclick = () => { S.verApagadas = !S.verApagadas; ls.set("dash_ver_apagadas", S.verApagadas ? "1" : "0"); $("#t-apagadas").setAttribute("aria-checked", S.verApagadas); pintarTabla(); };
   $("#t-solosel").onclick = alternarSoloSel;
+  $("#f-cuenta").onchange = (e) => { S.cuenta = e.target.value; ls.set("dash_cuenta", S.cuenta); pintarTabla(); };
   let tb = null;
   $("#f-buscar").oninput = (e) => { clearTimeout(tb); tb = setTimeout(() => { S.buscar = e.target.value; pintarTabla(); }, 150); };
   gestosCarrusel($("#carr"));
@@ -537,6 +539,18 @@ function dotEstado(e) {
 }
 // (16/10) Filtros: «solo seleccionadas» (ignora grupo y apagadas: muestra todo lo tildado) y búsqueda por nombre.
 const normTx = (t) => String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+// (16/10) cuentas del período para el selector, con cuántas campañas tiene cada una
+function pintarCuentas() {
+  const sel = $("#f-cuenta"); if (!sel) return;
+  const m = new Map();
+  for (const c of S.datos[S.periodo]?.campanas || []) { const e = m.get(c.act) || { nom: c.cuenta || c.act, n: 0 }; e.n++; m.set(c.act, e); }
+  if (S.cuenta && !m.has(S.cuenta)) m.set(S.cuenta, { nom: ls.get("dash_cuenta_nom", S.cuenta), n: 0 });
+  const ops = [...m].sort((a, b) => a[1].nom.localeCompare(b[1].nom, "es"));
+  sel.innerHTML = `<option value="">Todas las cuentas</option>` + ops.map(([act, e]) => `<option value="${esc(act)}"${act === S.cuenta ? " selected" : ""}>${esc(e.nom)} (${e.n})</option>`).join("");
+  if (S.cuenta && m.get(S.cuenta)?.n) ls.set("dash_cuenta_nom", m.get(S.cuenta).nom);
+  sel.classList.toggle("activo", !!S.cuenta);
+}
+const deCuenta = (c) => !S.cuenta || c.act === S.cuenta;
 const coincide = (x) => !S.buscar.trim() || normTx(x.nombre).includes(normTx(S.buscar.trim()));
 const detDe = (c) => S.det.get(`${S.periodo}|${c.id}`)?.data?.conjuntos || [];
 const selAd = (a) => S.sel.has("anuncio:" + a.id);
@@ -575,11 +589,11 @@ function pintarSoloSel() {
 }
 function campanasVisibles() {
   const d = S.datos[S.periodo]; if (!d) return { xs: [], ocultas: 0 };
-  if (S.soloSel) return { xs: (d.campanas || []).filter(selCamp).filter((c) => !S.buscar.trim() || coincide(c) || detDe(c).some((s) => coincide(s) || (s.anuncios || []).some(coincide))).sort(ordenRoas), ocultas: 0, filtro: true };
+  if (S.soloSel) return { xs: (d.campanas || []).filter(selCamp).filter(deCuenta).filter((c) => !S.buscar.trim() || coincide(c) || detDe(c).some((s) => coincide(s) || (s.anuncios || []).some(coincide))).sort(ordenRoas), ocultas: 0, filtro: true };
   const g = grupoActual();
-  const delGrupo = (d.campanas || []).filter((c) => g.clave === "todas" || c.grupo === g.clave);
+  const delGrupo = (d.campanas || []).filter((c) => (g.clave === "todas" || c.grupo === g.clave) && deCuenta(c));
   const xs = delGrupo.filter((c) => S.verApagadas || prendido(c.estado)).filter((c) => !S.buscar.trim() || coincide(c) || detDe(c).some((s) => coincide(s) || (s.anuncios || []).some(coincide))).sort(ordenRoas);
-  return { xs, ocultas: delGrupo.length - delGrupo.filter((c) => prendido(c.estado)).length, filtro: !!S.buscar.trim() };
+  return { xs, ocultas: delGrupo.length - delGrupo.filter((c) => prendido(c.estado)).length, filtro: !!S.buscar.trim() || !!S.cuenta };
 }
 const NF1 = new Intl.NumberFormat("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const nulo = (n) => n == null || (typeof n === "number" && isNaN(n));
@@ -855,12 +869,12 @@ function pintarTabla() {
   const cont = $("#tabla-scroll"); if (!cont) return;
   const d = S.datos[S.periodo];
   const { xs, ocultas, filtro } = campanasVisibles();
-  pintarSoloSel();
+  pintarSoloSel(); pintarCuentas();
   $("#n-camp").textContent = d ? (S.soloSel ? `${xs.length} seleccionada${xs.length === 1 ? "" : "s"}` : `${xs.length} ${S.verApagadas ? "" : "prendida" + (xs.length === 1 ? "" : "s")}`.trim()) : "";
   $("#t-apagadas-tx").textContent = `ver apagadas${ocultas ? ` (${ocultas})` : ""}`;
   if (!d || !xs.length) { const pf = $("#pie-flotante"); if (pf) pf.hidden = true; }
   if (!d) { cont.innerHTML = `<div class="vacio">${S.cargando ? `<span class="cargador"></span>Cargando campañas…` : "Sin datos."}</div>`; return; }
-  if (!xs.length && (filtro || S.soloSel)) { cont.innerHTML = `<div class="vacio">${S.soloSel ? "Lo seleccionado no tiene datos en este período." : "Ninguna campaña coincide con la búsqueda."} <button class="link" type="button" id="b-sin-filtro">Quitar filtros</button></div>`; $("#b-sin-filtro").onclick = quitarFiltros; return; }
+  if (!xs.length && (filtro || S.soloSel)) { cont.innerHTML = `<div class="vacio">${S.soloSel ? "Lo seleccionado no tiene datos en este período." : (S.cuenta && !S.buscar.trim() ? "Esta cuenta no tiene campañas en este grupo y período." : "Ninguna campaña coincide con los filtros.")} <button class="link" type="button" id="b-sin-filtro">Quitar filtros</button></div>`; $("#b-sin-filtro").onclick = quitarFiltros; return; }
   if (!xs.length) { cont.innerHTML = `<div class="vacio">${ocultas ? `No hay campañas prendidas en este grupo. <button class="link" type="button" id="b-ver-ap">Ver las ${ocultas} apagadas</button>` : "No hay campañas en este grupo para este período."}</div>`; const b = $("#b-ver-ap"); if (b) b.onclick = () => $("#t-apagadas").click(); return; }
   let h = `<table class="camp"><thead><tr><th class="nom" scope="col">Campaña</th>${colsVisibles().map(([k, t]) => `<th scope="col" class="c-${k}">${esc(t)}</th>`).join("")}</tr></thead><tbody>`;
   for (const c of xs) {
@@ -888,7 +902,7 @@ function pintarTabla() {
   cont.innerHTML = h + `</tbody><tfoot>${filaTotal(xs)}</tfoot></table>`;
   armarCabFlotante(); armarPieFlotante();
 }
-function quitarFiltros() { S.soloSel = false; S.buscar = ""; const f = $("#f-buscar"); if (f) f.value = ""; pintarTabla(); }
+function quitarFiltros() { S.soloSel = false; S.buscar = ""; S.cuenta = ""; ls.set("dash_cuenta", ""); const f = $("#f-buscar"); if (f) f.value = ""; pintarTabla(); }
 function buscarItem(k) {
   const [nivel, id] = [k.slice(0, k.indexOf(":")), k.slice(k.indexOf(":") + 1)];
   const d = S.datos[S.periodo];
