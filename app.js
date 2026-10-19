@@ -392,7 +392,7 @@ function montar() {
         <span class="cab-der"><button type="button" class="toggle-chico" role="switch" id="t-solosel" aria-checked="${S.soloSel}"><span class="mini" aria-hidden="true"></span><span id="t-solosel-tx">solo seleccionadas</span></button><button type="button" class="btn chico" id="b-cols" aria-haspopup="dialog">Columnas</button><button type="button" class="toggle-chico" role="switch" id="t-apagadas" aria-checked="${S.verApagadas}"><span class="mini" aria-hidden="true"></span><span id="t-apagadas-tx">ver apagadas</span></button></span>
       </div>
       <div class="filtro-camp"><label class="sr" for="f-buscar">Buscar por nombre</label><input type="search" id="f-buscar" class="campo f-buscar" placeholder="Buscar campaña, conjunto o anuncio…" autocomplete="off" value="${esc(S.buscar)}"><label class="sr" for="f-cuenta">Cuenta publicitaria</label><select id="f-cuenta" class="campo f-cuenta"></select></div>
-      <div class="tabla-caja boceto"><div class="tabla-scroll" id="tabla-scroll"></div></div>
+      <div class="tabla-con-reloj"><div class="tabla-caja boceto"><div class="tabla-scroll" id="tabla-scroll"></div></div><div class="riel-reloj" id="riel-reloj" aria-label="Historial de cambios por campaña"></div></div>
     </section>`;
   $$("[data-per]").forEach((b) => b.onclick = () => cambiarPeriodo(b.dataset.per));
   $("#sel-grupo").onchange = (e) => irA(+e.target.value);
@@ -789,6 +789,54 @@ function abrirBurbuja(ancla, clave, html, clase = "") {
   b.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") cerrarHoras(); });
   return b;
 }
+// (19/10, Lorenzo) Relojito a la derecha de cada campaña, fuera de la tabla: historial de modificaciones (registro de
+// actividad de Meta, 7 días) con métricas del día hasta la hora del cambio vs. desde el cambio hasta el siguiente (o ahora).
+const CACHE_HIST = new Map();
+const RELOJ_SVG = `<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><circle cx="12" cy="12.5" r="8.6" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12 7.6 V12.6 L15.4 14.6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+function pintarRiel() {
+  const riel = $("#riel-reloj"), cont = $("#tabla-scroll"); if (!riel || !cont) return;
+  const base = riel.getBoundingClientRect().top;
+  riel.innerHTML = $$("tr.fila.nivel-0", cont).map((tr) => {
+    const id = tr.dataset.k.slice(tr.dataset.k.indexOf(":") + 1), c = campanaPorId(id); if (!c) return "";
+    const r = tr.getBoundingClientRect();
+    return `<button type="button" class="btn-reloj" data-reloj="${esc(id)}" style="top:${Math.round(r.top - base + Math.min(r.height, 64) / 2 - 15)}px" aria-label="Historial de cambios de ${esc(c.nombre)}" title="Historial de cambios">${RELOJ_SVG}</button>`;
+  }).join("");
+}
+window.addEventListener("resize", () => pintarRiel());
+document.addEventListener("click", (e) => { const b = e.target.closest && e.target.closest("[data-reloj]"); if (b) { const c = campanaPorId(b.dataset.reloj); if (c) verHistorial(c, b); } });
+function haceTx(iso) {
+  const m = Math.round((Date.now() - Date.parse(iso)) / 60e3);
+  if (m < 60) return `hace ${m} min`; const h = Math.round(m / 60); if (h < 48) return `hace ${h} h`; return `hace ${Math.round(h / 24)} días`;
+}
+async function verHistorial(c, ancla, forzar = false) {
+  const b = forzar ? burbujaHoras : abrirBurbuja(ancla, "r:" + c.id, `<div class="bh-cargando"><span class="cargador"></span>Leyendo cambios en Meta…</div>`, "bh-hist");
+  if (!b) return;
+  b.setAttribute("aria-label", "Historial de cambios");
+  let d = CACHE_HIST.get(c.id);
+  if (forzar || !d || Date.now() - d.t > 5 * 60e3) {
+    try { d = { t: Date.now(), r: await api("dash_historial", { q: `&id=${encodeURIComponent(c.id)}&act=${encodeURIComponent(c.act)}${forzar ? "&forzar=1" : ""}` }) }; CACHE_HIST.set(c.id, d); }
+    catch (e) { if (burbujaHoras === b) { $(".bh-cuerpo", b).innerHTML = `<div class="neg">No se pudo: ${esc(e.message)}</div>`; ubicarBurbuja(b); } return; }
+  }
+  if (burbujaHoras !== b) return;
+  const r = d.r, gs = r.grupos || [];
+  const n2 = (x) => nulo(x) ? "—" : NF2.format(x);
+  const met = (m) => `<td>${n2(m.gasto)}</td><td>${m.ventas}</td><td>${m.ventas ? n2(m.roas) : "—"}</td><td>${n2(m.cpa)}</td>`;
+  const ICON = { mejoro: "▲", empeoro: "▼", igual: "＝", pronto: "…" };
+  const hh = (h) => String(h).padStart(2, "0") + ":00";
+  const tarjeta = (g) => `<li class="hist-it v-${g.veredicto}">
+      <div class="hist-cab"><b>${esc(g.dia.slice(8, 10) + "/" + g.dia.slice(5, 7))} ${String(g.hora).padStart(2, "0")}:${String(g.min).padStart(2, "0")}</b> <span class="mut">${haceTx(g.t)}</span></div>
+      <ul class="hist-cambios">${g.cambios.map((x) => `<li>${esc(x.que)}${x.nivel === "conjunto" ? ` <small>(${esc(x.objeto)})</small>` : ""}${x.antes != null || x.despues != null ? `: <s>${esc(x.antes ?? "—")}</s> → <b>${esc(x.despues ?? "—")}</b>` : ""}${x.quien ? ` <small class="mut">· ${esc(x.quien)}</small>` : ""}</li>`).join("")}</ul>
+      <table class="bh-tabla"><thead><tr><th></th><th>Gasto</th><th>Ventas</th><th>ROAS</th><th>CPA</th></tr></thead><tbody>
+        <tr><th scope="row">Antes <small>(0–${hh(g.hora)})</small></th>${met(g.antes)}</tr>
+        <tr><th scope="row">Después <small>(${g.hasta ? "hasta " + esc(g.hasta.slice(8, 10) + "/" + g.hasta.slice(5, 7) + " " + g.hasta.slice(11)) : "hasta ahora"})</small></th>${met(g.despues)}</tr></tbody></table>
+      <div class="hist-ver"><span aria-hidden="true">${ICON[g.veredicto] || ""}</span> ${esc(g.texto)}</div></li>`;
+  $(".bh-cuerpo", b).innerHTML = `<div class="hist-tit">Cambios · últimos 7 días <button type="button" class="link" data-hist-ref>actualizar</button></div>
+    ${r.consejo ? `<div class="hist-consejo">${esc(r.consejo)}</div>` : ""}
+    ${gs.length ? `<ol class="hist-lista">${gs.map(tarjeta).join("")}</ol>` : `<div class="mut">Sin modificaciones en los últimos 7 días.</div>`}
+    <div class="bh-pie">Métricas del pixel en ${esc(r.moneda)}, hora de la cuenta (${esc(String(r.zona).split("/").pop().replace(/_/g, " "))}). «Después» cuenta horas completas hasta el cambio siguiente.</div>`;
+  $("[data-hist-ref]", b).onclick = (e) => { e.stopPropagation(); $(".bh-cuerpo", b).innerHTML = `<div class="bh-cargando"><span class="cargador"></span>Actualizando…</div>`; verHistorial(c, ancla, true); };
+  ubicarBurbuja(b);
+}
 function verHoras(c, ancla) {
   const H = horasCampana(c); if (!H) return;
   const zona = (z) => z.split("/").pop().replace(/_/g, " ");
@@ -826,7 +874,7 @@ document.addEventListener("pointermove", (e) => {
   const dentro = (r, m) => e.clientX >= r.left - m && e.clientX <= r.right + m && e.clientY >= r.top - m && e.clientY <= r.bottom + m;
   if (!dentro(burbujaHoras.getBoundingClientRect(), 4) && !dentro(burbujaHoras._ancla.getBoundingClientRect(), 8)) cerrarHoras();
 }, { passive: true });
-document.addEventListener("pointerdown", (e) => { if (burbujaHoras && !burbujaHoras.contains(e.target) && !e.target.closest("[data-hora], [data-paises]")) cerrarHoras(); }, true);
+document.addEventListener("pointerdown", (e) => { if (burbujaHoras && !burbujaHoras.contains(e.target) && !e.target.closest("[data-hora], [data-paises], [data-reloj]")) cerrarHoras(); }, true);
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") cerrarHoras(); });
 window.addEventListener("scroll", cerrarHoras, { passive: true });
 setInterval(() => {
@@ -900,7 +948,7 @@ function pintarTabla() {
     }
   }
   cont.innerHTML = h + `</tbody><tfoot>${filaTotal(xs)}</tfoot></table>`;
-  armarCabFlotante(); armarPieFlotante();
+  armarCabFlotante(); armarPieFlotante(); pintarRiel();
 }
 function quitarFiltros() { S.soloSel = false; S.buscar = ""; S.cuenta = ""; ls.set("dash_cuenta", ""); const f = $("#f-buscar"); if (f) f.value = ""; pintarTabla(); }
 function buscarItem(k) {

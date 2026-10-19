@@ -1108,3 +1108,22 @@ table.camp tbody tr.fila.sel td { background: var(--marca); }
 select.campo.f-cuenta { width: auto; flex: 0 1 260px; max-width: 100%; font-size: 16px; }
 select.campo.f-cuenta.activo { background: var(--marca); }
 input.campo.f-buscar { font-size: 16px; padding: 9px 12px; max-width: 460px; }
+/* (19/10) relojito de historial, a la derecha de la tabla */
+.tabla-con-reloj { display: flex; gap: 6px; align-items: stretch; }
+.tabla-con-reloj .tabla-caja { flex: 1; min-width: 0; }
+.riel-reloj { position: relative; flex: 0 0 32px; }
+.btn-reloj { position: absolute; left: 0; width: 30px; height: 30px; padding: 0; display: grid; place-items: center; border: 2px solid var(--tinta); border-radius: 50%; background: var(--tarjeta); color: inherit; cursor: pointer; box-shadow: 2px 2px 0 var(--sombra); }
+.btn-reloj:hover, .btn-reloj:focus-visible { background: var(--papel-2); }
+.burbuja-horas.bh-hist { max-width: min(440px, calc(100vw - 16px)); max-height: min(70vh, 620px); overflow-y: auto; }
+.bh-hist .hist-tit { display: flex; justify-content: space-between; gap: 10px; margin-right: 24px; font-weight: 600; }
+.bh-hist .hist-consejo { margin: 8px 0; padding: 6px 8px; border-radius: 8px; background: var(--papel-2); }
+.bh-hist .hist-lista { list-style: none; margin: 0; padding: 0; }
+.bh-hist .hist-it { padding: 8px 0; border-top: 1.5px dashed var(--linea); display: block; }
+.bh-hist .hist-it li { display: list-item; padding: 1px 0; }
+.bh-hist .hist-cambios { margin: 4px 0 6px; padding-left: 16px; list-style: disc; }
+.bh-hist .bh-tabla { width: 100%; font-variant-numeric: tabular-nums; }
+.bh-hist .bh-tabla th[scope=row] { text-align: left; font-weight: 500; white-space: nowrap; }
+.bh-hist .hist-ver { margin-top: 4px; font-weight: 600; }
+.bh-hist .v-mejoro .hist-ver { color: var(--ok); }
+.bh-hist .v-empeoro .hist-ver { color: var(--peligro); }
+.bh-hist .v-igual .hist-ver, .bh-hist .v-pronto .hist-ver { color: var(--mut); }
