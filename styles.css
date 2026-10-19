@@ -1167,3 +1167,9 @@ input.campo.f-buscar { font-size: 16px; padding: 9px 12px; max-width: 460px; }
 .ph-tabla tr.ph-dif th, .ph-tabla tr.ph-dif td { border-bottom: 0; font-size: 13px; }
 .ph-bien { color: var(--ok); font-weight: 600; } .ph-mal { color: var(--peligro); font-weight: 600; }
 .ph-frases { margin-top: 14px; }
+.ph-tabla th[scope=row] { position: sticky; left: 0; background: var(--tarjeta); z-index: 1; min-width: 150px; }
+.ph-desliza { font-size: 12px; margin-top: 4px; text-align: right; }
+.ph-frases .ph-ver { font-size: 17px; font-weight: 700; }
+.ph-frases p:first-child { font-weight: inherit; }
+.ph-frases.v-mejoro .ph-ver { color: var(--ok); } .ph-frases.v-empeoro .ph-ver { color: var(--peligro); }
+.ph-frases.v-mejoro p:not(.ph-ver), .ph-frases.v-empeoro p:not(.ph-ver) { color: inherit; }

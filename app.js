@@ -858,28 +858,48 @@ function accionesHist(g) {
   for (const [n, k] of Object.entries(creados)) out.push(`Creó ${k === 1 ? (n === "anuncio" ? "1 anuncio" : n === "conjunto" ? "1 conjunto" : "la campaña") : `${k} ${n === "anuncio" ? "anuncios" : "conjuntos"}`}`);
   return [...new Set(out)];
 }
+// (19/10 e) métricas reales: arriba cómo estaba a la hora de la modificación, abajo cómo está ahora. Mismas columnas que el dashboard.
+const COLS_HIST = [["roas", "ROAS"], ["ventas", "Ventas"], ["aov", "AOV"], ["gasto", "Importe gastado"], ["valor", "Facturado (pixel)"], ["cpa", "CPA"], ["costo_pago_iniciado", "Costo x pago iniciado"], ["costo_carrito", "Costo x carrito"],
+  ["pagos_iniciados", "Pagos iniciados"], ["carritos", "Carritos"], ["visitas", "Visitas"], ["conv_visitas", "Conv. visitas→venta"], ["clics", "Clics"], ["ctr", "CTR"], ["cpc", "CPC"], ["cpm", "CPM"], ["impresiones", "Impresiones"]];
+const ENTEROS_HIST = new Set(["ventas", "pagos_iniciados", "carritos", "visitas", "clics", "impresiones"]), PCT_HIST = new Set(["ctr", "conv_visitas"]);
+function celdaHist(k, mm) {
+  const v = mm[k];
+  if (k === "roas") return `<span class="roas ${colorRoas(mm.ventas ? v : null)} chip-roas">${mm.ventas ? roasTx(v) : "—"}</span>`;
+  if (nulo(v)) return "—";
+  return ENTEROS_HIST.has(k) ? new Intl.NumberFormat("es-AR").format(v) : PCT_HIST.has(k) ? NF2.format(v) + " %" : NF2.format(v);
+}
+function resumenHist(g) {
+  const a = g.antes, n = g.ahora || g.despues, out = [];
+  const gasto = (n.gasto ?? 0) - (a.gasto ?? 0), ventas = (n.ventas ?? 0) - (a.ventas ?? 0), val = (n.valor ?? 0) - (a.valor ?? 0);
+  const ra = a.ventas ? a.roas ?? 0 : 0, rn = n.ventas ? n.roas ?? 0 : 0, dr = Math.round((rn - ra) * 100) / 100;
+  const lapso = g.hasta ? "hasta la modificación siguiente" : "desde que lo modificaste";
+  if (gasto < 1) out.push(`${lapso[0].toUpperCase() + lapso.slice(1)} casi no gastó plata${ventas ? `, pero cayeron ${ventas} venta${ventas === 1 ? "" : "s"}` : " y no cayeron ventas"}.`);
+  else out.push(`${lapso[0].toUpperCase() + lapso.slice(1)} gastó ${NF2.format(gasto)} y ${ventas ? `cayeron ${ventas} venta${ventas === 1 ? "" : "s"} más (${NF2.format(val)} facturado)` : "no cayó ninguna venta más"}.`);
+  if (!ra && !rn) out.push("Sigue sin ROAS: no hay ventas.");
+  else out.push(Math.abs(dr) < 0.05 ? `El ROAS se mantuvo en ${NF2.format(rn)}.` : `El ROAS ${dr > 0 ? "subió" : "bajó"} de ${NF2.format(ra)} a ${NF2.format(rn)} (${dr > 0 ? "+" : "−"}${NF2.format(Math.abs(dr))}).`);
+  if (a.cpa && n.cpa && Math.abs(n.cpa - a.cpa) >= 0.5) out.push(`Cada venta sale ${NF2.format(n.cpa)} (antes ${NF2.format(a.cpa)}).`);
+  const ver = gasto < 1 && !ventas ? "Sin cambios todavía." : dr > 0.05 ? "Mejoró." : dr < -0.05 ? "Empeoró." : "Se mantuvo.";
+  return { ver, cls: /Mejor/.test(ver) ? "mejoro" : /Empeor/.test(ver) ? "empeoro" : "igual", txt: out };
+}
 function pintarHist(m, c, r, sel) {
   const gs = r.grupos || [], cu = $(".ph-cuerpo", m);
   if (!gs.length) { cu.innerHTML = `<div class="ph-tit">${esc(c.nombre)}</div><div class="mut">Sin modificaciones en los últimos 7 días.</div>`; return; }
-  const g = gs[sel], n2 = (x) => nulo(x) ? "—" : NF2.format(x);
+  const g = gs[sel], ahora = g.ahora || g.despues;
   const fecha = (dia) => `${dia.slice(8, 10)}/${dia.slice(5, 7)}`, hora = (h, mi) => `${String(h).padStart(2, "0")}:${String(mi ?? 0).padStart(2, "0")}`;
-  const a = g.antes, d = g.despues;
-  const roasC = (mm) => `<span class="roas ${colorRoas(mm.ventas ? mm.roas : null)} chip-roas">${mm.ventas ? roasTx(mm.roas) : "—"}</span>`;
-  const dif = (x, y, mejorSube = true, dec = true) => { if (nulo(x) || nulo(y)) return ""; const df = y - x; if (Math.abs(df) < 0.005) return `<span class="mut">=</span>`; const bien = (df > 0) === mejorSube; return `<span class="${bien ? "ph-bien" : "ph-mal"}">${df > 0 ? "▲" : "▼"} ${dec ? NF2.format(Math.abs(df)) : Math.abs(df)}</span>`; };
-  const hasta = g.hasta ? `hasta el cambio del ${fecha(g.hasta)} ${g.hasta.slice(11)}` : "hasta ahora";
-  const [f1, f2] = frasesHist(g);
+  const R = resumenHist(g);
+  const filaH = (t, sub, mm) => `<tr><th scope="row">${t}<small>${sub}</small></th>${COLS_HIST.map(([k]) => `<td>${celdaHist(k, mm)}</td>`).join("")}</tr>`;
   cu.innerHTML = `<div class="ph-tit">${esc(c.nombre)}</div>
     <div class="ph-ultima"><span class="lbl">${sel ? "Modificación del" : "Última modificación"}</span>
       <div class="ph-cuando"><b>${fecha(g.dia)}</b> <b>${hora(g.hora, g.min)}</b> <span class="mut">· ${haceTx(g.t)}</span></div></div>
     <div class="ph-mod"><span class="lbl">Modificación:</span><ul>${accionesHist(g).map((x) => `<li>${x}</li>`).join("")}</ul></div>
-    <div class="ph-tabla-wrap"><table class="ph-tabla num"><thead><tr><th></th><th>Gasto</th><th>Gasto/h</th><th>Ventas</th><th>Facturado</th><th>ROAS</th><th>CPA</th></tr></thead><tbody>
-      <tr><th scope="row">Al modificar<small>${fecha(g.dia)}, 00:00 a ${hora(g.hora, 0)}</small></th><td>${n2(a.gasto)}</td><td>${n2(a.gasto_h)}</td><td>${a.ventas}</td><td>${n2(a.valor)}</td><td>${roasC(a)}</td><td>${n2(a.cpa)}</td></tr>
-      <tr><th scope="row">${g.hasta ? "Después" : "Ahora"}<small>${esc(hasta)}</small></th><td>${n2(d.gasto)}</td><td>${n2(d.gasto_h)}</td><td>${d.ventas}</td><td>${n2(d.valor)}</td><td>${roasC(d)}</td><td>${n2(d.cpa)}</td></tr>
-      <tr class="ph-dif"><th scope="row">Diferencia</th><td></td><td>${dif(a.gasto_h, d.gasto_h, true)}</td><td></td><td></td><td>${a.ventas && d.ventas ? dif(a.roas, d.roas, true) : ""}</td><td>${dif(a.cpa, d.cpa, false)}</td></tr>
+    <div class="ph-tabla-wrap"><table class="ph-tabla num"><thead><tr><th></th>${COLS_HIST.map(([, t]) => `<th>${esc(t)}</th>`).join("")}</tr></thead><tbody>
+      ${filaH(`A las ${hora(g.hora, g.min)}`, `cómo estaba al modificar (${fecha(g.dia)})`, g.antes)}
+      ${filaH(g.hasta ? `Hasta ${g.hasta.slice(11)}` : "Ahora", g.hasta ? `antes de la modificación siguiente (${fecha(g.hasta)})` : "cómo está ahora", ahora)}
     </tbody></table></div>
-    <div class="ph-frases v-${g.veredicto}"><span class="lbl">Resumen</span><p>${esc(f1)}</p><p>${esc(f2)}</p></div>
+    <div class="ph-desliza mut">Deslizá la tabla para ver todas las métricas →</div>
+    <div class="ph-frases v-${R.cls}"><span class="lbl">Resumen</span><p class="ph-ver">${R.ver}</p>${R.txt.map((t) => `<p>${esc(t)}</p>`).join("")}</div>
     ${gs.length > 1 ? `<div class="ph-otros"><span class="mut">Otras modificaciones:</span> ${gs.map((x, i) => `<button type="button" class="ph-chip${i === sel ? " on" : ""}" data-sel="${i}">${fecha(x.dia)} ${hora(x.hora, x.min)}</button>`).join("")}</div>` : ""}
-    <div class="ph-pie mut">Pixel, en ${esc(r.moneda)}, hora de la cuenta.</div>`;
+    <div class="ph-pie mut">Métricas del pixel de Meta en ${esc(r.moneda)}, acumuladas desde las 00:00 de ese día (hora de la cuenta). Se actualiza cada 10 min.</div>`;
   $$("[data-sel]", cu).forEach((b) => b.onclick = () => pintarHist(m, c, r, Number(b.dataset.sel)));
 }
 function verHoras(c, ancla) {
