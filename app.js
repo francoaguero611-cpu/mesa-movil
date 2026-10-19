@@ -811,34 +811,63 @@ function haceTx(iso) {
   const m = Math.round((Date.now() - Date.parse(iso)) / 60e3);
   if (m < 60) return `hace ${m} min`; const h = Math.round(m / 60); if (h < 48) return `hace ${h} h`; return `hace ${Math.round(h / 24)} días`;
 }
-async function verHistorial(c, ancla, forzar = false) {
-  const b = forzar ? burbujaHoras : abrirBurbuja(ancla, "r:" + c.id, `<div class="bh-cargando"><span class="cargador"></span>Leyendo cambios en Meta…</div>`, "bh-hist");
-  if (!b) return;
-  b.setAttribute("aria-label", "Historial de cambios");
+// (19/10 c) pop-up ancho y centrado: última modificación, métricas en fila (deslizar Antes ↔ Después) y dos frases cortas
+function cerrarHist() { const m = $("#pop-hist"); if (m) m.remove(); document.removeEventListener("keydown", escHist); }
+function escHist(e) { if (e.key === "Escape") cerrarHist(); }
+function frasesHist(g) {
+  const a = g.antes, d = g.despues;
+  const verbo = g.cambios.some((x) => /budget|presupuesto/i.test(x.tipo + x.que)) ? "surfeaste" : "lo modificaste";
+  if (d.horas < 2) return g.hasta ? ["Lo volviste a modificar antes de las 2 horas: no alcanza para comparar.", "Mirá la modificación siguiente."] : [`Lo cambiaste ${haceTx(g.t)}: todavía no hay horas completas para comparar.`, "Esperá a que junte datos."];
+  const v = d.ventas, ra = a.roas ?? 0, rd = d.roas ?? 0, dif = Math.round((rd - ra) * 100) / 100, n = NF2.format(Math.abs(dif));
+  const roasTx2 = Math.abs(dif) < 0.2 ? `el ROAS se mantuvo (${dif < 0 ? "bajó" : "subió"} solo ${n})` : dif < 0 ? `el ROAS bajó ${n} puntos (${NF2.format(ra)} → ${NF2.format(rd)})` : `el ROAS subió ${n} puntos (${NF2.format(ra)} → ${NF2.format(rd)})`;
+  const ventasTx = v ? `tiró ${v} venta${v === 1 ? "" : "s"} más` : "no cayó ninguna venta más";
+  const pero = (v > 0) === (dif >= -0.2) ? "y" : "pero";
+  const f1 = `Desde que ${verbo}, ${ventasTx}, ${pero} ${roasTx2}.`;
+  const ga = a.gasto_h, gd = d.gasto_h;
+  const f2 = ga && gd ? `Gasta ${NF2.format(gd)} por hora (antes ${NF2.format(ga)})${d.cpa ? `, cada venta sale ${NF2.format(d.cpa)}` : ""}.` : `Lleva ${NF2.format(d.gasto)} gastados en ${d.horas} h.`;
+  return [f1, f2];
+}
+async function verHistorial(c, ancla, forzar = false, sel = 0) {
+  cerrarHoras(); cerrarHist();
+  const m = document.createElement("div"); m.id = "pop-hist"; m.className = "pop-hist-fondo";
+  m.innerHTML = `<div class="pop-hist boceto" role="dialog" aria-modal="true" aria-label="Historial de cambios"><button type="button" class="ph-x" aria-label="Cerrar">✕</button><div class="ph-cuerpo"><div class="bh-cargando"><span class="cargador"></span>Cargando…</div></div></div>`;
+  document.body.appendChild(m);
+  m.addEventListener("click", (e) => { if (e.target === m || e.target.closest(".ph-x")) cerrarHist(); });
+  document.addEventListener("keydown", escHist);
   let d = CACHE_HIST.get(c.id);
-  if (forzar || !d || Date.now() - d.t > 5 * 60e3) {
-    try { d = { t: Date.now(), r: await api("dash_historial", { q: `&id=${encodeURIComponent(c.id)}&act=${encodeURIComponent(c.act)}${forzar ? "&forzar=1" : ""}` }) }; CACHE_HIST.set(c.id, d); }
-    catch (e) { if (burbujaHoras === b) { $(".bh-cuerpo", b).innerHTML = `<div class="neg">No se pudo: ${esc(e.message)}</div>`; ubicarBurbuja(b); } return; }
+  if (forzar || !d || Date.now() - d.t > 2 * 60e3) {
+    try { d = { t: Date.now(), r: await api("dash_historial", { q: `&id=${encodeURIComponent(c.id)}&act=${encodeURIComponent(c.act)}` }) }; CACHE_HIST.set(c.id, d); }
+    catch (e) { const cu = $(".ph-cuerpo", m); if (cu) cu.innerHTML = `<div class="neg">No se pudo: ${esc(e.message)}</div>`; return; }
   }
-  if (burbujaHoras !== b) return;
-  const r = d.r, gs = r.grupos || [];
-  const n2 = (x) => nulo(x) ? "—" : NF2.format(x);
-  const met = (m) => `<td>${n2(m.gasto)}</td><td>${m.ventas}</td><td>${m.ventas ? n2(m.roas) : "—"}</td><td>${n2(m.cpa)}</td>`;
-  const ICON = { mejoro: "▲", empeoro: "▼", igual: "＝", pronto: "…" };
-  const hh = (h) => String(h).padStart(2, "0") + ":00";
-  const tarjeta = (g) => `<li class="hist-it v-${g.veredicto}">
-      <div class="hist-cab"><b>${esc(g.dia.slice(8, 10) + "/" + g.dia.slice(5, 7))} ${String(g.hora).padStart(2, "0")}:${String(g.min).padStart(2, "0")}</b> <span class="mut">${haceTx(g.t)}</span></div>
-      <ul class="hist-cambios">${g.cambios.map((x) => `<li>${esc(x.que)}${x.nivel === "conjunto" ? ` <small>(${esc(x.objeto)})</small>` : ""}${x.antes != null || x.despues != null ? `: <s>${esc(x.antes ?? "—")}</s> → <b>${esc(x.despues ?? "—")}</b>` : ""}${x.quien ? ` <small class="mut">· ${esc(x.quien)}</small>` : ""}</li>`).join("")}</ul>
-      <table class="bh-tabla"><thead><tr><th></th><th>Gasto</th><th>Ventas</th><th>ROAS</th><th>CPA</th></tr></thead><tbody>
-        <tr><th scope="row">Antes <small>(0–${hh(g.hora)})</small></th>${met(g.antes)}</tr>
-        <tr><th scope="row">Después <small>(${g.hasta ? "hasta " + esc(g.hasta.slice(8, 10) + "/" + g.hasta.slice(5, 7) + " " + g.hasta.slice(11)) : "hasta ahora"})</small></th>${met(g.despues)}</tr></tbody></table>
-      <div class="hist-ver"><span aria-hidden="true">${ICON[g.veredicto] || ""}</span> ${esc(g.texto)}</div></li>`;
-  $(".bh-cuerpo", b).innerHTML = `<div class="hist-tit">Cambios · últimos 7 días <button type="button" class="link" data-hist-ref>actualizar</button></div>
-    ${r.consejo ? `<div class="hist-consejo">${esc(r.consejo)}</div>` : ""}
-    ${gs.length ? `<ol class="hist-lista">${gs.map(tarjeta).join("")}</ol>` : `<div class="mut">Sin modificaciones en los últimos 7 días.</div>`}
-    <div class="bh-pie">Métricas del pixel en ${esc(r.moneda)}, hora de la cuenta (${esc(String(r.zona).split("/").pop().replace(/_/g, " "))}). «Después» cuenta horas completas hasta el cambio siguiente.</div>`;
-  $("[data-hist-ref]", b).onclick = (e) => { e.stopPropagation(); $(".bh-cuerpo", b).innerHTML = `<div class="bh-cargando"><span class="cargador"></span>Actualizando…</div>`; CACHE_HIST.delete(c.id); verHistorial(c, ancla, true); };
-  ubicarBurbuja(b);
+  if (!document.body.contains(m)) return;
+  pintarHist(m, c, d.r, sel);
+}
+function pintarHist(m, c, r, sel) {
+  const gs = r.grupos || [], cu = $(".ph-cuerpo", m);
+  if (!gs.length) { cu.innerHTML = `<div class="ph-tit">${esc(c.nombre)}</div><div class="mut">Sin modificaciones en los últimos 7 días.</div>`; return; }
+  const g = gs[sel], n2 = (x) => nulo(x) ? "—" : NF2.format(x);
+  const fecha = (dia, h, mi) => `${dia.slice(8, 10)}/${dia.slice(5, 7)} ${String(h).padStart(2, "0")}:${String(mi ?? 0).padStart(2, "0")}`;
+  const cambios = g.cambios.map((x) => `${esc(x.que)}${x.nivel === "conjunto" ? ` <span class="mut">(${esc(x.objeto)})</span>` : ""}${x.antes != null || x.despues != null ? `: <s>${esc(x.antes ?? "—")}</s> → <b>${esc(x.despues ?? "—")}</b>` : ""}`).join("<br>");
+  const fila = (t, mm, sub) => `<div class="ph-panel"><div class="ph-panel-tit">${t} <span class="mut">${sub}</span></div><div class="ph-mets">
+      <div class="met boceto"><div class="lbl">Gasto</div><div class="val num">${n2(mm.gasto)}</div><div class="sub">${mm.gasto_h ? n2(mm.gasto_h) + " por hora" : "&nbsp;"}</div></div>
+      <div class="met boceto"><div class="lbl">Ventas</div><div class="val num">${mm.ventas}</div><div class="sub">${n2(mm.valor)} facturado</div></div>
+      <div class="met boceto"><div class="lbl">ROAS</div><div class="val num"><span class="roas ${colorRoas(mm.ventas ? mm.roas : null)} chip-roas">${mm.ventas ? roasTx(mm.roas) : "—"}</span></div><div class="sub">&nbsp;</div></div>
+      <div class="met boceto"><div class="lbl">CPA</div><div class="val num">${n2(mm.cpa)}</div><div class="sub">gasto ÷ ventas</div></div></div></div>`;
+  const hasta = g.hasta ? `hasta el cambio del ${g.hasta.slice(8, 10)}/${g.hasta.slice(5, 7)} ${g.hasta.slice(11)}` : "hasta ahora";
+  const [f1, f2] = frasesHist(g);
+  cu.innerHTML = `<div class="ph-tit">${esc(c.nombre)}</div>
+    <div class="ph-ultima"><span class="mut">${sel ? "Modificación del" : "Última modificación"}</span> <b>${fecha(g.dia, g.hora, g.min)}</b> <span class="mut">· ${haceTx(g.t)}</span><div class="ph-que">${cambios}</div></div>
+    <div class="ph-tabs" role="tablist"><button type="button" role="tab" data-ph="0">Antes</button><button type="button" role="tab" data-ph="1" class="on">Después</button></div>
+    <div class="ph-carril">${fila("Antes", g.antes, `(ese día, 00:00 a ${String(g.hora).padStart(2, "0")}:00)`)}${fila("Después", g.despues, `(${hasta})`)}</div>
+    <div class="ph-frases v-${g.veredicto}"><p>${esc(f1)}</p><p>${esc(f2)}</p></div>
+    ${gs.length > 1 ? `<div class="ph-otros"><span class="mut">Otras modificaciones:</span> ${gs.map((x, i) => `<button type="button" class="ph-chip${i === sel ? " on" : ""}" data-sel="${i}">${fecha(x.dia, x.hora, x.min)}</button>`).join("")}</div>` : ""}
+    <div class="ph-pie mut">Pixel, en ${esc(r.moneda)}, hora de la cuenta.</div>`;
+  const car = $(".ph-carril", cu), tabs = $$(".ph-tabs button", cu);
+  const ir = (i, suave = true) => { car.scrollTo({ left: i * car.clientWidth, behavior: suave ? "smooth" : "auto" }); tabs.forEach((t, k) => t.classList.toggle("on", k === i)); };
+  requestAnimationFrame(() => ir(1, false));
+  tabs.forEach((t) => t.onclick = () => ir(Number(t.dataset.ph)));
+  car.addEventListener("scroll", () => { const i = Math.round(car.scrollLeft / car.clientWidth); tabs.forEach((t, k) => t.classList.toggle("on", k === i)); }, { passive: true });
+  $$("[data-sel]", cu).forEach((b) => b.onclick = () => pintarHist(m, c, r, Number(b.dataset.sel)));
 }
 function verHoras(c, ancla) {
   const H = horasCampana(c); if (!H) return;
