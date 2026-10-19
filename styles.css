@@ -1109,11 +1109,11 @@ select.campo.f-cuenta { width: auto; flex: 0 1 260px; max-width: 100%; font-size
 select.campo.f-cuenta.activo { background: var(--marca); }
 input.campo.f-buscar { font-size: 16px; padding: 9px 12px; max-width: 460px; }
 /* (19/10) relojito de historial, a la derecha de la tabla */
-.tabla-con-reloj { display: flex; gap: 6px; align-items: stretch; }
+.tabla-con-reloj { display: flex; gap: 16px; align-items: stretch; }
 .tabla-con-reloj .tabla-caja { flex: 1; min-width: 0; }
 .riel-reloj { position: relative; flex: 0 0 32px; }
-.btn-reloj { position: absolute; left: 0; width: 30px; height: 30px; padding: 0; display: grid; place-items: center; border: 2px solid var(--tinta); border-radius: 50%; background: var(--tarjeta); color: inherit; cursor: pointer; box-shadow: 2px 2px 0 var(--sombra); }
-.btn-reloj:hover, .btn-reloj:focus-visible { background: var(--papel-2); }
+.btn-reloj { position: absolute; left: 0; width: 30px; height: 30px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--mut); cursor: pointer; }
+.btn-reloj:hover, .btn-reloj:focus-visible { color: inherit; }
 .burbuja-horas.bh-hist { max-width: min(440px, calc(100vw - 16px)); max-height: min(70vh, 620px); overflow-y: auto; }
 .bh-hist .hist-tit { display: flex; justify-content: space-between; gap: 10px; margin-right: 24px; font-weight: 600; }
 .bh-hist .hist-consejo { margin: 8px 0; padding: 6px 8px; border-radius: 8px; background: var(--papel-2); }

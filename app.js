@@ -748,8 +748,11 @@ const banderasDe = (txt) => {
   if (/🌎|🌍|🌏/u.test(String(txt || ""))) out.push(...LATAM_PAISES);
   return [...new Set(out)];
 };
+// (19/10) si el nombre no tiene bandera («19.10 BIDCAP CUERO JAPON»), el país escrito con palabras
+const PAIS_PALABRA = [[/jap[oó]n|japan/i, "JP"], [/francia|france/i, "FR"], [/alemania|germany/i, "DE"], [/italia|italy/i, "IT"], [/polonia|poland/i, "PL"], [/rumania|romania/i, "RO"], [/portugal/i, "PT"], [/brasil|brazil/i, "BR"], [/m[eé]xico/i, "MX"], [/argentina/i, "AR"], [/espa[nñ]a|spain/i, "ES"], [/chile/i, "CL"], [/colombia/i, "CO"], [/per[uú]\b/i, "PE"], [/\busa\b|estados unidos/i, "US"], [/corea|korea/i, "KR"], [/australia/i, "AU"], [/canad[aá]/i, "CA"], [/reino unido|\buk\b/i, "GB"]];
 function paisesCampana(c) {
   let ps = banderasDe(c.nombre).filter((p) => ZONAS_PAIS[p]);
+  if (!ps.length) ps = PAIS_PALABRA.filter(([re]) => re.test(c.nombre || "")).map(([, p]) => p).filter((p) => ZONAS_PAIS[p]);
   if (!ps.length) { const g = (S.datos[S.periodo]?.grupos || []).find((x) => x.clave === c.grupo); ps = banderasDe(g?.bandera).filter((p) => ZONAS_PAIS[p]); }
   return ps;
 }
@@ -834,7 +837,7 @@ async function verHistorial(c, ancla, forzar = false) {
     ${r.consejo ? `<div class="hist-consejo">${esc(r.consejo)}</div>` : ""}
     ${gs.length ? `<ol class="hist-lista">${gs.map(tarjeta).join("")}</ol>` : `<div class="mut">Sin modificaciones en los últimos 7 días.</div>`}
     <div class="bh-pie">Métricas del pixel en ${esc(r.moneda)}, hora de la cuenta (${esc(String(r.zona).split("/").pop().replace(/_/g, " "))}). «Después» cuenta horas completas hasta el cambio siguiente.</div>`;
-  $("[data-hist-ref]", b).onclick = (e) => { e.stopPropagation(); $(".bh-cuerpo", b).innerHTML = `<div class="bh-cargando"><span class="cargador"></span>Actualizando…</div>`; verHistorial(c, ancla, true); };
+  $("[data-hist-ref]", b).onclick = (e) => { e.stopPropagation(); $(".bh-cuerpo", b).innerHTML = `<div class="bh-cargando"><span class="cargador"></span>Actualizando…</div>`; CACHE_HIST.delete(c.id); verHistorial(c, ancla, true); };
   ubicarBurbuja(b);
 }
 function verHoras(c, ancla) {
