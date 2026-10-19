@@ -4,7 +4,7 @@ const SHELL = ["./", "index.html", "styles.css?v=37", "app.js?v=54", "demo.js?v=
   "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png", "icons/apple-touch-icon.png"];
 // Cazador (antes Buscador de ofertas): se guarda aparte y sin trabar la instalación si algún archivo falta en el hosting.
 // buscador.html quedó como redirección a ./#cazador (links viejos).
-const EXTRA = ["buscador.html", "buscador.css?v=5", "buscador.js?v=9", "workspace.css?v=1", "workspace.js?v=2", "creativos.css?v=8", "creativos.js?v=9"];
+const EXTRA = ["buscador.html", "buscador.css?v=5", "buscador.js?v=10", "workspace.css?v=1", "workspace.js?v=2", "creativos.css?v=8", "creativos.js?v=9"];
 const API_HOST = "tppcpnfzcxxusdhrlmdx.supabase.co";
 const API_CACHE = "dash-api";
 

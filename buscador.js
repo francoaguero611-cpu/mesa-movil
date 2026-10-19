@@ -180,6 +180,8 @@ const VERT_TX = Object.fromEntries(VERTICALES);
 const vertIdx = (k) => { const i = VERTICALES.findIndex(([x]) => x === k); return i < 0 ? VERTICALES.length : i; };
 // (12/10 noche, v4, Lorenzo: «no tan filtrado, con más cantidad»): sin el preset estricto; 30–800 anuncios (más de 1.000 = marca
 // muy explotada), todos los anuncios a la misma landing, digital/libro físico, sin marcas personales; por nicho y adentro lo mejor para EXPORTAR.
+// (19/10) listas armadas por Claude: con la lista activa se ven SOLO esas ofertas (los demás filtros no cuentan). Link directo: ?lista=<clave>
+const LISTAS = { "br-1910": { nombre: "Brasil digitales 19/10 (+40 anuncios, web, sin WhatsApp)", ids: ["wvltrack.com", "calisteniaasiaticavslbr.lovable.app", "floripacalistenia.com.br", "desafiodrrenanbotelho.com.br", "vkdigital.com.br", "girrecroche.com.br", "app-helenaastrologia.online", "pagarfy.pages.dev", "caseirinhossaudaveis.com", "inlead.digital", "mvkiids.com.br", "oracaodosorixas.netlify.app", "lucianofernandesif.com.br", "trocadefaixajudo.com.br", "trocadefaixajudo.netlify.app", "jejumreset.online", "menovida.com.br", "institutosaudeancestral.com.br", "minhafase.com", "desafiodajessicaoliveira.com.br", "lancamentosdigital.com", "skeap.com.br", "divinalstudio.com.br", "metodocolunasaudavel.com", "pedagogiacomcristo.com", "institutocdt.com.br", "codigometabolico.pro", "mulheresgerandovalor.com.br", "lkrausche.com", "ingleselisato.com.br", "bonecasfofas.online", "maletadafonoinfantil.site", "receitasok.shop", "biancahonoriosda.com", "vivasemprecomdinheiro.com.br", "sopinha-julianasouza.lovable.app", "louvores-sem-parar.vercel.app", "metodolucrativo.online", "smarthealthhub.online", "protocolobarrigafechada.com.br", "kinusaigastudio.online", "chagratis.shop", "pilates-em-casa-one.vercel.app", "rdf-5-motivos.lovable.app", "gamma.app", "panetonesmagicos.com.br", "secajejumturbo21.vercel.app", "natalbrilhante.online", "milenaxaviernutri.com.br"] } };
 const FILTRO_DEF = { q: "", min: 30, max: 800, mercado: "todos", formatos: [], dmin: null, dmax: null, orden: "nicho", v: 4,
   santi: false, funnel: true, clases: [...CLASES_DEF, "desconocido"], marcas: false, verticales: [] };
 const B = {
@@ -205,6 +207,7 @@ try {
     if (!Array.isArray(B.filtro.verticales)) B.filtro.verticales = [];
   }
 } catch {}
+if (LISTAS[URLP.get("lista")]) { B.filtro.lista = URLP.get("lista"); B.filtro.orden = "anuncios"; }
 const guardarSel = () => ls.set("buscador_sel", JSON.stringify([...B.sel.entries()]));
 const guardarFiltro = () => ls.set("caz_filtro", JSON.stringify(B.filtro));
 
@@ -553,7 +556,9 @@ const mejor = (a, b) => (b.puntajeSanti ?? -1) - (a.puntajeSanti ?? -1) || (b.pu
 function filtradas() {
   const f = B.filtro;
   const q = f.q.trim().toLowerCase();
+  const lista = LISTAS[f.lista];
   const xs = ofertas().filter((o) => {
+    if (lista) return lista.ids.includes(o.id) || (o.ids_previos || []).some((x) => lista.ids.includes(x));
     if (o.anuncios < (Number(f.min) || 0)) return false;
     if (f.santi && !o.winner) return false;
     if (f.funnel && !o.funnel) return false;
@@ -599,6 +604,7 @@ function filtrosHTML() {
       <label class="bo-q"><span class="sr">Buscar</span><input class="campo" id="f-q" type="search" placeholder="Buscar nombre, página, nicho, dominio…" value="${esc(f.q)}" autocomplete="off"></label>
       <label class="bo-orden"><span class="sr">Ordenar</span><select class="campo" id="f-orden">${ORDENES.map(([k, t]) => `<option value="${k}" ${k === f.orden ? "selected" : ""}>${t}</option>`).join("")}</select></label>
     </div>
+    ${LISTAS[f.lista] ? `<div class="bo-santi" role="group" aria-label="Lista"><button type="button" class="seg-b" aria-pressed="true" id="f-lista">📋 ${esc(LISTAS[f.lista].nombre)} ✕</button></div>` : `<div class="bo-santi" role="group" aria-label="Listas">${Object.entries(LISTAS).map(([k, l]) => `<button type="button" class="seg-b" aria-pressed="false" data-flista="${esc(k)}">📋 ${esc(l.nombre)}</button>`).join("")}</div>`}
     <div class="bo-santi" role="group" aria-label="Criterios de Santi">
       ${chip("data-ffun", "1", "Todos los anuncios a la misma landing", f.funnel)}
       ${chip("data-fsanti", "1", "Solo winners Santi (45+ anuncios, 7+ días)", f.santi)}
@@ -657,6 +663,8 @@ function bindFiltros() {
   $$("[data-fdi]").forEach((b) => b.onclick = () => cambiar((f) => { const r = RANGOS_DIAS.find((x) => x[0] === b.dataset.fdi); f.dmin = r[2]; f.dmax = r[3]; }));
   const dias = (id, k) => { $(id).onchange = (e) => { const v = e.target.value === "" ? null : Math.max(0, Math.round(Number(e.target.value))); cambiar((f) => { f[k] = Number.isFinite(v) ? v : null; }); }; };
   dias("#f-dmin", "dmin"); dias("#f-dmax", "dmax");
+  const fl = $("#f-lista"); if (fl) fl.onclick = () => cambiar((f) => { f.lista = null; });
+  $$("[data-flista]").forEach((b) => b.onclick = () => cambiar((f) => { f.lista = b.dataset.flista; f.orden = "anuncios"; }));
   const l = $("#f-limpiar"); if (l) l.onclick = () => cambiar((f) => Object.assign(f, { ...FILTRO_DEF, orden: f.orden }));
   if (!ORDENES.some(([k]) => k === B.filtro.orden)) { B.filtro.orden = "nicho"; $("#f-orden").value = "nicho"; }
 }
