@@ -842,31 +842,44 @@ async function verHistorial(c, ancla, forzar = false, sel = 0) {
   if (!document.body.contains(m)) return;
   pintarHist(m, c, d.r, sel);
 }
+// (19/10 d) acción en palabras: «Bajó el presupuesto de 200,55 a 150», «Apagó el anuncio X», «Creó 5 anuncios»
+const NIV_TX = { campana: "la campaña", conjunto: "el conjunto", anuncio: "el anuncio" };
+function accionesHist(g) {
+  const out = [], creados = {};
+  for (const x of g.cambios) {
+    const quien = x.nivel === "campana" ? NIV_TX.campana : `${NIV_TX[x.nivel]} <i>${esc(x.objeto)}</i>`;
+    const na = Number(x.antes), nd = Number(x.despues);
+    if (/budget/i.test(x.tipo) && isFinite(na) && isFinite(nd) && x.antes != null) out.push(`${nd > na ? "Subió" : "Bajó"} el presupuesto de ${quien} de <b>${NF2.format(na)}</b> a <b>${NF2.format(nd)}</b>`);
+    else if (/run_status/i.test(x.tipo)) out.push(`${/inactiv|paus|desactiv|apag/i.test(x.despues ?? "") ? "Apagó" : "Prendió"} ${quien}`);
+    else if (/^create_/i.test(x.tipo)) creados[x.nivel] = (creados[x.nivel] || 0) + 1;
+    else if (/bid/i.test(x.tipo)) out.push(`Cambió la puja de ${quien}${x.despues ? ` a <b>${esc(x.despues)}</b>` : ""}`);
+    else out.push(`${esc(x.que)}${x.nivel !== "campana" ? ` <span class="mut">(${esc(x.objeto)})</span>` : ""}`);
+  }
+  for (const [n, k] of Object.entries(creados)) out.push(`Creó ${k === 1 ? (n === "anuncio" ? "1 anuncio" : n === "conjunto" ? "1 conjunto" : "la campaña") : `${k} ${n === "anuncio" ? "anuncios" : "conjuntos"}`}`);
+  return [...new Set(out)];
+}
 function pintarHist(m, c, r, sel) {
   const gs = r.grupos || [], cu = $(".ph-cuerpo", m);
   if (!gs.length) { cu.innerHTML = `<div class="ph-tit">${esc(c.nombre)}</div><div class="mut">Sin modificaciones en los últimos 7 días.</div>`; return; }
   const g = gs[sel], n2 = (x) => nulo(x) ? "—" : NF2.format(x);
-  const fecha = (dia, h, mi) => `${dia.slice(8, 10)}/${dia.slice(5, 7)} ${String(h).padStart(2, "0")}:${String(mi ?? 0).padStart(2, "0")}`;
-  const cambios = g.cambios.map((x) => `${esc(x.que)}${x.nivel === "conjunto" ? ` <span class="mut">(${esc(x.objeto)})</span>` : ""}${x.antes != null || x.despues != null ? `: <s>${esc(x.antes ?? "—")}</s> → <b>${esc(x.despues ?? "—")}</b>` : ""}`).join("<br>");
-  const fila = (t, mm, sub) => `<div class="ph-panel"><div class="ph-panel-tit">${t} <span class="mut">${sub}</span></div><div class="ph-mets">
-      <div class="met boceto"><div class="lbl">Gasto</div><div class="val num">${n2(mm.gasto)}</div><div class="sub">${mm.gasto_h ? n2(mm.gasto_h) + " por hora" : "&nbsp;"}</div></div>
-      <div class="met boceto"><div class="lbl">Ventas</div><div class="val num">${mm.ventas}</div><div class="sub">${n2(mm.valor)} facturado</div></div>
-      <div class="met boceto"><div class="lbl">ROAS</div><div class="val num"><span class="roas ${colorRoas(mm.ventas ? mm.roas : null)} chip-roas">${mm.ventas ? roasTx(mm.roas) : "—"}</span></div><div class="sub">&nbsp;</div></div>
-      <div class="met boceto"><div class="lbl">CPA</div><div class="val num">${n2(mm.cpa)}</div><div class="sub">gasto ÷ ventas</div></div></div></div>`;
-  const hasta = g.hasta ? `hasta el cambio del ${g.hasta.slice(8, 10)}/${g.hasta.slice(5, 7)} ${g.hasta.slice(11)}` : "hasta ahora";
+  const fecha = (dia) => `${dia.slice(8, 10)}/${dia.slice(5, 7)}`, hora = (h, mi) => `${String(h).padStart(2, "0")}:${String(mi ?? 0).padStart(2, "0")}`;
+  const a = g.antes, d = g.despues;
+  const roasC = (mm) => `<span class="roas ${colorRoas(mm.ventas ? mm.roas : null)} chip-roas">${mm.ventas ? roasTx(mm.roas) : "—"}</span>`;
+  const dif = (x, y, mejorSube = true, dec = true) => { if (nulo(x) || nulo(y)) return ""; const df = y - x; if (Math.abs(df) < 0.005) return `<span class="mut">=</span>`; const bien = (df > 0) === mejorSube; return `<span class="${bien ? "ph-bien" : "ph-mal"}">${df > 0 ? "▲" : "▼"} ${dec ? NF2.format(Math.abs(df)) : Math.abs(df)}</span>`; };
+  const hasta = g.hasta ? `hasta el cambio del ${fecha(g.hasta)} ${g.hasta.slice(11)}` : "hasta ahora";
   const [f1, f2] = frasesHist(g);
   cu.innerHTML = `<div class="ph-tit">${esc(c.nombre)}</div>
-    <div class="ph-ultima"><span class="mut">${sel ? "Modificación del" : "Última modificación"}</span> <b>${fecha(g.dia, g.hora, g.min)}</b> <span class="mut">· ${haceTx(g.t)}</span><div class="ph-que">${cambios}</div></div>
-    <div class="ph-tabs" role="tablist"><button type="button" role="tab" data-ph="0">Antes</button><button type="button" role="tab" data-ph="1" class="on">Después</button></div>
-    <div class="ph-carril">${fila("Antes", g.antes, `(ese día, 00:00 a ${String(g.hora).padStart(2, "0")}:00)`)}${fila("Después", g.despues, `(${hasta})`)}</div>
-    <div class="ph-frases v-${g.veredicto}"><p>${esc(f1)}</p><p>${esc(f2)}</p></div>
-    ${gs.length > 1 ? `<div class="ph-otros"><span class="mut">Otras modificaciones:</span> ${gs.map((x, i) => `<button type="button" class="ph-chip${i === sel ? " on" : ""}" data-sel="${i}">${fecha(x.dia, x.hora, x.min)}</button>`).join("")}</div>` : ""}
+    <div class="ph-ultima"><span class="lbl">${sel ? "Modificación del" : "Última modificación"}</span>
+      <div class="ph-cuando"><b>${fecha(g.dia)}</b> <b>${hora(g.hora, g.min)}</b> <span class="mut">· ${haceTx(g.t)}</span></div></div>
+    <div class="ph-mod"><span class="lbl">Modificación:</span><ul>${accionesHist(g).map((x) => `<li>${x}</li>`).join("")}</ul></div>
+    <div class="ph-tabla-wrap"><table class="ph-tabla num"><thead><tr><th></th><th>Gasto</th><th>Gasto/h</th><th>Ventas</th><th>Facturado</th><th>ROAS</th><th>CPA</th></tr></thead><tbody>
+      <tr><th scope="row">Al modificar<small>${fecha(g.dia)}, 00:00 a ${hora(g.hora, 0)}</small></th><td>${n2(a.gasto)}</td><td>${n2(a.gasto_h)}</td><td>${a.ventas}</td><td>${n2(a.valor)}</td><td>${roasC(a)}</td><td>${n2(a.cpa)}</td></tr>
+      <tr><th scope="row">${g.hasta ? "Después" : "Ahora"}<small>${esc(hasta)}</small></th><td>${n2(d.gasto)}</td><td>${n2(d.gasto_h)}</td><td>${d.ventas}</td><td>${n2(d.valor)}</td><td>${roasC(d)}</td><td>${n2(d.cpa)}</td></tr>
+      <tr class="ph-dif"><th scope="row">Diferencia</th><td></td><td>${dif(a.gasto_h, d.gasto_h, true)}</td><td></td><td></td><td>${a.ventas && d.ventas ? dif(a.roas, d.roas, true) : ""}</td><td>${dif(a.cpa, d.cpa, false)}</td></tr>
+    </tbody></table></div>
+    <div class="ph-frases v-${g.veredicto}"><span class="lbl">Resumen</span><p>${esc(f1)}</p><p>${esc(f2)}</p></div>
+    ${gs.length > 1 ? `<div class="ph-otros"><span class="mut">Otras modificaciones:</span> ${gs.map((x, i) => `<button type="button" class="ph-chip${i === sel ? " on" : ""}" data-sel="${i}">${fecha(x.dia)} ${hora(x.hora, x.min)}</button>`).join("")}</div>` : ""}
     <div class="ph-pie mut">Pixel, en ${esc(r.moneda)}, hora de la cuenta.</div>`;
-  const car = $(".ph-carril", cu), tabs = $$(".ph-tabs button", cu);
-  const ir = (i, suave = true) => { car.scrollTo({ left: i * car.clientWidth, behavior: suave ? "smooth" : "auto" }); tabs.forEach((t, k) => t.classList.toggle("on", k === i)); };
-  requestAnimationFrame(() => ir(1, false));
-  tabs.forEach((t) => t.onclick = () => ir(Number(t.dataset.ph)));
-  car.addEventListener("scroll", () => { const i = Math.round(car.scrollLeft / car.clientWidth); tabs.forEach((t, k) => t.classList.toggle("on", k === i)); }, { passive: true });
   $$("[data-sel]", cu).forEach((b) => b.onclick = () => pintarHist(m, c, r, Number(b.dataset.sel)));
 }
 function verHoras(c, ancla) {

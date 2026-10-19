@@ -1153,3 +1153,17 @@ input.campo.f-buscar { font-size: 16px; padding: 9px 12px; max-width: 460px; }
 .ph-chip { padding: 3px 10px; border: 1.5px solid var(--linea); border-radius: 999px; background: none; color: inherit; font: inherit; font-variant-numeric: tabular-nums; cursor: pointer; }
 .ph-chip.on { border-color: var(--tinta); font-weight: 600; }
 .ph-pie { margin-top: 10px; font-size: 12px; }
+/* (19/10 d) historial: dos filas (al modificar / ahora) */
+.ph-ultima .lbl, .ph-mod .lbl, .ph-frases .lbl { display: block; font-family: var(--f-titulo); color: var(--mut); font-size: 14px; }
+.ph-cuando { font-size: 22px; font-variant-numeric: tabular-nums; }
+.ph-mod { margin-top: 10px; }
+.ph-mod ul { margin: 2px 0 0; padding-left: 18px; font-size: 14.5px; }
+.ph-tabla-wrap { margin-top: 14px; overflow-x: auto; border: 2px solid var(--tinta); border-radius: 10px; background: var(--tarjeta); }
+.ph-tabla { width: 100%; border-collapse: collapse; font-size: 14.5px; font-variant-numeric: tabular-nums; }
+.ph-tabla th, .ph-tabla td { padding: 8px 10px; text-align: right; white-space: nowrap; border-bottom: 1.5px solid var(--linea); }
+.ph-tabla thead th { font-weight: 600; color: var(--mut); font-size: 13px; }
+.ph-tabla th[scope=row] { text-align: left; font-weight: 600; }
+.ph-tabla th[scope=row] small { display: block; font-weight: 400; color: var(--mut); font-size: 11.5px; }
+.ph-tabla tr.ph-dif th, .ph-tabla tr.ph-dif td { border-bottom: 0; font-size: 13px; }
+.ph-bien { color: var(--ok); font-weight: 600; } .ph-mal { color: var(--peligro); font-weight: 600; }
+.ph-frases { margin-top: 14px; }
