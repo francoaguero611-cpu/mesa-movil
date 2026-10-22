@@ -42,7 +42,8 @@ const ESTADO = {
   error: ["Error", "c-err"],
   pausado: ["Pausado", "c-gris"],
 };
-const TIPO = { creativo: "CREATIVO", vsl: "VSL", reno: "RENO", iteracion: "ITERACIÓN", traduccion: "TRADUCCIÓN", ugc: "UGC", oto: "VSL OTO", avatar: "AVATAR", imagen: "IMAGEN", landing: "LANDING" };
+const TIPO = { creativo: "ANUNCIO", anuncio: "ANUNCIO", vsl: "VSL", reno: "RENO", iteracion: "ITERACIÓN", traduccion: "TRADUCCIÓN", ugc: "UGC", oto: "VSL OTO", avatar: "AVATAR", imagen: "IMAGEN",
+  landing: "LANDING", tienda: "TIENDA", checkout: "CHECKOUT", entregable: "ENTREGABLE", postventa: "POST-VENTA", campana: "CAMPAÑA", tracking: "TRACKING", investigacion: "INVESTIGACIÓN", quiz: "QUIZ" };
 const PASO_ICO = { pend: "○", curso: "●", ok: "✓", error: "✕", salto: "–" };
 // servicio → [nombre, qué hace, color, clave del saldo]
 const SERV = {
@@ -64,7 +65,12 @@ const SERV = {
   mac: ["Mac", "trabajo local", "#94a3b8", "disco"],
   drive: ["Drive", "entrega", "#22c55e", null],
   panda: ["Panda Video", "hosting del VSL", "#fbbf24", null],
-  meta: ["Meta", "subida de anuncios", "#3b82f6", null],
+  meta: ["Meta", "anuncios y campañas", "#3b82f6", null],
+  impultienda: ["Impultienda", "tienda, landing, checkout", "#a78bfa", null],
+  shopify: ["Shopify", "tienda", "#95bf47", null],
+  stripe: ["Stripe", "cobros", "#635bff", null],
+  utmify: ["UTMify", "tracking", "#22d3ee", null],
+  canva: ["Canva", "diseño de entregables", "#00c4cc", null],
 };
 const servDe = (k) => SERV[k] || [k.charAt(0).toUpperCase() + k.slice(1), "", "#9ca3af", null];
 // mínimo para avisar «falta saldo» (en la unidad que mide saldos.py)
@@ -216,8 +222,8 @@ function armarEsqueleto() {
       <button type="button" class="tl-btn ico" data-acc="sig" aria-label="Oferta siguiente">›</button>
     </div>
     <div class="tl-ctrl">
+      <div class="tl-seg tl-quien" id="tl-persona" aria-label="De quién es el panel"></div>
       <div class="tl-seg" id="tl-filtro"></div>
-      <div class="tl-seg" id="tl-persona"></div>
       <div class="tl-zoom"><button type="button" class="tl-btn ico" data-acc="zm" aria-label="Alejar">−</button><button type="button" class="tl-btn zv" data-acc="todo" title="Ver todo">70%</button><button type="button" class="tl-btn ico" data-acc="zp" aria-label="Acercar">+</button></div>
     </div>
   </div>
@@ -240,7 +246,8 @@ function pintarBarraSup() {
     return `<button type="button" class="tl-chip${act === i ? " on" : ""}${err ? " err" : ""}" data-acc="ir" data-i="${i}"><span class="anillo" style="--p:${p}"></span>${esc(m.oferta)}${rev ? `<b class="rev">${rev}</b>` : ""}</button>`;
   }).join("") || `<span class="tl-tenue">sin ofertas</span>`;
   $("#tl-filtro", r).innerHTML = [["todo", "Todo"], ["marcha", "En marcha"], ["revisar", "Para revisar"]].map(([k, t]) => `<button type="button" aria-pressed="${T.filtro === k}" data-acc="filtro" data-v="${k}">${t}</button>`).join("");
-  $("#tl-persona", r).innerHTML = [["todos", "Los dos"], ["lorenzo", "Lorenzo"], ["franco", "Franco"]].map(([k, t]) => `<button type="button" aria-pressed="${T.persona === k}" data-acc="persona" data-v="${k}">${t}</button>`).join("");
+  const yo = CTX.yo || "lorenzo", otro = yo === "lorenzo" ? "franco" : "lorenzo";
+  $("#tl-persona", r).innerHTML = [[yo, "Mi panel"], [otro, otro === "franco" ? "Franco" : "Lorenzo"], ["todos", "Los dos"]].map(([k, t]) => `<button type="button" aria-pressed="${T.persona === k}" data-acc="persona" data-v="${k}">${t}</button>`).join("");
 }
 
 function pintarSaldos() {
@@ -509,6 +516,7 @@ function enganchar() {
     else if (a === "reabrir") revisar("reabrir");
     else if (a === "archivar") revisar("archivar");
     else if (a === "prev") { T.prevI = Number(b.dataset.i); pintarPanel(true); }
+    else if (a === "camp" || a === "pres" || a === "pres-monto") accionCampana(a, b);
   });
   addEventListener("resize", T.onResize = () => { ubicar(); aplicarCam(); });
   addEventListener("keydown", T.onKey = (e) => { if (e.key === "Escape" && T.sel) cerrarPanel(); });
@@ -592,11 +600,17 @@ function pintarPanel(entero = false) {
     <div class="tl-pbloque">
       <h4>Vista previa</h4>
       ${pv ? `${prevs.length > 1 ? `<div class="tl-ptabs">${prevs.map((x, i) => `<button type="button" data-acc="prev" data-i="${i}" aria-pressed="${x === pv}">${esc(x.t)}</button>`).join("")}</div>` : ""}
-        <div class="tl-pmedia" id="tl-pmedia">${pv.tipo === "video" ? `<video controls playsinline preload="metadata" src="${esc(url(pv.u))}"></video>` : pv.tipo === "imagen" ? `<img src="${esc(url(pv.u))}" alt="${esc(pv.t)}">` : `<a class="tl-btn" href="${esc(url(pv.u))}" target="_blank" rel="noopener">Abrir «${esc(pv.t)}» ↗</a>`}</div>
+        <div class="tl-pmedia${pv.tipo === "web" ? " web" : ""}" id="tl-pmedia">${pv.tipo === "video" ? `<video controls playsinline preload="metadata" src="${esc(url(pv.u))}"></video>`
+          : pv.tipo === "imagen" ? `<img src="${esc(url(pv.u))}" alt="${esc(pv.t)}">`
+          : pv.tipo === "audio" ? `<audio controls preload="metadata" src="${esc(url(pv.u))}"></audio>`
+          : pv.tipo === "web" ? `<div class="tl-cel"><div class="tl-cel-notch"></div><iframe src="${esc(url(pv.u))}" title="${esc(pv.t)} en el celular" loading="lazy" referrerpolicy="no-referrer"></iframe></div>`
+          : `<a class="tl-btn" href="${esc(url(pv.u))}" target="_blank" rel="noopener">Abrir «${esc(pv.t)}» ↗</a>`}</div>
         <div class="tl-tenue">${esc(pv.t)} · ${hace(pv.ts)}${pv.tipo !== "link" ? ` · <a href="${esc(url(pv.u))}" target="_blank" rel="noopener">abrir aparte ↗</a>` : ""}</div>`
       : `<p class="tl-tenue">Todavía no hay vista previa. Aparece acá apenas Claude la suba.</p>`}
       ${it.carpeta ? `<a class="tl-btn ancho" href="${esc(url(it.carpeta))}" target="_blank" rel="noopener">📁 Abrir la carpeta</a>` : ""}
+      ${(it.links || []).length ? `<div class="tl-links">${it.links.map((l) => `<a class="tl-btn" href="${esc(url(l.u))}" target="_blank" rel="noopener">${esc(l.t)} ↗</a>`).join("")}</div>` : ""}
     </div>
+    ${campanaHTML(it)}
     <div class="tl-pbloque tl-rev">
       ${rv ? `<p class="tl-rv ${rv.decision === "aprobado" ? "c-ok" : "c-vio"}">${rv.decision === "aprobado" ? "✔ Aprobado" : "✎ Corrección pedida"} por ${esc(rv.por)} · ${hace(rv.ts)}${rv.comentario ? `<br><q>${esc(rv.comentario)}</q>` : ""}</p>` : ""}
       <label for="tl-com">¿Qué hay que corregir?</label>
@@ -616,9 +630,54 @@ function pintarPanel(entero = false) {
     ${corr.length ? `<div class="tl-pbloque"><h4>Correcciones</h4><ol class="tl-corr">${corr.map((c) => `<li class="k-${esc(c.estado)}"><span>${esc(c.texto)}</span><small>${esc(c.por || "")} · ${hace(c.ts)} · <b>${esc({ pedida: "pedida", en_curso: "en curso", hecha: "hecha", descartada: "descartada" }[c.estado] || c.estado)}</b></small></li>`).join("")}</ol></div>` : ""}
     <div class="tl-pbloque tl-pterm"><h4>Terminal <span class="tl-tenue">${esc(it.id)}</span></h4><div class="tl-plog" id="tl-plog"></div></div>`;
   if (viejoVideo) $("#tl-pmedia", p)?.replaceChildren(viejoVideo);
+  const cel = $(".tl-cel", p); if (cel) requestAnimationFrame(() => cel.style.setProperty("--k", String(cel.clientWidth / 390)));
   if (borrador) { const t2 = $("#tl-com", p); t2.value = borrador; if (conFoco) t2.focus({ preventScroll: true }); }
   pintarLog();
 }
+// ---------- campaña de Meta como pieza (meta: campana_id, act, estado, presupuesto, moneda) ----------
+function campanaHTML(it) {
+  const m = it.meta; if (!m?.campana_id || !m.act) return "";
+  const on = m.estado === "ACTIVE";
+  const pres = m.presupuesto != null ? `${m.moneda && m.moneda !== "USD" ? m.moneda + " " : "US$ "}${num(m.presupuesto, 2)} por día` : "presupuesto sin leer";
+  return `<div class="tl-pbloque tl-camp">
+    <h4>Campaña en Meta</h4>
+    <div class="tl-cest"><span class="tl-pill ${on ? "on" : "off"}">${on ? "● Prendida" : "○ Apagada"}</span><span>${esc(pres)}</span></div>
+    <div class="tl-pacc">
+      ${on ? `<button type="button" class="tl-btn" data-acc="camp" data-v="PAUSED">⏸ Apagar</button>` : `<button type="button" class="tl-btn ok" data-acc="camp" data-v="ACTIVE">▶ Prender</button>`}
+      <button type="button" class="tl-btn" data-acc="pres" data-v="10">+10 %</button>
+      <button type="button" class="tl-btn" data-acc="pres" data-v="30">+30 %</button>
+      <button type="button" class="tl-btn" data-acc="pres" data-v="-10">−10 %</button>
+    </div>
+    <div class="tl-monto"><input type="number" inputmode="decimal" min="1" step="0.01" id="tl-monto" placeholder="Nuevo presupuesto diario" aria-label="Nuevo presupuesto diario"><button type="button" class="tl-btn" data-acc="pres-monto">Cambiar</button></div>
+    <p class="tl-tenue">Termina siempre en ,55. Se toca de verdad en Meta: hay que tocar dos veces para confirmar.</p>
+  </div>`;
+}
+async function accionCampana(a, b) {
+  const it = (T.d?.items || []).find((x) => x.id === T.sel); const m = it?.meta; if (!m) return;
+  if (T.demo) { CTX.toast("Es el ejemplo: no se toca Meta."); return; }
+  if (!CTX.appApi) { CTX.toast("Abrí el Workspace desde la app para manejar campañas.", "error"); return; }
+  const monto = a === "pres-monto" ? Number(String($("#tl-monto", T.raiz)?.value || "").replace(",", ".")) : null;
+  if (a === "pres-monto" && !(monto >= 1)) { CTX.toast("Poné un monto válido.", "error"); return; }
+  if (b.dataset.seguro !== "1") { b.dataset.seguro = "1"; b.dataset.txt = b.textContent; b.textContent = "¿Seguro? Tocá de nuevo"; setTimeout(() => { if (b.isConnected && b.dataset.seguro === "1") { b.dataset.seguro = ""; b.textContent = b.dataset.txt; } }, 5000); return; }
+  b.disabled = true; b.textContent = "Cambiando en Meta…";
+  const item = { id: m.campana_id, act: m.act, nivel: "campana", nombre: it.nombre };
+  try {
+    if (a === "camp") {
+      const r = await CTX.appApi("estado", { body: { estado: b.dataset.v, items: [item] }, escritura: true });
+      const res = r?.resultados?.[0]; if (!res?.ok) throw new Error(res?.error || "Meta no respondió");
+      if (!r.dry) await api("taller_meta", "", { id: it.id, meta: { estado: b.dataset.v }, log: b.dataset.v === "ACTIVE" ? "▶ Campaña prendida desde el Workspace" : "⏸ Campaña apagada desde el Workspace" });
+      CTX.toast(r.dry ? "Modo prueba: no se cambió de verdad." : b.dataset.v === "ACTIVE" ? "Campaña prendida ▶" : "Campaña apagada ⏸");
+    } else {
+      const body = a === "pres" ? { pct: Number(b.dataset.v), items: [item] } : { items: [{ ...item, monto }] };
+      const r = await CTX.appApi("presupuesto", { body, escritura: true });
+      const res = r?.resultados?.[0]; if (!res?.ok) throw new Error(res?.error || "Meta no respondió");
+      if (!r.dry) await api("taller_meta", "", { id: it.id, meta: { presupuesto: res.despues, ...(res.moneda ? { moneda: res.moneda } : {}) }, log: `Presupuesto → ${res.despues} ${res.moneda || ""} desde el Workspace` });
+      CTX.toast(r.dry ? "Modo prueba: no se cambió de verdad." : `Presupuesto nuevo: ${num(res.despues, 2)} ${res.moneda || ""}`);
+    }
+    await cargar(); pintarPanel(true);
+  } catch (e) { CTX.toast(`No se pudo: ${e.message}`, "error", 8000); b.disabled = false; b.dataset.seguro = ""; b.textContent = b.dataset.txt || "Reintentar"; }
+}
+
 async function revisar(decision) {
   const it = (T.d?.items || []).find((x) => x.id === T.sel); if (!it) return;
   const com = ($("#tl-com", T.raiz)?.value || "").trim();
@@ -645,6 +704,7 @@ function montar(raiz, ctx = {}) {
   desmontar();
   CTX = { ...CTX, ...ctx };
   T.raiz = raiz; T.firma = ""; T.primeraVez = true; T.d = null;
+  T.persona = CTX.yo || "lorenzo"; // (22/10) siempre arranca en «Mi panel»; el selector muestra el del otro
   T.abrirId = decodeURIComponent(location.hash.split("/")[1] || "") || null;
   raiz.classList.add("tl");
   document.documentElement.classList.add("tl-activo");
@@ -702,6 +762,12 @@ function demo() {
         servicios: { atlas: { estado: "error", det: "saldo insuficiente" } },
         pasos: [P("guion", "Guion", "ok"), P("broll", "B-roll 9 clips", "error", { serv: "atlas", n: 4, de: 9, det: "Atlas se quedó sin saldo" }), P("render", "Render", "pend", { serv: "lambda" })],
         ultimo: { id: 6, texto: "Atlas: saldo insuficiente (US$ 0,67)" } },
+      { id: "demo-yogur-landing", dueno: "lorenzo", oferta: "Yogur Bariátrico AR", mercado: "AR", tipo: "landing", nombre: "Landing + checkout", estado: "para_revisar", inicio: m(-120), actualizado: m(-30),
+        pasos: [P("estructura", "Estructura de la landing ganadora", "ok"), P("textos", "Textos en argentino", "ok"), P("fotos", "Fotos y reseñas reales", "ok", { serv: "gpt" }), P("checkout", "Checkout Cuoio", "ok", { serv: "impultienda" }), P("pixel", "Pixel y CAPI", "ok", { serv: "meta" })],
+        previews: [{ t: "Landing en el celular", u: "https://example.com/", tipo: "web", ts: m(-30) }], links: [{ t: "Landing", u: "https://example.com/" }, { t: "Checkout", u: "https://example.com/" }], ultimo: { id: 3, texto: "Landing publicada" } },
+      { id: "demo-yogur-camp", dueno: "lorenzo", oferta: "Yogur Bariátrico AR", mercado: "AR", tipo: "campana", nombre: "🇦🇷 23.10 CBO Yogur (LATAM)", estado: "esperando", inicio: m(-15), actualizado: m(-5),
+        meta: { campana_id: "1", act: "1", estado: "PAUSED", presupuesto: 30.55, moneda: "USD" }, links: [{ t: "Ads Manager", u: "https://adsmanager.facebook.com/" }],
+        pasos: [P("campana", "Campaña CBO", "ok", { serv: "meta" }), P("conjunto", "Conjunto con anunciante verificado", "ok", { serv: "meta" }), P("anuncios", "6 anuncios en pausa", "ok", { serv: "meta", n: 6, de: 6 }), P("prender", "Prender (lo hacés vos)", "pend")], ultimo: { id: 2, texto: "Campaña armada en pausa" } },
       { id: "demo-cuero-r1", dueno: "franco", oferta: "Cuero & Oficio JA", mercado: "JA", tipo: "reno", nombre: "Reno JPK-2 · hook nuevo", estado: "aprobado", inicio: m(-600), actualizado: m(-200),
         revision: { decision: "aprobado", por: "lorenzo", ts: m(-200) },
         pasos: [P("hook", "Hook visual 3 s", "ok"), P("voz", "Voz JPK-2", "ok", { serv: "elevenlabs" }), P("render", "Render", "ok", { serv: "lambda" }), P("drive", "Subir a Drive", "ok", { serv: "drive" })], ultimo: { id: 5, texto: "Entregado en Drive" } },
@@ -721,5 +787,5 @@ function demoLog(id) {
   ];
 }
 
-window.Taller = { montar, desmontar };
+window.Taller = { montar, desmontar, abrir: (id) => { if (T.raiz) { const m = T.marcos.find((x) => x.items.some((i) => i.id === id)); if (m) volarA(m); abrir(id); } } };
 })();

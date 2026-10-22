@@ -2842,11 +2842,11 @@ function cargarTaller() {
   if (tlCarga) return tlCarga;
   const css = new Promise((ok) => {
     if ($('link[href^="taller.css"]')) return ok();
-    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "taller.css?v=2";
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "taller.css?v=3";
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "taller.js?v=2";
+    const sc = document.createElement("script"); sc.src = "taller.js?v=3";
     sc.onload = () => window.Taller ? ok() : mal(new Error("El Taller no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar el Taller. ¿Hay conexión?")); };
     document.head.appendChild(sc);
@@ -2870,7 +2870,7 @@ async function montarTaller() {
     return;
   }
   if (S.vista !== "workspace" || !$("#tl")) return;
-  window.Taller.montar($("#tl"), { login: (msg) => login(msg), toast });
+  window.Taller.montar($("#tl"), { login: (msg) => login(msg), toast, yo: usuarioActual()?.id || "lorenzo", appApi: (accion, o) => api(accion, o) });
 }
 
 // ---------- Workspace (12/10): workspace.js se carga la primera vez. Spec: Segundo-cerebro-business/OUTPUTS/2026-10-12-workspace-spec.md ----------

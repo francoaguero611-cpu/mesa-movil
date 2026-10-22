@@ -1,0 +1,41 @@
+/* Avisos (22/10): campanita del header + panel + pop-up en el medio. Usa los colores de la app. */
+.av-wrap { position: relative; }
+.av-btn .av-n { position: absolute; top: -7px; right: -7px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 99px; background: var(--peligro); color: #fff; font-size: 11px; font-weight: 700; line-height: 20px; text-align: center; border: 2px solid var(--papel); }
+.av-btn.hay svg { animation: av-tiembla 2.4s ease-in-out infinite; transform-origin: 50% 20%; }
+@keyframes av-tiembla { 0%, 86%, 100% { transform: rotate(0); } 89% { transform: rotate(14deg); } 92% { transform: rotate(-12deg); } 95% { transform: rotate(6deg); } }
+.av-panel { position: absolute; right: 0; top: calc(100% + 10px); width: min(380px, calc(100vw - 24px)); max-height: min(70vh, 560px); display: flex; flex-direction: column; background: var(--tarjeta); color: var(--tinta); border: 2px solid var(--tinta); border-radius: 12px; box-shadow: 4px 4px 0 var(--sombra); z-index: 60; overflow: hidden; }
+.av-cab { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--linea); font-family: var(--f-titulo); }
+.av-link { background: none; border: 0; color: var(--acento); font: inherit; font-size: 13px; cursor: pointer; text-decoration: underline; }
+.av-items { overflow-y: auto; }
+.av-item { display: flex; gap: 10px; padding: 11px 14px; border-bottom: 1px solid var(--linea); }
+.av-item.nueva { background: color-mix(in srgb, var(--marca) 35%, transparent); }
+.av-ico { font-size: 18px; line-height: 1.2; flex: none; width: 22px; text-align: center; }
+.av-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 14px; }
+.av-txt b { font-weight: 700; }
+.av-txt span { color: var(--tinta-2); overflow-wrap: anywhere; }
+.av-txt small { color: var(--mut); font-size: 12px; }
+.av-item.t-saldo .av-txt b, .av-item.t-error .av-txt b { color: var(--peligro); }
+.av-acc, .av-pop-acc { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.av-b { background: var(--papel-2); color: var(--tinta); border: 1.5px solid var(--tinta); border-radius: 8px; padding: 6px 10px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.av-b.ok { background: var(--ok); color: #fff; border-color: var(--ok); }
+.av-b.tenue { border-color: var(--linea); color: var(--mut); background: transparent; }
+.av-b:disabled { opacity: .6; cursor: default; }
+.av-vacio { padding: 26px 14px; text-align: center; color: var(--mut); margin: 0; }
+
+.av-pop-fondo { position: fixed; inset: 0; z-index: 200; background: rgba(5,6,8,.55); display: flex; align-items: center; justify-content: center; padding: 16px; animation: av-fade .18s ease-out; }
+.av-pop { width: min(420px, 100%); background: #0e1013; color: #e6e8eb; border: 1px solid #343a43; border-radius: 16px; padding: 22px 22px 18px; text-align: center; font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace; box-shadow: 0 30px 80px rgba(0,0,0,.6); animation: av-sube .25s cubic-bezier(.2,.8,.2,1); }
+.av-pop.t-saldo, .av-pop.t-error { border-color: #ff5c5c; box-shadow: 0 0 0 1px #ff5c5c, 0 30px 80px rgba(0,0,0,.6); }
+.av-pop.t-campana { border-color: #4cc9f0; }
+.av-pop.t-oferta { border-color: #3ddc84; }
+.av-pop-ico { font-size: 34px; }
+.av-pop h3 { margin: 8px 0 6px; font-size: 18px; line-height: 1.3; }
+.av-pop p { margin: 0 0 6px; color: #a7b0ba; font-size: 13.5px; line-height: 1.5; }
+.av-pop-acc { justify-content: center; margin-top: 14px; }
+.av-pop .av-b { background: #161a1f; color: #e6e8eb; border-color: #343a43; padding: 9px 14px; font-size: 13.5px; }
+.av-pop .av-b:first-child { background: #e6e8eb; color: #07080a; border-color: #e6e8eb; }
+.av-pop.t-saldo .av-b:first-child, .av-pop.t-error .av-b:first-child { background: #ff5c5c; border-color: #ff5c5c; color: #fff; }
+.av-pop .av-b.ok { background: #3ddc84; border-color: #3ddc84; color: #07080a; }
+.av-pop .av-b.tenue { background: transparent; color: #7d8590; border-color: transparent; }
+@keyframes av-fade { from { opacity: 0; } }
+@keyframes av-sube { from { transform: translateY(14px) scale(.98); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .av-btn.hay svg, .av-pop, .av-pop-fondo { animation: none; } }
