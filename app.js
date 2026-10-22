@@ -2846,7 +2846,7 @@ function cargarTaller() {
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "taller.js?v=4";
+    const sc = document.createElement("script"); sc.src = "taller.js?v=5";
     sc.onload = () => window.Taller ? ok() : mal(new Error("El Taller no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar el Taller. ¿Hay conexión?")); };
     document.head.appendChild(sc);

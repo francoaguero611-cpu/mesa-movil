@@ -451,7 +451,9 @@ function enganchar() {
     const rc = v.getBoundingClientRect();
     if (pinza && pts.size >= 2) {
       const [a, b] = [...pts.values()];
-      const z2 = limZ(pinza.z * Math.hypot(a.x - b.x, a.y - b.y) / pinza.d), k = z2 / pinza.z;
+      const ratio = Math.hypot(a.x - b.x, a.y - b.y) / pinza.d;
+      if (!pinza.zoom && Math.abs(ratio - 1) > 0.06) pinza.zoom = ratio; // umbral: deslizar con dos dedos no es pellizco
+      const z2 = limZ(pinza.z * (pinza.zoom ? ratio / pinza.zoom : 1)), k = z2 / pinza.z;
       const mx = (a.x + b.x) / 2 - rc.left, my = (a.y + b.y) / 2 - rc.top, m0x = pinza.mx - rc.left, m0y = pinza.my - rc.top;
       T.cam = { z: z2, x: mx - (m0x - pinza.cx) * k, y: my - (m0y - pinza.cy) * k };
       aplicarCam(); return;
@@ -480,10 +482,18 @@ function enganchar() {
   v.addEventListener("wheel", (e) => {
     e.preventDefault(); cancelAnimationFrame(T.anim);
     const rc = v.getBoundingClientRect();
-    const mouse = e.deltaMode === 1 || (Math.abs(e.deltaY) >= 40 && e.deltaX === 0 && Number.isInteger(e.deltaY));
-    if (e.ctrlKey || e.metaKey || mouse) zoomEn(e.clientX - rc.left, e.clientY - rc.top, Math.exp(-e.deltaY * (e.ctrlKey ? 0.012 : 0.0022)));
+    // (22/10) Zoom SOLO pellizcando (el trackpad lo manda como rueda + ctrlKey) o con ⌘/Ctrl + rueda. Deslizar siempre mueve.
+    if (e.ctrlKey || e.metaKey) zoomEn(e.clientX - rc.left, e.clientY - rc.top, Math.exp(-e.deltaY * (e.ctrlKey && !e.metaKey ? 0.012 : 0.0022)));
     else { T.cam.x -= e.deltaX; T.cam.y -= e.deltaY; aplicarCam(); clearTimeout(T.chipT); T.chipT = setTimeout(marcarChip, 150); }
   }, { passive: false });
+  let gesto = null;
+  v.addEventListener("gesturestart", (e) => { e.preventDefault(); gesto = { z: T.cam.z }; });
+  v.addEventListener("gesturechange", (e) => {
+    e.preventDefault(); if (!gesto) return;
+    const rc = v.getBoundingClientRect();
+    zoomEn(e.clientX - rc.left, e.clientY - rc.top, limZ(gesto.z * e.scale) / T.cam.z);
+  });
+  v.addEventListener("gestureend", (e) => { e.preventDefault(); gesto = null; });
   v.addEventListener("keydown", (e) => {
     const cd = e.target.closest?.(".tl-card");
     if (cd && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); abrir(cd.dataset.item); return; }
