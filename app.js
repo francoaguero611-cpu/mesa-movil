@@ -2704,6 +2704,8 @@ const SECCIONES = [
     montar: () => montarWorkspace() },
   { id: "creativos", nombre: "Creativos", raiz: "#cr", icono: "M3.6 7 C 3.5 6, 4.1 5.3, 5 5.3 L9.3 5.2 L11.1 7.2 L19 7.1 C 20 7.1, 20.6 7.7, 20.5 8.6 L20.3 17.9 C 20.2 18.8, 19.6 19.3, 18.8 19.3 L5.1 19.1 C 4.2 19.1, 3.7 18.5, 3.7 17.7 Z M10.2 10.8 L14.6 13.2 L10.3 15.6 Z",
     montar: (o) => montarCreativos(o), ya: (o) => window.Creativos?.abrir(o.ruta || {}) }, // tocarla estando adentro = volver a todas las carpetas
+  { id: "taller", nombre: "Taller", raiz: "#tl", icono: "M4 5.5 H9.5 V10 H4 Z M14.5 14 H20 V18.5 H14.5 Z M9.5 7.8 C 13 7.8, 12 16.2, 14.5 16.2 M14.5 4.5 H20 V9 H14.5 Z M9.5 7.6 C 11.5 7.4, 12.5 6.8, 14.5 6.8",
+    montar: () => montarTaller() }, // (22/10) producción de creativos y VSL en vivo, tablero tipo Miro
 ];
 const seccionDe = (id) => SECCIONES.find((x) => x.id === id) || null;
 
@@ -2835,6 +2837,44 @@ async function montarCreativos(o = {}) {
   window.Creativos.montar($("#cr"), { login: (msg) => login(msg), toast, abrirModal, ruta: o?.ruta ?? null });
 }
 
+// ---------- Taller (22/10): taller.js se carga la primera vez. Lo alimenta Segundo-cerebro-business/scripts/taller.py ----------
+let tlCarga = null;
+function cargarTaller() {
+  if (window.Taller) return Promise.resolve();
+  if (tlCarga) return tlCarga;
+  const css = new Promise((ok) => {
+    if ($('link[href^="taller.css"]')) return ok();
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "taller.css?v=1";
+    l.onload = l.onerror = () => ok(); document.head.appendChild(l);
+  });
+  const js = new Promise((ok, mal) => {
+    const sc = document.createElement("script"); sc.src = "taller.js?v=1";
+    sc.onload = () => window.Taller ? ok() : mal(new Error("El Taller no arrancó"));
+    sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar el Taller. ¿Hay conexión?")); };
+    document.head.appendChild(sc);
+  });
+  tlCarga = Promise.all([css, js]).catch((e) => { tlCarga = null; throw e; });
+  return tlCarga;
+}
+async function montarTaller() {
+  cerrarMenu(); pararRanking();
+  S.vista = "taller"; ls.set("dash_seccion", "taller");
+  if (!location.hash.startsWith("#taller")) { try { history.replaceState(null, "", location.pathname + location.search + "#taller"); } catch {} } // #taller/<id> abre ese creativo
+  pintarNav();
+  $("#main").innerHTML = `<section class="tl-sec" id="tl" aria-labelledby="tl-t"><h2 class="sr" id="tl-t">Taller</h2><p class="vacio"><span class="cargador"></span>Abriendo el Taller…</p></section>`;
+  pintarBarra();
+  window.scrollTo(0, 0);
+  try { await cargarTaller(); }
+  catch (e) {
+    if (S.vista !== "taller" || !$("#tl")) return;
+    $("#tl").innerHTML = `<div class="err-box" role="alert"><b>No se pudo abrir el Taller.</b> ${esc(e.message)}<div><button type="button" class="btn chico" id="tl-reintentar">Reintentar</button></div></div>`;
+    $("#tl-reintentar").onclick = () => montarTaller();
+    return;
+  }
+  if (S.vista !== "taller" || !$("#tl")) return;
+  window.Taller.montar($("#tl"), { login: (msg) => login(msg), toast });
+}
+
 // ---------- Workspace (12/10): workspace.js se carga la primera vez. Spec: Segundo-cerebro-business/OUTPUTS/2026-10-12-workspace-spec.md ----------
 let wsCarga = null;
 function cargarWorkspace() {
@@ -2920,7 +2960,7 @@ function buscarRk(k) {
   return RK.sel.get(k) || null;
 }
 // (11/10) también desmonta el Cazador: todo cambio de sección pasa por acá.
-function pararRanking() { const pf = $("#pie-flotante"); if (pf) pf.hidden = true; clearInterval(RK.timer); RK.timer = null; window.Cazador?.desmontar(); window.Workspace?.desmontar(); window.Creativos?.desmontar(); }
+function pararRanking() { const pf = $("#pie-flotante"); if (pf) pf.hidden = true; clearInterval(RK.timer); RK.timer = null; window.Cazador?.desmontar(); window.Workspace?.desmontar(); window.Creativos?.desmontar(); window.Taller?.desmontar(); }
 
 function montarRanking({ pedido = null } = {}) {
   cerrarMenu(); pararRanking();
