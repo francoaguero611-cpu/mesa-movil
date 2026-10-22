@@ -84,6 +84,7 @@ const T = {
   filtro: ls.get("tl_filtro", "todo"), persona: ls.get("tl_persona", "todos"),
   term: false, demo: new URLSearchParams(location.search).get("demo") === "1",
   anim: 0, primeraVez: true,
+  selec: new Set(), chat: ls.get("tl_chat", "1") === "1", para: "", enviando: false,
 };
 
 // ---------- API ----------
@@ -183,7 +184,7 @@ function armarMarcos() {
 function pintar() {
   const r = T.raiz; if (!r) return;
   if (!$(".tl-vista", r)) armarEsqueleto();
-  pintarBarraSup(); pintarSaldos(); pintarTerminal();
+  pintarBarraSup(); pintarSaldos(); pintarTerminal(); pintarChat();
   const vacio = $(".tl-vacio", r);
   if (T.error && !T.d) { vacio.hidden = false; vacio.innerHTML = `<b>No se pudo leer el Workspace.</b><span>${esc(T.error)}</span><button type="button" class="tl-btn" data-acc="reintentar">Reintentar</button>`; return; }
   if (!T.d) { vacio.hidden = false; vacio.innerHTML = `<span class="tl-cursor">cargando el workspace</span>`; return; }
@@ -234,6 +235,8 @@ function armarEsqueleto() {
   <div class="tl-saldos" id="tl-saldos"></div>
   <canvas class="tl-mini" id="tl-mini" width="200" height="120" aria-label="Mapa chico: tocá para ir"></canvas>
   <button type="button" class="tl-btn tl-vivo" data-acc="term"><span class="pt"></span>Claude en vivo</button>
+  <button type="button" class="tl-btn tl-chatbtn" data-acc="chat">💬 Chat<b class="tl-selcount" hidden></b></button>
+  <section class="tl-chat" id="tl-chat" hidden aria-label="Chat general con tu Claude"></section>
   <section class="tl-term" id="tl-term" hidden aria-label="Terminal de Claude en vivo"></section>
   <aside class="tl-panel" id="tl-panel" hidden aria-label="Detalle del creativo"></aside>`;
   enganchar();
@@ -279,7 +282,7 @@ function mundoHTML(marcos) {
     const costo = m.items.reduce((a, it) => a + (Number(it.costo_usd) || 0), 0);
     const merc = [...new Set(m.items.map((x) => x.mercado).filter(Boolean))].join(" · ");
     html += `<div class="tl-marco" style="left:${ox}px;top:${oy}px;width:${m.w}px;height:${m.h}px">
-      <div class="tl-mtit"><span class="tl-hash">#</span>${esc(m.oferta)}${merc ? `<span class="tl-merc">${esc(merc)}</span>` : ""}</div>
+      <div class="tl-mtit"><span class="tl-hash">#</span>${esc(m.oferta)}${merc ? `<span class="tl-merc">${esc(merc)}</span>` : ""}${m.items.some(puedoEscribir) ? `<span class="tl-selof" data-selof="${esc(m.oferta)}" title="Seleccionar todas las piezas de esta oferta">☐ todas</span>` : ""}</div>
       <div class="tl-msub">${m.items.length} pieza${m.items.length > 1 ? "s" : ""} · ${prog}% · ${falta > 0 ? `faltan ≈ ${minTxt(falta)}` : cuenta((x) => ["trabajando", "corrigiendo"].includes(x.estado)) ? "calculando cuánto falta" : "sin trabajo en marcha"}${costo ? ` · gastado US$ ${num(costo, 2)}` : ""}</div>
     </div>`;
     // nodo central de la oferta
@@ -339,7 +342,8 @@ function tarjetaHTML(it, x, y, est) {
   const hechos = ps.filter((q) => q.estado === "ok" || q.estado === "salto").length;
   const prev = (it.previews || [])[0];
   const corr = (it.correcciones || []).filter((c) => c.estado !== "hecha" && c.estado !== "descartada").length;
-  return `<div role="button" tabindex="0" aria-label="${esc(it.nombre)}: ${esc(est[0])}" class="tl-card ${est[1]}${T.sel === it.id ? " sel" : ""}" data-item="${esc(it.id)}" style="left:${x}px;top:${y}px;width:${L.IT_W}px;height:${L.IT_H}px">
+  return `<div role="button" tabindex="0" aria-label="${esc(it.nombre)}: ${esc(est[0])}" class="tl-card ${est[1]}${T.sel === it.id ? " sel" : ""}${T.selec.has(it.id) ? " marcada" : ""}" data-item="${esc(it.id)}" style="left:${x}px;top:${y}px;width:${L.IT_W}px;height:${L.IT_H}px">
+    ${puedoEscribir(it) ? `<span class="tl-sel${T.selec.has(it.id) ? " on" : ""}" data-sel="${esc(it.id)}" role="checkbox" aria-checked="${T.selec.has(it.id)}" aria-label="Seleccionar ${esc(it.nombre)}" title="Seleccionar (o ⌘/Shift + clic en la tarjeta)">✓</span>` : ""}
     <div class="tl-ch"><span class="tl-tipo">${esc(TIPO[it.tipo] || String(it.tipo || "").toUpperCase())}</span><span class="tl-est">${esc(est[0])}</span>${it.dueno ? `<span class="tl-dueno">${esc(it.dueno)}</span>` : ""}</div>
     <div class="tl-cn">${esc(it.nombre)}</div>
     <div class="tl-cp"><div class="tl-barra"><i style="width:${p}%"></i></div><span>${p}%</span></div>
@@ -471,8 +475,11 @@ function enganchar() {
       v.classList.remove("arrastrando");
       if (arr && !movio && e.type === "pointerup") {
         const el = document.elementFromPoint(e.clientX, e.clientY);
-        const card = el?.closest?.(".tl-card");
-        if (card) abrir(card.dataset.item);
+        const card = el?.closest?.(".tl-card"), cas = el?.closest?.("[data-sel]"), of = el?.closest?.("[data-selof]");
+        if (cas) alternarSel(cas.dataset.sel);
+        else if (of) { const m = T.marcos.find((x) => x.oferta === of.dataset.selof); const ids = (m?.items || []).filter(puedoEscribir).map((x) => x.id); const todas = ids.every((i) => T.selec.has(i)); ids.forEach((i) => todas ? T.selec.delete(i) : T.selec.add(i)); pintarSel(); }
+        else if (card && (e.shiftKey || e.metaKey || e.ctrlKey) && puedoEscribir((T.d?.items || []).find((x) => x.id === card.dataset.item))) alternarSel(card.dataset.item);
+        else if (card) abrir(card.dataset.item);
         else if (el?.closest?.(".tl-hub, .tl-mtit")) { const i = marcoEn(e); if (i >= 0) volarA(T.marcos[i]); }
       }
       arr = null; marcarChip();
@@ -524,6 +531,10 @@ function enganchar() {
     else if (a === "filtro") { T.filtro = b.dataset.v; ls.set("tl_filtro", T.filtro); T.firma = ""; T.primeraVez = true; pintar(); }
     else if (a === "persona") { T.persona = b.dataset.v; ls.set("tl_persona", T.persona); T.firma = ""; T.primeraVez = true; pintar(); }
     else if (a === "term") { T.term = !T.term; pintarTerminal(); }
+    else if (a === "chat") { T.chat = !T.chat; ls.set("tl_chat", T.chat ? "1" : "0"); pintarChat(true); }
+    else if (a === "limpiar-sel") { T.selec.clear(); pintarSel(); }
+    else if (a === "quitar-sel") { T.selec.delete(b.dataset.v); pintarSel(); }
+    else if (a === "enviar") enviarChat();
     else if (a === "reintentar") cargar();
     else if (a === "ejemplo") { T.demo = true; T.primeraVez = true; cargar(); }
     else if (a === "cerrar") cerrarPanel();
@@ -541,6 +552,62 @@ function marcoEn(e) {
   const v = $(".tl-vista", T.raiz), rc = v.getBoundingClientRect();
   const wx = (e.clientX - rc.left - T.cam.x) / T.cam.z;
   return T.marcos.findIndex((m) => wx >= m.x && wx <= m.x + m.w);
+}
+
+// ---------- selección y chat general (22/10) ----------
+// Cada uno le escribe SOLO a su Claude: se puede seleccionar y escribir únicamente en «Mi panel» (el servidor lo vuelve a chequear).
+const yoId = () => T.d?.yo || CTX.yo || "lorenzo";
+const puedoEscribir = (it) => !!it && it.dueno === yoId() && !T.demo || (T.demo && it?.dueno === "lorenzo");
+function alternarSel(id) { T.selec.has(id) ? T.selec.delete(id) : T.selec.add(id); pintarSel(); }
+function pintarSel() {
+  for (const id of [...T.selec]) if (!(T.d?.items || []).some((x) => x.id === id)) T.selec.delete(id);
+  $$(".tl-card", T.raiz).forEach((c) => { const on = T.selec.has(c.dataset.item); c.classList.toggle("marcada", on); const k = $(".tl-sel", c); if (k) { k.classList.toggle("on", on); k.setAttribute("aria-checked", on); } });
+  const n = $(".tl-selcount", T.raiz); if (n) { n.hidden = !T.selec.size; n.textContent = T.selec.size; }
+  if (T.selec.size && !T.chat) { T.chat = true; ls.set("tl_chat", "1"); }
+  pintarChat(true);
+}
+function pintarChat(forzar = false) {
+  const n = $("#tl-chat", T.raiz), b = $(".tl-chatbtn", T.raiz); if (!n) return;
+  n.hidden = !T.chat; b?.classList.toggle("on", T.chat);
+  if (!T.chat || !T.d) return;
+  const quien = T.persona === "todos" ? yoId() : T.persona, mio = quien === yoId();
+  const msgs = (T.d.chat || []).filter((m) => m.dueno === quien);
+  const items = new Map((T.d.items || []).map((x) => [x.id, x]));
+  const chats = (T.d.chats || []).filter((c) => c.dueno === quien);
+  const firma = JSON.stringify([quien, msgs.map((m) => [m.id, m.estado]), [...T.selec], chats.map((c) => c.sesion), T.para, T.enviando]);
+  if (!forzar && n.dataset.firma === firma) return;
+  const txt = $("#tl-chat-txt", n), borrador = txt?.value || "", foco = document.activeElement === txt;
+  const lista = $(".tl-chlog", n), abajo = !lista || lista.scrollTop + lista.clientHeight >= lista.scrollHeight - 40;
+  n.dataset.firma = firma;
+  const estadoMsg = (m) => m.tipo !== "usuario" ? "" : m.estado === "pendiente" ? "⏳ esperando que un chat lo tome" : m.estado === "entregado" ? `📨 lo está viendo el chat ${esc(m.sesion || "")}` : m.estado === "respondido" ? "✔ respondido" : esc(m.estado);
+  const sel = [...T.selec].map((id) => items.get(id)).filter(Boolean);
+  n.innerHTML = `<div class="tl-chcab"><b>${mio ? "Chat con tu Claude" : `Chat de ${quien === "franco" ? "Franco" : "Lorenzo"} · solo lectura`}</b><button type="button" class="tl-btn ico" data-acc="chat" aria-label="Cerrar chat">×</button></div>
+    <div class="tl-chlog">${msgs.map((m) => `<div class="tl-msg ${m.tipo === "usuario" ? "yo" : "cl"}">
+      ${m.tipo === "usuario" && m.items?.length ? `<div class="tl-mpz">→ ${m.items.length} pieza${m.items.length > 1 ? "s" : ""}: ${m.items.map((i) => esc(items.get(i)?.nombre || i)).join(" · ")}</div>` : ""}
+      <div class="tl-mtx">${esc(m.texto)}</div><small>${m.tipo === "usuario" ? "" : "Claude · "}${hora(m.ts, false)} ${estadoMsg(m)}</small></div>`).join("") || `<p class="tl-tenue tl-chvacio">${mio ? "Escribile a tu Claude como en el chat de siempre. Seleccioná piezas (la casilla ✓ de cada tarjeta, o ⌘/Shift + clic) para que la corrección vaya solo a esas." : "Todavía no hay mensajes."}</p>`}</div>
+    ${mio ? `${sel.length ? `<div class="tl-selbar"><b>${sel.length} elemento${sel.length > 1 ? "s" : ""} seleccionado${sel.length > 1 ? "s" : ""}</b><button type="button" class="tl-link" data-acc="limpiar-sel">limpiar</button><div class="tl-selchips">${sel.map((x) => `<span>${esc(x.nombre)}<button type="button" data-acc="quitar-sel" data-v="${esc(x.id)}" aria-label="Quitar ${esc(x.nombre)}">×</button></span>`).join("")}</div></div>` : ""}
+      ${sel.length ? "" : `<label class="tl-para">Para: <select id="tl-para"><option value="">el chat que esté libre</option>${chats.map((c) => `<option value="${esc(c.sesion)}"${T.para === c.sesion ? " selected" : ""}>${esc(c.sesion)} · ${esc(c.tema || "sin tema")} (${hora(c.ult, false)})</option>`).join("")}</select></label>`}
+      <div class="tl-comp"><textarea id="tl-chat-txt" rows="2" placeholder="${sel.length ? `Corrección para ${sel.length === 1 ? "esta pieza" : `estas ${sel.length} piezas`}… (Enter manda, Shift+Enter baja de línea)` : "Escribile a tu Claude… (Enter manda)"}"${T.enviando ? " disabled" : ""}></textarea><button type="button" class="tl-btn ok" data-acc="enviar"${T.enviando ? " disabled" : ""}>${T.enviando ? "…" : "➤"}</button></div>`
+      : `<p class="tl-tenue tl-solol">No podés escribirle al Claude de ${quien === "franco" ? "Franco" : "Lorenzo"}. Volvé a «Mi panel» para escribirle al tuyo.</p>`}`;
+  const t2 = $("#tl-chat-txt", n);
+  if (t2) {
+    t2.value = borrador; if (foco) t2.focus({ preventScroll: true });
+    t2.onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviarChat(); } };
+  }
+  const ps = $("#tl-para", n); if (ps) ps.onchange = () => { T.para = ps.value; };
+  const l2 = $(".tl-chlog", n); if (abajo) l2.scrollTop = l2.scrollHeight;
+}
+async function enviarChat() {
+  const t = $("#tl-chat-txt", T.raiz), texto = (t?.value || "").trim(); if (!texto || T.enviando) return;
+  if (T.demo) { CTX.toast("Es el ejemplo: no se manda nada."); return; }
+  T.enviando = true; pintarChat(true);
+  try {
+    await api("taller_chat", "", { texto, items: [...T.selec], para: T.selec.size ? null : T.para || null });
+    const n = T.selec.size;
+    T.enviando = false; $("#tl-chat-txt", T.raiz).value = ""; T.selec.clear(); pintarSel();
+    CTX.toast(n ? `Enviado a ${n} pieza${n > 1 ? "s" : ""}: pasan a «corrigiendo».` : "Enviado a tu Claude.");
+    await cargar();
+  } catch (e) { T.enviando = false; pintarChat(true); CTX.toast(`No se pudo mandar: ${e.message}`, "error", 8000); }
 }
 
 // ---------- terminal general (hooks de Claude Code → ws_eventos) ----------
@@ -760,6 +827,13 @@ function demo() {
       { dueno: "lorenzo", servicio: "runpod", ok: true, valor: 23.83, unidad: "USD", texto: "US$ 23.83 · gastando US$ 2.76/h ahora", medido: m(-3) },
       { dueno: "lorenzo", servicio: "heygen", ok: true, valor: 6, unidad: "créditos", texto: "6 de cuota", medido: m(-3) },
       { dueno: "lorenzo", servicio: "disco", ok: true, valor: 20.3, unidad: "GB", texto: "20.3 GB libres", medido: m(-3) },
+    ],
+    yo: "lorenzo",
+    chats: [{ sesion: "646c48e9", dueno: "lorenzo", ult: m(-2), tema: "VSL yogur: segundo 43" }, { sesion: "57737244", dueno: "lorenzo", ult: m(-5), tema: "creativos yogur A1–A6" }],
+    chat: [
+      { id: 1, ts: m(-30), dueno: "lorenzo", autor: "lorenzo", tipo: "usuario", texto: "A todos subiles la música, no se escucha", items: ["demo-yogur-a4", "demo-yogur-a5"], estado: "respondido", sesion: "57737244" },
+      { id: 2, ts: m(-22), dueno: "lorenzo", autor: "claude", tipo: "claude", texto: "Listo: subí la música a 0,12 en A4 y A5 y dejé las vistas previas nuevas.", items: [], estado: "respondido" },
+      { id: 3, ts: m(-3), dueno: "lorenzo", autor: "lorenzo", tipo: "usuario", texto: "En el A5 sacá el congelado del 0:58", items: ["demo-yogur-a5"], estado: "entregado", sesion: "57737244" },
     ],
     eventos: [
       { id: 1, ts: m(-4), dueno: "lorenzo", tipo: "usuario", texto: "dale, terminá el A4 y pasame la vista previa" },
