@@ -257,3 +257,22 @@ html.tl-activo, html.tl-activo body { overflow: hidden; overscroll-behavior: non
 .tl-monto input { flex: 1; min-width: 0; background: #07080a; color: var(--tl-txt); border: 1px solid var(--tl-borde2); border-radius: 8px; padding: 8px 10px; font: inherit; }
 .tl-camp p { margin: 8px 0 0; font-size: 11.5px; }
 .tl-quien button[aria-pressed="true"] { background: var(--tl-ok); color: var(--tl-bg); font-weight: 700; }
+
+/* (22/10 c) color por estado: haciendo ámbar · corrigiendo violeta · terminado verde · error rojo · cola gris */
+.tl-card.c-ok { box-shadow: 0 0 0 1px rgba(61,220,132,.25), 0 0 26px rgba(61,220,132,.14); }
+.tl-card.c-cian { box-shadow: none; }
+.tl-card.c-vio { box-shadow: 0 0 0 1px rgba(192,132,252,.25), 0 0 26px rgba(192,132,252,.16); }
+.tl-ronda { font-size: 11.5px; color: var(--tl-vio); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-ronda span { color: #d8c4f5; }
+.tl-ronda.hecha { color: var(--tl-ok); }
+.tl-hstats span.c-ok { color: var(--tl-ok); } .tl-hstats .c-ok b { color: var(--tl-ok); }
+.tl-hstats span.c-vio { color: var(--tl-vio); } .tl-hstats .c-vio b { color: var(--tl-vio); }
+.tl-pronda { border-left: 3px solid var(--tl-vio); padding-left: 12px; }
+.tl-pronda h4 { color: var(--tl-vio); }
+.tl-pronda.hecha { border-left-color: var(--tl-ok); } .tl-pronda.hecha h4 { color: var(--tl-ok); }
+.tl-pronda q { display: block; color: #d8c4f5; margin: 0 0 10px; line-height: 1.45; }
+.tl-pest.c-vio + .tl-barra i, .tl-pest.c-amb + .tl-barra i { background: currentColor; }
+.tl-pest.c-vio + .tl-barra { color: var(--tl-vio); } .tl-pest.c-amb + .tl-barra { color: var(--tl-amb); } .tl-pest.c-err + .tl-barra { color: var(--tl-err); }
+.tl-pest.c-err + .tl-barra i { background: currentColor; }
+.tl-leyenda { position: absolute; left: 12px; top: 64px; display: flex; gap: 12px; flex-wrap: wrap; background: rgba(14,16,19,.85); border: 1px solid var(--tl-borde); border-radius: 8px; padding: 5px 10px; font-size: 11px; z-index: 1; }
+@media (max-width: 700px) { .tl-leyenda { top: auto; bottom: 96px; } }

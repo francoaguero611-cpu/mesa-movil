@@ -33,9 +33,9 @@ const minTxt = (m) => m < 1 ? "menos de 1 min" : m < 60 ? `${Math.round(m)} min`
 // ---------- catálogo ----------
 const ESTADO = {
   en_cola: ["En cola", "c-gris"],
-  trabajando: ["Trabajando", "c-amb"],
+  trabajando: ["Haciendo", "c-amb"],
   esperando: ["Esperando", "c-gris"],
-  para_revisar: ["Para revisar", "c-cian"],
+  para_revisar: ["Terminado · para revisar", "c-ok"],
   corrigiendo: ["Corrigiendo", "c-vio"],
   aprobado: ["Aprobado", "c-ok"],
   listo: ["Listo", "c-ok"],
@@ -112,10 +112,13 @@ async function cargar() {
 }
 
 // ---------- cálculos ----------
+// (22/10) Cada corrección es una vuelta nueva (it.ronda): la barra vuelve a 0 y cuenta solo los pasos de esa corrección.
+const enRonda = (it) => it.estado === "corrigiendo" && it.ronda && !it.ronda.fin;
+const pasosVista = (it) => enRonda(it) ? it.ronda.pasos || [] : it.pasos || [];
 function progreso(it) {
+  if (["aprobado", "listo", "para_revisar"].includes(it.estado)) return 100;
   if (it.progreso != null) return Math.max(0, Math.min(100, Number(it.progreso)));
-  if (["aprobado", "listo"].includes(it.estado)) return 100;
-  const ps = it.pasos || [];
+  const ps = pasosVista(it);
   if (!ps.length) return it.estado === "para_revisar" ? 100 : 0;
   const v = ps.reduce((a, p) => a + (p.estado === "ok" || p.estado === "salto" ? 1 : p.estado === "curso" ? (p.n != null && p.de ? 0.15 + 0.8 * p.n / p.de : 0.5) : 0), 0);
   return Math.round(100 * v / ps.length);
@@ -123,15 +126,15 @@ function progreso(it) {
 function faltaMin(it) {
   if (["aprobado", "listo", "para_revisar", "error", "pausado"].includes(it.estado)) return null;
   if (it.eta) { const m = (new Date(it.eta).getTime() - Date.now()) / 60000; return Math.max(0, m); }
-  const p = progreso(it);
-  if (p < 4 || !it.inicio) return null;
-  const pas = (Date.now() - new Date(it.inicio).getTime()) / 60000;
+  const p = progreso(it), ini = enRonda(it) ? it.ronda.inicio : it.inicio;
+  if (p < 4 || !ini) return null;
+  const pas = (Date.now() - new Date(ini).getTime()) / 60000;
   return pas * (100 - p) / p;
 }
 function serviciosDe(it) {
   const m = new Map();
   const ponga = (k, est) => { k = String(k || "").toLowerCase(); if (!k) return; const prev = m.get(k); const rango = { activo: 4, error: 3, espera: 2, ok: 1, pend: 0 }; if (!prev || rango[est] > rango[prev]) m.set(k, est); };
-  for (const p of it.pasos || []) if (p.serv) ponga(p.serv, p.estado === "curso" ? "activo" : p.estado === "ok" ? "ok" : p.estado === "error" ? "error" : "pend");
+  for (const p of [...(it.pasos || []), ...(enRonda(it) ? it.ronda.pasos || [] : [])]) if (p.serv) ponga(p.serv, p.estado === "curso" ? "activo" : p.estado === "ok" ? "ok" : p.estado === "error" ? "error" : "pend");
   for (const [k, v] of Object.entries(it.servicios || {})) ponga(k, v.estado);
   // si el ítem ya terminó, nada queda «activo»
   if (["aprobado", "listo", "para_revisar"].includes(it.estado)) for (const [k, v] of m) if (v === "activo") m.set(k, "ok");
@@ -227,6 +230,7 @@ function armarEsqueleto() {
       <div class="tl-zoom"><button type="button" class="tl-btn ico" data-acc="zm" aria-label="Alejar">−</button><button type="button" class="tl-btn zv" data-acc="todo" title="Ver todo">70%</button><button type="button" class="tl-btn ico" data-acc="zp" aria-label="Acercar">+</button></div>
     </div>
   </div>
+  <div class="tl-leyenda" aria-label="Colores"><span class="c-amb">● Haciendo</span><span class="c-vio">● Corrigiendo</span><span class="c-ok">● Terminado</span><span class="c-err">● Error</span><span class="tl-tenue">● En cola</span></div>
   <div class="tl-saldos" id="tl-saldos"></div>
   <canvas class="tl-mini" id="tl-mini" width="200" height="120" aria-label="Mapa chico: tocá para ir"></canvas>
   <button type="button" class="tl-btn tl-vivo" data-acc="term"><span class="pt"></span>Claude en vivo</button>
@@ -270,7 +274,7 @@ function mundoHTML(marcos) {
   for (const m of marcos) {
     const ox = m.x, oy = m.y;
     const prog = Math.round(m.items.reduce((a, it) => a + progreso(it), 0) / m.items.length);
-    const cuenta = (f) => m.items.filter(f).length;
+    const cuenta = (f) => m.items.filter(f).length; // hub: listas · haciendo · corrigiendo · error
     const falta = Math.max(0, ...m.items.map((it) => faltaMin(it) ?? 0));
     const costo = m.items.reduce((a, it) => a + (Number(it.costo_usd) || 0), 0);
     const merc = [...new Set(m.items.map((x) => x.mercado).filter(Boolean))].join(" · ");
@@ -284,9 +288,9 @@ function mundoHTML(marcos) {
       <div class="tl-hk">oferta</div><div class="tl-hn">${esc(m.oferta)}</div>
       <div class="tl-barra"><i style="width:${prog}%"></i></div>
       <div class="tl-hstats">
-        <span><b>${cuenta((x) => ["aprobado", "listo"].includes(x.estado))}</b>listas</span>
-        <span class="c-cian"><b>${cuenta((x) => x.estado === "para_revisar")}</b>revisar</span>
-        <span class="c-amb"><b>${cuenta((x) => ["trabajando", "corrigiendo", "en_cola", "esperando"].includes(x.estado))}</b>en marcha</span>
+        <span class="c-ok"><b>${cuenta((x) => ["aprobado", "listo", "para_revisar"].includes(x.estado))}</b>terminadas</span>
+        <span class="c-amb"><b>${cuenta((x) => ["trabajando", "en_cola", "esperando"].includes(x.estado))}</b>haciendo</span>
+        <span class="c-vio"><b>${cuenta((x) => x.estado === "corrigiendo")}</b>corrigiendo</span>
         <span class="c-err"><b>${cuenta((x) => x.estado === "error")}</b>error</span>
       </div>
     </div>`;
@@ -326,7 +330,8 @@ function cable(x1, y1, x2, y2, est, col) {
 
 function tarjetaHTML(it, x, y, est) {
   const p = progreso(it), f = faltaMin(it);
-  const ps = it.pasos || [];
+  const ps = pasosVista(it);
+  const ronda = enRonda(it) ? it.ronda : null;
   // mostrar el paso en curso y sus vecinos: lo que importa está a la vista
   const ic = Math.max(0, ps.findIndex((q) => q.estado === "curso" || q.estado === "error"));
   const desde = Math.max(0, Math.min(ic - 2, ps.length - 6));
@@ -338,6 +343,7 @@ function tarjetaHTML(it, x, y, est) {
     <div class="tl-ch"><span class="tl-tipo">${esc(TIPO[it.tipo] || String(it.tipo || "").toUpperCase())}</span><span class="tl-est">${esc(est[0])}</span>${it.dueno ? `<span class="tl-dueno">${esc(it.dueno)}</span>` : ""}</div>
     <div class="tl-cn">${esc(it.nombre)}</div>
     <div class="tl-cp"><div class="tl-barra"><i style="width:${p}%"></i></div><span>${p}%</span></div>
+    ${ronda ? `<div class="tl-ronda">✎ Corrección ${ronda.n}: <span>${esc((ronda.textos || []).slice(-1)[0] || "")}</span></div>` : it.ronda?.fin && it.estado === "para_revisar" ? `<div class="tl-ronda hecha">✔ Corrección ${it.ronda.n} terminada</div>` : ""}
     <div class="tl-ceta">${it.estado === "para_revisar" ? "▶ lista para que la mires" : it.estado === "aprobado" ? "✔ aprobada" : f != null ? `faltan ≈ ${minTxt(f)}` : it.estado === "error" ? "frenada por un error" : "—"}${ps.length ? ` · ${hechos}/${ps.length} pasos` : ""}${corr ? ` · <b class="c-vio">${corr} corrección${corr > 1 ? "es" : ""}</b>` : ""}</div>
     <ul class="tl-chk">${vis.map((q) => `<li class="p-${q.estado}"><i>${PASO_ICO[q.estado] || "○"}</i><span>${esc(q.t)}${q.n != null && q.de ? ` <em>${num(q.n)}/${num(q.de)}</em>` : ""}</span>${q.serv ? `<small style="--sc:${servDe(q.serv)[2]}">${esc(servDe(q.serv)[0])}</small>` : ""}</li>`).join("") || `<li class="p-pend"><i>○</i><span>sin checklist todavía</span></li>`}${ps.length > vis.length ? `<li class="tl-mas">+${ps.length - vis.length} pasos más</li>` : ""}</ul>
     <div class="tl-cpie">${it.ultimo ? `<code>&gt; ${esc(it.ultimo.texto).slice(0, 90)}</code>` : `<code class="tl-tenue">&gt; sin actividad</code>`}${prev ? `<span class="tl-ver">▶ vista previa</span>` : ""}</div>
@@ -415,7 +421,7 @@ function pintarMini() {
     g.fillStyle = "rgba(255,255,255,.06)"; g.strokeStyle = "rgba(255,255,255,.25)"; g.lineWidth = 1;
     g.fillRect(ox + m.x * k, oy + m.y * k, m.w * k, m.h * k); g.strokeRect(ox + m.x * k + .5, oy + m.y * k + .5, m.w * k - 1, m.h * k - 1);
     for (const p of m.pos) {
-      const cl = { para_revisar: "#4cc9f0", aprobado: "#3ddc84", listo: "#3ddc84", error: "#ff5c5c", trabajando: "#ffb020", corrigiendo: "#c084fc" }[p.it.estado] || "#6b7280";
+      const cl = { para_revisar: "#3ddc84", aprobado: "#3ddc84", listo: "#3ddc84", error: "#ff5c5c", trabajando: "#ffb020", corrigiendo: "#c084fc" }[p.it.estado] || "#6b7280";
       g.fillStyle = cl; g.fillRect(ox + (m.x + p.x) * k, oy + (m.y + p.y) * k, L.IT_W * k, Math.max(2, L.IT_H * k));
     }
   }
@@ -622,8 +628,13 @@ function pintarPanel(entero = false) {
         <button type="button" class="tl-btn tenue" data-acc="archivar" title="Sacarlo del tablero">Archivar</button>
       </div>
     </div>
+    ${it.ronda ? `<div class="tl-pbloque tl-pronda${it.ronda.fin ? " hecha" : ""}">
+      <h4>Corrección ${it.ronda.n} ${it.ronda.fin ? "· terminada" : "· en curso"} <span class="tl-tenue">${(it.ronda.pasos || []).filter((q) => q.estado === "ok").length}/${(it.ronda.pasos || []).length}</span></h4>
+      ${(it.ronda.textos || []).map((t) => `<q>${esc(t)}</q>`).join("")}
+      <ul class="tl-chk largo">${(it.ronda.pasos || []).map((q) => `<li class="p-${q.estado}"><i>${PASO_ICO[q.estado] || "○"}</i><span>${esc(q.t)}${q.n != null && q.de ? ` <em>${num(q.n)}/${num(q.de)}</em>` : ""}${q.det ? `<br><small class="tl-det">${esc(q.det)}</small>` : ""}</span>${q.serv ? `<small style="--sc:${servDe(q.serv)[2]}">${esc(servDe(q.serv)[0])}</small>` : ""}${q.ini && q.estado === "curso" ? `<time>${hace(q.ini)}</time>` : q.fin ? `<time>${hora(q.fin, false)}</time>` : ""}</li>`).join("")}</ul>
+    </div>` : ""}
     <div class="tl-pbloque">
-      <h4>Checklist <span class="tl-tenue">${(it.pasos || []).filter((q) => q.estado === "ok" || q.estado === "salto").length}/${(it.pasos || []).length}</span></h4>
+      <h4>${it.ronda ? "Primera vez" : "Checklist"} <span class="tl-tenue">${(it.pasos || []).filter((q) => q.estado === "ok" || q.estado === "salto").length}/${(it.pasos || []).length}</span></h4>
       <ul class="tl-chk largo">${(it.pasos || []).map((q) => `<li class="p-${q.estado}"><i>${PASO_ICO[q.estado] || "○"}</i><span>${esc(q.t)}${q.n != null && q.de ? ` <em>${num(q.n)}/${num(q.de)}</em>` : ""}${q.det ? `<br><small class="tl-det">${esc(q.det)}</small>` : ""}</span>${q.serv ? `<small style="--sc:${servDe(q.serv)[2]}">${esc(servDe(q.serv)[0])}</small>` : ""}${q.ini && q.estado === "curso" ? `<time>${hace(q.ini)}</time>` : q.fin ? `<time>${hora(q.fin, false)}</time>` : ""}</li>`).join("") || `<li class="p-pend"><i>○</i><span>sin checklist</span></li>`}</ul>
     </div>
     ${servs.length ? `<div class="tl-pbloque"><h4>Servicios</h4><div class="tl-pserv">${servs.map(([k, e]) => { const s = saldoDe(k), d = it.servicios?.[k]?.det; return `<span class="e-${e}${s?.bajo ? " bajo" : ""}" style="--sc:${servDe(k)[2]}"><i></i><b>${esc(servDe(k)[0])}</b>${d ? ` · ${esc(d)}` : ""}${s ? `<small>${s.bajo ? "⚠ " : ""}${esc(s.texto || "")}</small>` : ""}</span>`; }).join("")}</div></div>` : ""}
@@ -756,6 +767,7 @@ function demo() {
         ultimo: { id: 8, texto: "Bajando tramo t6 del pod 3…" } },
       { id: "demo-yogur-a5", dueno: "lorenzo", oferta: "Yogur Bariátrico AR", mercado: "AR", tipo: "creativo", nombre: "A5 · Testimonio cocina", estado: "corrigiendo", inicio: m(-90), actualizado: m(-6),
         correcciones: [{ texto: "En 0:58 se congela la imagen", por: "lorenzo", ts: m(-12), estado: "en_curso" }],
+        ronda: { n: 1, inicio: m(-12), textos: ["En 0:58 se congela la imagen"], pasos: [P("c-leer", "Entender la corrección", "ok"), P("c-corregir", "Rehacer el corte en 0:58", "curso", { serv: "ffmpeg" }), P("c-qa", "Revisar que no quede congelado", "pend", { serv: "gemini" }), P("c-preview", "Nueva vista previa", "pend")] },
         pasos: [P("voz", "Voz", "ok", { serv: "elevenlabs" }), P("lipsync", "Lip sync", "ok", { serv: "runpod" }), P("subs", "Subtítulos (400)", "ok"), P("fix", "Corregir congelado 0:58", "curso", { serv: "ffmpeg" }), P("qa", "Revisar de nuevo", "pend", { serv: "gemini" })],
         ultimo: { id: 7, texto: "Rehaciendo el corte en 0:58" } },
       { id: "demo-yogur-a7", dueno: "lorenzo", oferta: "Yogur Bariátrico AR", mercado: "AR", tipo: "creativo", nombre: "A7 · B-roll recetas", estado: "error", inicio: m(-50), actualizado: m(-15),
