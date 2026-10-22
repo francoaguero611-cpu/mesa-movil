@@ -2700,14 +2700,12 @@ const SECCIONES = [
     montar: (o) => montarRanking(o), ya: (o) => { if (o.pedido != null) abrirPedido(o.pedido); } },
   { id: "cazador", nombre: "Cazador", raiz: "#caz", icono: "M12 4.2 C 16.5 4, 19.9 7.4, 19.8 12 C 19.7 16.6, 16.4 19.9, 12 19.8 C 7.5 19.7, 4.2 16.5, 4.2 12 C 4.3 7.6, 7.4 4.3, 12.6 4.3 M12 1.8 V7 M12 17 V22.2 M1.8 12 H7 M17 12 H22.2 M11.9 11.6 L12.1 12.4",
     montar: (o) => montarCazador(o), ya: (o) => { if (o.pedido != null) window.Cazador?.abrirPedido(o.pedido); } },
-  { id: "workspace", nombre: "Workspace", raiz: "#ws", icono: "M3.8 5 C 9 4.8, 15 5.1, 20.2 4.9 L20 19.2 C 14.8 19.4, 9 19.1, 4 19.2 Z M7 9.5 L9.8 12 L7 14.5 M12 15 H16.5",
-    montar: () => montarWorkspace() },
+  { id: "workspace", nombre: "Workspace", raiz: "#tl", icono: "M3.8 5 C 9 4.8, 15 5.1, 20.2 4.9 L20 19.2 C 14.8 19.4, 9 19.1, 4 19.2 Z M7 9.5 L9.8 12 L7 14.5 M12 15 H16.5",
+    montar: () => montarTaller() }, // (22/10) el tablero en vivo (ex «Taller») reemplazó al Workspace viejo de etapas; montarWorkspace queda sin usar
   { id: "creativos", nombre: "Creativos", raiz: "#cr", icono: "M3.6 7 C 3.5 6, 4.1 5.3, 5 5.3 L9.3 5.2 L11.1 7.2 L19 7.1 C 20 7.1, 20.6 7.7, 20.5 8.6 L20.3 17.9 C 20.2 18.8, 19.6 19.3, 18.8 19.3 L5.1 19.1 C 4.2 19.1, 3.7 18.5, 3.7 17.7 Z M10.2 10.8 L14.6 13.2 L10.3 15.6 Z",
     montar: (o) => montarCreativos(o), ya: (o) => window.Creativos?.abrir(o.ruta || {}) }, // tocarla estando adentro = volver a todas las carpetas
-  { id: "taller", nombre: "Taller", raiz: "#tl", icono: "M4 5.5 H9.5 V10 H4 Z M14.5 14 H20 V18.5 H14.5 Z M9.5 7.8 C 13 7.8, 12 16.2, 14.5 16.2 M14.5 4.5 H20 V9 H14.5 Z M9.5 7.6 C 11.5 7.4, 12.5 6.8, 14.5 6.8",
-    montar: () => montarTaller() }, // (22/10) producción de creativos y VSL en vivo, tablero tipo Miro
 ];
-const seccionDe = (id) => SECCIONES.find((x) => x.id === id) || null;
+const seccionDe = (id) => SECCIONES.find((x) => x.id === (id === "taller" ? "workspace" : id)) || null; // #taller = nombre viejo
 
 function armarSlider() {
   const n = $("#secciones"); if (!n || n.dataset.armado) return;
@@ -2844,11 +2842,11 @@ function cargarTaller() {
   if (tlCarga) return tlCarga;
   const css = new Promise((ok) => {
     if ($('link[href^="taller.css"]')) return ok();
-    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "taller.css?v=1";
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "taller.css?v=2";
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "taller.js?v=1";
+    const sc = document.createElement("script"); sc.src = "taller.js?v=2";
     sc.onload = () => window.Taller ? ok() : mal(new Error("El Taller no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar el Taller. ¿Hay conexión?")); };
     document.head.appendChild(sc);
@@ -2858,20 +2856,20 @@ function cargarTaller() {
 }
 async function montarTaller() {
   cerrarMenu(); pararRanking();
-  S.vista = "taller"; ls.set("dash_seccion", "taller");
-  if (!location.hash.startsWith("#taller")) { try { history.replaceState(null, "", location.pathname + location.search + "#taller"); } catch {} } // #taller/<id> abre ese creativo
+  S.vista = "workspace"; ls.set("dash_seccion", "workspace");
+  if (!/^#(workspace|taller)\//.test(location.hash)) { try { history.replaceState(null, "", location.pathname + location.search + "#workspace"); } catch {} } // #workspace/<id> abre ese creativo
   pintarNav();
-  $("#main").innerHTML = `<section class="tl-sec" id="tl" aria-labelledby="tl-t"><h2 class="sr" id="tl-t">Taller</h2><p class="vacio"><span class="cargador"></span>Abriendo el Taller…</p></section>`;
+  $("#main").innerHTML = `<section class="tl-sec" id="tl" aria-labelledby="tl-t"><h2 class="sr" id="tl-t">Workspace</h2><p class="vacio"><span class="cargador"></span>Abriendo el Workspace…</p></section>`;
   pintarBarra();
   window.scrollTo(0, 0);
   try { await cargarTaller(); }
   catch (e) {
-    if (S.vista !== "taller" || !$("#tl")) return;
-    $("#tl").innerHTML = `<div class="err-box" role="alert"><b>No se pudo abrir el Taller.</b> ${esc(e.message)}<div><button type="button" class="btn chico" id="tl-reintentar">Reintentar</button></div></div>`;
+    if (S.vista !== "workspace" || !$("#tl")) return;
+    $("#tl").innerHTML = `<div class="err-box" role="alert"><b>No se pudo abrir el Workspace.</b> ${esc(e.message)}<div><button type="button" class="btn chico" id="tl-reintentar">Reintentar</button></div></div>`;
     $("#tl-reintentar").onclick = () => montarTaller();
     return;
   }
-  if (S.vista !== "taller" || !$("#tl")) return;
+  if (S.vista !== "workspace" || !$("#tl")) return;
   window.Taller.montar($("#tl"), { login: (msg) => login(msg), toast });
 }
 

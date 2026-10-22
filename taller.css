@@ -239,3 +239,5 @@ html.tl-activo, html.tl-activo body { overflow: hidden; overscroll-behavior: non
   .tl *, .tl *::before, .tl *::after { animation: none !important; transition: none !important; }
   .tl-pulso { display: none; }
 }
+
+.tl, .tl:focus, .tl:focus-visible { outline: none !important; }

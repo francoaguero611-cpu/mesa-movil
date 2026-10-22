@@ -1,4 +1,4 @@
-/* Taller — sección del Dashboard desde el 22/10 (pedido de Lorenzo: «ver la creación de los creativos y VSL sin preguntarte
+/* Workspace (nació como «Taller» el 22/10 y ese mismo día reemplazó al Workspace viejo de etapas) — sección del Dashboard (pedido de Lorenzo: «ver la creación de los creativos y VSL sin preguntarte
    cómo venís»). Un tablero tipo Miro de fondo negro: cuadrícula infinita con zoom, un marco por oferta, cada creativo/VSL
    como tarjeta con su checklist propio, flechas hacia los servicios que está usando (RunPod, Atlas, ElevenLabs…),
    saldos, tiempo que falta, vista previa para aprobar o pedir corrección y la terminal de cada pieza.
@@ -99,7 +99,7 @@ async function cargar() {
     T.d = T.demo ? demo() : await api("taller", "&dias=7");
     T.error = null;
   } catch (e) {
-    if (e.code === 401) { desmontar(); CTX.login("Entrá de nuevo para ver el Taller."); return; }
+    if (e.code === 401) { desmontar(); CTX.login("Entrá de nuevo para ver el Workspace."); return; }
     T.error = e.message;
   } finally { T.cargando = false; }
   pintar();
@@ -176,8 +176,8 @@ function pintar() {
   if (!$(".tl-vista", r)) armarEsqueleto();
   pintarBarraSup(); pintarSaldos(); pintarTerminal();
   const vacio = $(".tl-vacio", r);
-  if (T.error && !T.d) { vacio.hidden = false; vacio.innerHTML = `<b>No se pudo leer el Taller.</b><span>${esc(T.error)}</span><button type="button" class="tl-btn" data-acc="reintentar">Reintentar</button>`; return; }
-  if (!T.d) { vacio.hidden = false; vacio.innerHTML = `<span class="tl-cursor">cargando el taller</span>`; return; }
+  if (T.error && !T.d) { vacio.hidden = false; vacio.innerHTML = `<b>No se pudo leer el Workspace.</b><span>${esc(T.error)}</span><button type="button" class="tl-btn" data-acc="reintentar">Reintentar</button>`; return; }
+  if (!T.d) { vacio.hidden = false; vacio.innerHTML = `<span class="tl-cursor">cargando el workspace</span>`; return; }
   const marcos = armarMarcos();
   const firma = JSON.stringify([marcos.map((m) => [m.oferta, m.items.map((i) => [i.id, i.actualizado, i.estado, i.ultimo?.id])]), T.d.saldos?.map((s) => s.medido), Math.floor(Date.now() / 30000)]);
   T.marcos = marcos;
@@ -204,12 +204,12 @@ function pintar() {
 
 function armarEsqueleto() {
   T.raiz.innerHTML = `
-  <div class="tl-vista" tabindex="0" aria-label="Tablero del Taller: arrastrá para moverte, rueda o pellizco para el zoom">
+  <div class="tl-vista" tabindex="0" aria-label="Tablero del Workspace: arrastrá para moverte, rueda o pellizco para el zoom">
     <div class="tl-mundo"></div>
     <div class="tl-vacio" hidden></div>
   </div>
   <div class="tl-sup">
-    <div class="tl-marca"><span class="tl-prompt">~/taller</span><span class="tl-cursor"></span></div>
+    <div class="tl-marca"><span class="tl-prompt">~/workspace</span><span class="tl-cursor"></span></div>
     <div class="tl-nav">
       <button type="button" class="tl-btn ico" data-acc="ant" aria-label="Oferta anterior">‹</button>
       <div class="tl-chips" id="tl-chips"></div>
@@ -627,7 +627,7 @@ async function revisar(decision) {
   $$(".tl-pacc button", T.raiz).forEach((b) => b.disabled = true);
   try {
     await api("taller_revision", "", { id: it.id, decision, comentario: com });
-    CTX.toast(decision === "aprobar" ? "Aprobado ✔" : decision === "corregir" ? "Corrección enviada: Claude la ve en el Taller." : decision === "archivar" ? "Archivado." : "Listo.");
+    CTX.toast(decision === "aprobar" ? "Aprobado ✔" : decision === "corregir" ? "Corrección enviada: Claude la ve en el Workspace." : decision === "archivar" ? "Archivado." : "Listo.");
     if (decision === "archivar") cerrarPanel();
     await cargar();
     if (T.sel) { T.logUlt = 0; T.log = []; cargarLog(); pintarPanel(true); }
@@ -684,7 +684,7 @@ function demo() {
       { id: 1, ts: m(-4), dueno: "lorenzo", tipo: "usuario", texto: "dale, terminá el A4 y pasame la vista previa" },
       { id: 2, ts: m(-3), dueno: "lorenzo", tipo: "herramienta", herramienta: "Bash", texto: "Bajar tramos t1 y t6 del pod" },
       { id: 3, ts: m(-2), dueno: "lorenzo", tipo: "herramienta", herramienta: "Bash", texto: "Armar A4 con subtítulos y música" },
-      { id: 4, ts: m(-1), dueno: "lorenzo", tipo: "mensaje", texto: "A4 armado, subo la vista previa al Taller." },
+      { id: 4, ts: m(-1), dueno: "lorenzo", tipo: "mensaje", texto: "A4 armado, subo la vista previa al Workspace." },
     ],
     items: [
       { id: "demo-yogur-vsl", dueno: "lorenzo", oferta: "Yogur Bariátrico AR", mercado: "AR", tipo: "vsl", nombre: "VSL v1 · 20 min", estado: "para_revisar", inicio: m(-300), actualizado: m(-20), costo_usd: 14.2,
