@@ -893,13 +893,13 @@ function pintarHist(m, c, r, sel) {
       <div class="ph-cuando"><b>${fecha(g.dia)}</b> <b>${hora(g.hora, g.min)}</b> <span class="mut">· ${haceTx(g.t)}</span></div></div>
     <div class="ph-mod"><span class="lbl">Modificación:</span><ul>${accionesHist(g).map((x) => `<li>${x}</li>`).join("")}</ul></div>
     <div class="ph-tabla-wrap"><table class="ph-tabla num"><thead><tr><th></th>${COLS_HIST.map(([, t]) => `<th>${esc(t)}</th>`).join("")}</tr></thead><tbody>
-      ${filaH(`A las ${hora(g.hora, g.min)}`, `cómo estaba al modificar (${fecha(g.dia)})`, g.antes)}
+      ${filaH(`A las ${hora(g.hora, g.min)}`, g.antes.foto === null ? `aproximado: no había foto guardada (${fecha(g.dia)})` : `foto del dashboard al modificar (${fecha(g.dia)})`, g.antes)}
       ${filaH(g.hasta ? `Hasta ${g.hasta.slice(11)}` : "Ahora", g.hasta ? `antes de la modificación siguiente (${fecha(g.hasta)})` : "cómo está ahora", ahora)}
     </tbody></table></div>
     <div class="ph-desliza mut">Deslizá la tabla para ver todas las métricas →</div>
     <div class="ph-frases v-${R.cls}"><span class="lbl">Resumen</span><p class="ph-ver">${R.ver}</p>${R.txt.map((t) => `<p>${esc(t)}</p>`).join("")}</div>
     ${gs.length > 1 ? `<div class="ph-otros"><span class="mut">Otras modificaciones:</span> ${gs.map((x, i) => `<button type="button" class="ph-chip${i === sel ? " on" : ""}" data-sel="${i}">${fecha(x.dia)} ${hora(x.hora, x.min)}</button>`).join("")}</div>` : ""}
-    <div class="ph-pie mut">Métricas del pixel de Meta en ${esc(r.moneda)}, acumuladas desde las 00:00 de ese día (hora de la cuenta). Se actualiza cada 10 min.</div>`;
+    <div class="ph-pie mut">Mismas métricas que el dashboard, acumuladas del día. «A las ${hora(g.hora, g.min)}» es la foto guardada en el momento del cambio y no cambia más; «Ahora» es el dashboard de este momento.</div>`;
   $$("[data-sel]", cu).forEach((b) => b.onclick = () => pintarHist(m, c, r, Number(b.dataset.sel)));
 }
 function verHoras(c, ancla) {
