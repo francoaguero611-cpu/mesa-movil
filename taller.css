@@ -316,3 +316,9 @@ html.tl-activo, html.tl-activo body { overflow: hidden; overscroll-behavior: non
   .tl-chatbtn { right: auto; left: 8px; bottom: 8px; }
   .tl-chat { right: 6px; left: 6px; width: auto; bottom: 52px; height: 62%; }
 }
+
+/* (23/10) correcciones rápidas + marcar segundo */
+.tl-rapidos { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.tl-rapidos button { background: #14181d; color: #d7dbe0; border: 1px solid var(--tl-borde2); border-radius: 99px; padding: 5px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+.tl-rapidos button:hover { border-color: var(--tl-vio); color: #fff; }
+.tl-marcar { margin-top: 8px; }

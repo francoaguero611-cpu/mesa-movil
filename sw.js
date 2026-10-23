@@ -1,10 +1,10 @@
 /* Service worker — Dashboard Lorenzo */
-const VERSION = "dash-v68";
-const SHELL = ["./", "index.html", "styles.css?v=41", "app.js?v=64", "demo.js?v=33", "manifest.webmanifest", "avisos.css?v=1", "avisos.js?v=1",
+const VERSION = "dash-v69";
+const SHELL = ["./", "index.html", "styles.css?v=41", "app.js?v=65", "demo.js?v=33", "manifest.webmanifest", "avisos.css?v=1", "avisos.js?v=1",
   "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png", "icons/apple-touch-icon.png"];
 // Cazador (antes Buscador de ofertas): se guarda aparte y sin trabar la instalación si algún archivo falta en el hosting.
 // buscador.html quedó como redirección a ./#cazador (links viejos).
-const EXTRA = ["buscador.html", "buscador.css?v=5", "buscador.js?v=10", "workspace.css?v=1", "workspace.js?v=2", "creativos.css?v=8", "creativos.js?v=9", "taller.css?v=5", "taller.js?v=6"];
+const EXTRA = ["buscador.html", "buscador.css?v=5", "buscador.js?v=10", "workspace.css?v=1", "workspace.js?v=2", "creativos.css?v=8", "creativos.js?v=9", "taller.css?v=6", "taller.js?v=7"];
 const API_HOST = "tppcpnfzcxxusdhrlmdx.supabase.co";
 const API_CACHE = "dash-api";
 

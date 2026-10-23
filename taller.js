@@ -544,6 +544,8 @@ function enganchar() {
     else if (a === "archivar") revisar("archivar");
     else if (a === "prev") { T.prevI = Number(b.dataset.i); pintarPanel(true); }
     else if (a === "camp" || a === "pres" || a === "pres-monto") accionCampana(a, b);
+    else if (a === "rapido") { const t = $("#tl-com", T.raiz); if (t) { t.value = (t.value.trim() ? t.value.trim() + " · " : "") + b.dataset.v; t.focus(); } }
+    else if (a === "marcar") marcarSegundo();
   });
   addEventListener("resize", T.onResize = () => { ubicar(); aplicarCam(); });
   addEventListener("keydown", T.onKey = (e) => { if (e.key === "Escape" && T.sel) cerrarPanel(); });
@@ -553,6 +555,14 @@ function marcoEn(e) {
   const wx = (e.clientX - rc.left - T.cam.x) / T.cam.z;
   return T.marcos.findIndex((m) => wx >= m.x && wx <= m.x + m.w);
 }
+
+// ---------- botones rápidos por tipo de pieza (23/10) ----------
+const RAPIDOS = {
+  video: [["🎵", "Subir la música"], ["🔉", "Bajar la música"], ["🪝", "Cambiar el hook (primeros 3 s)"], ["🎙", "Probar otra voz"], ["✂️", "Hacerlo más corto"], ["🔠", "Subtítulos más grandes"], ["🔁", "Hacer 3 variaciones"]],
+  web: [["📱", "Mejorar cómo se ve en el celular"], ["✍️", "Cambiar el titular"], ["⭐", "Sumar más reseñas"], ["🖼", "Cambiar las fotos"], ["💲", "Revisar precios y botón de pago"]],
+  otro: [["✍️", "Mejorar el texto"], ["🖼", "Cambiar las imágenes"], ["🔁", "Hacer otra versión"]],
+};
+const grupoRapido = (it) => ["landing", "tienda", "checkout", "quiz"].includes(it.tipo) ? "web" : ["campana", "tracking", "investigacion"].includes(it.tipo) ? null : ["entregable", "avatar", "imagen"].includes(it.tipo) ? "otro" : "video";
 
 // ---------- selección y chat general (22/10) ----------
 // Cada uno le escribe SOLO a su Claude: se puede seleccionar y escribir únicamente en «Mi panel» (el servidor lo vuelve a chequear).
@@ -696,8 +706,10 @@ function pintarPanel(entero = false) {
     ${campanaHTML(it)}
     <div class="tl-pbloque tl-rev">
       ${rv ? `<p class="tl-rv ${rv.decision === "aprobado" ? "c-ok" : "c-vio"}">${rv.decision === "aprobado" ? "✔ Aprobado" : "✎ Corrección pedida"} por ${esc(rv.por)} · ${hace(rv.ts)}${rv.comentario ? `<br><q>${esc(rv.comentario)}</q>` : ""}</p>` : ""}
+      ${puedoEscribir(it) && grupoRapido(it) ? `<div class="tl-rapidos" aria-label="Correcciones rápidas">${RAPIDOS[grupoRapido(it)].map(([ic, t]) => `<button type="button" data-acc="rapido" data-v="${esc(t)}">${ic} ${esc(t)}</button>`).join("")}</div>` : ""}
       <label for="tl-com">¿Qué hay que corregir?</label>
       <textarea id="tl-com" rows="3" placeholder="Ej.: en 0:12 el subtítulo tapa la cara · la música más baja · cambiá el hook"></textarea>
+      ${pv?.tipo === "video" && puedoEscribir(it) ? `<button type="button" class="tl-btn tl-marcar" data-acc="marcar">📍 Marcar el segundo del video</button>` : ""}
       <div class="tl-pacc">
         <button type="button" class="tl-btn ok" data-acc="aprobar"${["aprobado"].includes(it.estado) ? " disabled" : ""}>✔ Aprobar</button>
         <button type="button" class="tl-btn vio" data-acc="corregir">✎ Pedir corrección</button>
@@ -766,6 +778,15 @@ async function accionCampana(a, b) {
   } catch (e) { CTX.toast(`No se pudo: ${e.message}`, "error", 8000); b.disabled = false; b.dataset.seguro = ""; b.textContent = b.dataset.txt || "Reintentar"; }
 }
 
+function marcarSegundo() {
+  const v = $("#tl-pmedia video", T.raiz), t = $("#tl-com", T.raiz); if (!v || !t) return;
+  v.pause();
+  const s = Math.floor(v.currentTime || 0), marca = `[${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}]`;
+  const i = t.selectionStart ?? t.value.length;
+  t.value = t.value.slice(0, i) + (i && !/\s$/.test(t.value.slice(0, i)) ? " " : "") + marca + " " + t.value.slice(i);
+  t.focus(); const fin = i + marca.length + 2; t.setSelectionRange(fin, fin);
+}
+
 async function revisar(decision) {
   const it = (T.d?.items || []).find((x) => x.id === T.sel); if (!it) return;
   const com = ($("#tl-com", T.raiz)?.value || "").trim();
@@ -773,8 +794,9 @@ async function revisar(decision) {
   if (T.demo) { CTX.toast("Es el ejemplo: no se guarda nada."); return; }
   $$(".tl-pacc button", T.raiz).forEach((b) => b.disabled = true);
   try {
-    await api("taller_revision", "", { id: it.id, decision, comentario: com });
-    CTX.toast(decision === "aprobar" ? "Aprobado ✔" : decision === "corregir" ? "Corrección enviada: Claude la ve en el Workspace." : decision === "archivar" ? "Archivado." : "Listo.");
+    if (decision === "corregir") await api("taller_chat", "", { texto: com, items: [it.id] });
+    else await api("taller_revision", "", { id: it.id, decision, comentario: com });
+    CTX.toast(decision === "aprobar" ? "Aprobado ✔" : decision === "corregir" ? "Corrección enviada: se la paso a tu Claude." : decision === "archivar" ? "Archivado." : "Listo.");
     if (decision === "archivar") cerrarPanel();
     await cargar();
     if (T.sel) { T.logUlt = 0; T.log = []; cargarLog(); pintarPanel(true); }

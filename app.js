@@ -2842,11 +2842,11 @@ function cargarTaller() {
   if (tlCarga) return tlCarga;
   const css = new Promise((ok) => {
     if ($('link[href^="taller.css"]')) return ok();
-    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "taller.css?v=5";
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "taller.css?v=6";
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "taller.js?v=6";
+    const sc = document.createElement("script"); sc.src = "taller.js?v=7";
     sc.onload = () => window.Taller ? ok() : mal(new Error("El Taller no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar el Taller. ¿Hay conexión?")); };
     document.head.appendChild(sc);
