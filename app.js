@@ -631,6 +631,7 @@ function estadoTxt(x) {
   let [t, c] = ESTADO_COL[x.estado] || (prendido(x.estado) ? ["activo", "on"] : [String(x.estado || "—").toLowerCase(), "off"]);
   if (prendido(x.estado) && x.aprendizaje === "aprendizaje") [t, c] = ["aprendizaje", "apr"];
   if (prendido(x.estado) && x.aprendizaje === "limitado") [t, c] = ["aprendizaje limitado", "raro"];
+  if (prendido(x.estado) && x.aprendizaje === "sin_conjuntos") [t, c] = ["sin conjuntos activos", "off"]; // (24/10 b) campaña prendida que no entrega
   return `<span class="est-col ${c}">${esc(t)}</span>`;
 }
 // (24/10, Lorenzo) Columna Acciones: lo que sugiere el manual de la CBO (dash_acciones) + días del testeo / del mínimo + techo.
