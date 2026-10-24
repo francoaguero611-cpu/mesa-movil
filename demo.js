@@ -538,6 +538,18 @@
     }
     if (accion.startsWith("reglas_")) { const r = reglasDemo(accion, p, body); if (r !== undefined) return r; }
     if (accion === "dash_log") return { log: LOG.slice(0, 50) };
+    if (accion === "dash_acciones") { // (24/10) «Acciones a realizar» de ejemplo
+      const cs = dash("hoy").campanas.filter((c) => c.estado === "ACTIVE");
+      const c0 = cs[0], c1 = cs[1] || cs[0], c2 = cs[2] || cs[0];
+      const s0 = (detalle(c0.id, "hoy").conjuntos || [])[0];
+      const acc = [
+        { tipo: "surf_sug", nivel: "campana", id: c0.id, campana: c0.id, act: c0.act, nombre: c0.nombre, texto: "ayer ROAS 2,4, hoy 2,7 (9v, gastó 64 % del presupuesto) → +30 %", ac: "s+30", antes: c0.presupuesto, despues: Math.floor((c0.presupuesto || 50) * 1.3) + 0.55, porque: "Manual de la CBO (sección 6): ayer y hoy con ROAS ≥ 2 → +30 %." },
+        { tipo: "techo", nivel: "campana", id: c1.id, campana: c1.id, act: c1.act, nombre: c1.nombre, texto: "techo ~150 (22/10: ROAS 2,3 → 1,1 al subir); hoy en 195,55 → bajá 30 % o escalá horizontal", ac: "s-30", porque: "Al subir el presupuesto el ROAS se cayó: el techo de la cuenta está cerca del presupuesto anterior." },
+        { tipo: "lista_horizontal", nivel: "campana", id: c2.id, campana: c2.id, act: c2.act, nombre: c2.nombre, texto: "ROAS 2,1 → 2,6 → 2,2 (3 días), 14v → escala horizontal", porque: "Validada: 3 días seguidos en ganancia." },
+      ];
+      if (s0) acc.push({ tipo: "reno_minimo", nivel: "conjunto", id: s0.id, campana: c0.id, act: c0.act, nombre: s0.nombre, campana_nombre: c0.nombre, texto: "3 días, gastó 31,20 (2,4 tickets), 1v → sacale el mínimo", ac: "min0", porque: "Manual (sección 5): el gasto mínimo de una renovación dura 3 días y se saca." });
+      return { generado: new Date().toISOString(), acciones: acc };
+    }
     if (accion === "dash_problemas") { // (24/10) anuncios rechazados / con problemas de ejemplo
       const cs = dash("hoy").campanas.filter((c) => c.estado === "ACTIVE").slice(0, 2);
       return { generado: new Date().toISOString(), errores: [], anuncios: cs.length ? [

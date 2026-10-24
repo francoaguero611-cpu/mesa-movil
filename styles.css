@@ -1200,3 +1200,42 @@ input.campo.f-buscar { font-size: 16px; padding: 9px 12px; max-width: 460px; }
 @media (prefers-reduced-motion: reduce) { .prob-det > summary::before { transition: none; } }
 .dot.mal { background: var(--peligro); border-color: var(--peligro); }
 .prob-pie .link { font-size: inherit; }
+
+/* (24/10, Lorenzo) Punto de estado en la esquina del nombre (no mueve el texto) + columnas Estado y Acciones */
+.camp td.nom { position: sticky; }
+.dot.dot-esq { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-width: 0; box-shadow: none; }
+.dot.dot-esq.off { border: 1.5px solid var(--mut); width: 7px; height: 7px; }
+.camp td.c-estado, .camp td.c-acciones, .camp th.c-estado, .camp th.c-acciones { text-align: left; }
+.camp td.c-acciones { white-space: normal; min-width: 120px; max-width: 220px; }
+.est-col { font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+.est-col.on { color: var(--ok); }
+.est-col.apr { color: var(--acento); }
+.est-col.raro { color: var(--r-nar-tx); }
+.est-col.mal { color: var(--peligro); }
+.est-col.off { color: var(--mut); font-weight: 500; }
+.chip-ac { font: inherit; font-size: 11px; font-weight: 700; border: 1.5px solid currentColor; border-radius: var(--r-chip); padding: 1px 6px; margin: 1px 4px 1px 0; background: transparent; cursor: pointer; white-space: nowrap; display: inline-block; }
+.chip-ac.ok { color: var(--ok); } .chip-ac.naranja { color: var(--r-nar-tx); } .chip-ac.mal { color: var(--peligro); } .chip-ac.acento { color: var(--acento); }
+.ac-info { display: inline-block; font-size: 11px; color: var(--mut); margin-right: 6px; white-space: nowrap; }
+.fila-nube td { padding: 0 8px 8px !important; background: transparent; }
+.nube { position: sticky; left: 8px; max-width: min(520px, calc(100vw - 48px)); background: var(--marca); color: var(--tinta); border: 2px solid var(--marca-borde); border-radius: var(--r-card); padding: 10px 34px 10px 12px; text-align: left; white-space: normal; box-shadow: 3px 3px 0 var(--sombra); }
+.nube p { margin: 4px 0 0; font-size: 13px; }
+.nube .mut { color: color-mix(in srgb, var(--tinta) 70%, transparent); }
+.nube-x { position: absolute; top: 4px; right: 6px; background: none; border: 0; font-size: 14px; cursor: pointer; color: inherit; }
+.nube-pie { font-size: 12px !important; }
+/* Acciones a realizar */
+#acc-barra { margin: 0 0 14px; }
+.acc-btn { display: flex; align-items: center; gap: 10px; width: 100%; max-width: 640px; text-align: left; padding: 10px 14px; border: 2px solid var(--tinta); border-radius: var(--r-card); background: var(--marca); font: inherit; cursor: pointer; color: var(--tinta); }
+.acc-btn.vacio-acc { background: transparent; }
+.acc-tit { font-family: var(--f-titulo); font-weight: 700; font-size: 16px; }
+.acc-n { min-width: 26px; text-align: center; font-weight: 700; border-radius: 20px; padding: 1px 8px; border: 1.5px solid var(--tinta); }
+.acc-n.hay { background: var(--tinta); color: var(--marca); } .acc-n.mal { background: var(--peligro); border-color: var(--peligro); color: #fff; }
+.acc-urg { font-size: 12px; color: var(--peligro); font-weight: 700; }
+.acc-ver { margin-left: auto; font-size: 13px; }
+.acc-cuerpo { max-height: 60vh; overflow: auto; margin: 10px 0; }
+.acc-grupo { margin: 14px 0 6px; font-size: 14px; } .acc-grupo small { color: var(--mut); font-weight: 600; }
+.acc-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.acc-it { width: 100%; text-align: left; display: grid; grid-template-columns: auto 1fr auto; gap: 2px 8px; align-items: center; padding: 8px 10px; border: 1.5px solid var(--linea); border-radius: var(--r-card); background: transparent; font: inherit; color: inherit; cursor: pointer; }
+.acc-it:hover { border-color: var(--tinta); }
+.acc-nom { font-weight: 600; overflow-wrap: anywhere; min-width: 0; } .acc-ir { grid-row: 1; grid-column: 3; font-size: 13px; color: var(--acento); }
+.acc-camp, .acc-tx { grid-column: 1 / -1; font-size: 12.5px; overflow-wrap: anywhere; } .acc-tx { color: var(--tinta); }
+.acc-pie { font-size: 12px; }

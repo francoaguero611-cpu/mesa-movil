@@ -137,7 +137,7 @@ async function api(accion, { q = "", body = null, escritura = false } = {}) {
 let demoP = null;
 function cargarDemo() {
   if (window.DemoAPI) return Promise.resolve();
-  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=34"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=35"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
   return demoP;
 }
 
@@ -320,7 +320,7 @@ async function cargar(forzar = false) {
   try {
     const d = await api("dash", { q: `&periodo=${per}${forzar ? "&forzar=1" : ""}` });
     S.datos[per] = d;
-    if (forzar) { for (const k of [...S.det.keys()]) if (k.startsWith(per + "|")) S.det.delete(k); cargarProblemas(true); }
+    if (forzar) { for (const k of [...S.det.keys()]) if (k.startsWith(per + "|")) S.det.delete(k); cargarProblemas(true); cargarAcciones(true); }
   } catch (e) {
     if (e.code === 401) { ls.del("dash_clave"); return login("Clave incorrecta"); }
     S.error = e.message;
@@ -378,6 +378,7 @@ function montar() {
       <div class="periodos" role="group" aria-label="Período">${botonesPer("data-per", S.periodo)}</div>
       <div class="hora" id="hora"></div>
     </div>
+    <div id="acc-barra"></div>
     <div id="avisos"></div>
     <section class="carr" id="carr" aria-roledescription="carrusel" aria-label="Métricas por grupo">
       <button type="button" class="btn flecha prev" id="b-prev" aria-label="Grupo anterior"><span class="izq"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M9.5 5.5 C 12 8, 14 10.5, 15.5 12.2 C 13.6 14, 11.6 16.4, 9.2 18.6" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
@@ -406,11 +407,62 @@ function montar() {
   let tb = null;
   $("#f-buscar").oninput = (e) => { clearTimeout(tb); tb = setTimeout(() => { S.buscar = e.target.value; pintarTabla(); }, 150); };
   gestosCarrusel($("#carr"));
+  $("#tabla-scroll").addEventListener("click", (e) => { // (24/10) chips de Acciones y nubecita
+    const x = e.target.closest("[data-nube-x]"); if (x) { e.stopPropagation(); S.nube = null; pintarTabla(); return; }
+    const ch = e.target.closest("[data-nube]"); if (!ch) return;
+    e.stopPropagation(); const a = accionesDe(ch.dataset.nube)[+ch.dataset.nubeI]; if (!a) return;
+    S.nube = S.nube && S.nube.id === a.id && S.nube.acc === a ? null : { id: a.id, acc: a }; pintarTabla();
+  }, true);
   $("#tabla-scroll").addEventListener("click", clickTabla);
   $("#tabla-scroll").addEventListener("keydown", teclaTabla);
   pintarTodo();
   if (!S.datos[S.periodo]) cargar();
-  cargarProblemas();
+  cargarProblemas(); cargarAcciones();
+}
+// (24/10, Lorenzo) «Acciones a realizar»: rectángulo arriba de las métricas; al entrar se abre solo (una vez por sesión) con la lista.
+// Tocar una acción → la tabla con esa campaña / conjunto seleccionado y la nubecita con el porqué. Nada se aplica solo.
+var ACC = { st: null, data: null, error: null }; // var: la tabla puede pintarse antes de esta línea
+const ACC_ORDEN = ["testeo_matar", "reno_matar", "techo", "testeo_dia1", "surf_sug", "reno_minimo", "lista_horizontal"];
+const ACC_TIT = { surf_sug: "Surfeo", testeo_dia1: "Testeos: día 1 en pérdida", testeo_matar: "Testeos para apagar", reno_minimo: "Sacar el gasto mínimo", reno_matar: "Renovaciones para apagar",
+  techo: "Techo de la cuenta", lista_horizontal: "Listas para escala horizontal" };
+async function cargarAcciones(forzar = false) {
+  if (ACC.st === "cargando") return;
+  ACC.st = "cargando"; pintarAccBarra();
+  try { ACC.data = await api("dash_acciones", { q: forzar ? "&forzar=1" : "" }); ACC.st = "ok"; }
+  catch (e) { ACC.st = "error"; ACC.error = e.message; }
+  pintarAccBarra(); pintarTabla();
+  let visto = null; try { visto = sessionStorage.getItem("dash_acc_visto"); } catch {}
+  const n = (ACC.data?.acciones || []).length;
+  if (n && !visto && S.vista === "dash" && !eventoAbierto && !modalActual) { try { sessionStorage.setItem("dash_acc_visto", "1"); } catch {} abrirAcciones(); }
+}
+function pintarAccBarra() {
+  const b = $("#acc-barra"); if (!b) return;
+  const xs = ACC.data?.acciones || [], n = xs.length;
+  const urg = xs.filter((a) => /matar|techo/.test(a.tipo)).length;
+  b.innerHTML = `<button type="button" class="acc-btn boceto${n ? "" : " vacio-acc"}" id="b-acc"><span class="acc-tit">Acciones a realizar</span>
+    <span class="acc-n ${urg ? "mal" : n ? "hay" : ""}">${ACC.st === "cargando" && !ACC.data ? "…" : n}</span>${urg ? `<span class="acc-urg">${urg} urgente${urg === 1 ? "" : "s"}</span>` : ""}<span class="acc-ver">ver ›</span></button>`;
+  $("#b-acc").onclick = abrirAcciones;
+}
+function abrirAcciones() {
+  const xs = ACC.data?.acciones || [];
+  const grupos = ACC_ORDEN.map((t) => [t, xs.filter((a) => a.tipo === t)]).filter(([, l]) => l.length);
+  const cuerpo = !xs.length ? `<p class="mut">${ACC.st === "error" ? "No se pudo leer: " + esc(ACC.error) : ACC.data ? "Nada para hacer ahora. ✅" : "Revisando…"}</p>`
+    : grupos.map(([t, l]) => `<h4 class="acc-grupo">${esc(ACC_TIT[t] || t)} <small>${l.length}</small></h4><ul class="acc-lista">${l.map((a) => `<li><button type="button" class="acc-it" data-acc-i="${xs.indexOf(a)}">
+        <span class="chip-ac ${AC_COLOR[a.tipo]?.(a) || "acento"}">${esc(AC_TX[a.tipo]?.(a) || a.tipo)}</span>
+        <span class="acc-nom"><span class="niv-tag niv-${a.nivel}">${NIVEL[a.nivel]?.[0] || ""}</span> ${esc(a.nombre || a.id)}</span>
+        ${a.nivel !== "campana" && a.campana_nombre ? `<span class="acc-camp mut">en ${esc(a.campana_nombre)}</span>` : ""}
+        <span class="acc-tx">${esc(a.texto || "")}</span><span class="acc-ir">ir ›</span></button></li>`).join("")}</ul>`).join("");
+  const m = abrirModal(`<h3>Acciones a realizar</h3><p class="mut">Sugerencias del manual de la CBO de Santi. Tocá una y te llevo a la tabla con eso seleccionado. Nada se aplica solo.</p>
+    <div class="acc-cuerpo">${cuerpo}</div><p class="mut acc-pie">${ACC.data?.generado ? `Calculado ${horaCorta(ACC.data.generado)}` : ""} <button class="link" type="button" data-acc-re>Recalcular</button></p>
+    <div class="botones"><button type="button" class="btn pri" data-x data-foco>Cerrar</button></div>`, { ancho: true });
+  $("[data-x]", m.dlg).onclick = m.cerrar;
+  $("[data-acc-re]", m.dlg).onclick = async () => { m.cerrar(); await cargarAcciones(true); abrirAcciones(); };
+  $$("[data-acc-i]", m.dlg).forEach((b) => b.onclick = () => { const a = xs[+b.dataset.accI]; m.cerrar(); irAAccion(a); });
+}
+async function irAAccion(a) {
+  S.nube = { id: a.id, acc: a };
+  const it = { n: a.nivel, id: a.id, c: a.campana, a: a.act, nom: a.nombre };
+  await mostrarEnTabla(prepararEvento({ t: a.tipo, items: [it] }, [it]));
 }
 // (24/10, Lorenzo) Anuncios rechazados o con problemas en campañas prendidas. No gastan, así que en la tabla no se veían.
 // Lista al fondo del dashboard; sale de dash_problemas (caché 10 min del servidor). Respeta el filtro de cuenta.
@@ -572,6 +624,31 @@ function dotEstado(e) {
   const cls = on ? "on" : (e === "DISAPPROVED" || e === "WITH_ISSUES") ? "raro mal" : (e === "PAUSED" || e === "CAMPAIGN_PAUSED" || e === "ADSET_PAUSED" || e === "ARCHIVED") ? "off" : "raro";
   return `<span class="dot ${cls}" role="img" aria-label="${on ? "prendido" : esc(ESTADOS[e] || String(e || "").toLowerCase())}" title="${on ? "Prendido" : esc(ESTADOS[e] || e)}"></span>`;
 }
+// (24/10, Lorenzo) Columna Estado: activo / aprendizaje / limitado / rechazado / en revisión / en preparación / apagado
+const ESTADO_COL = { DISAPPROVED: ["rechazado", "mal"], WITH_ISSUES: ["con problemas", "mal"], PENDING_REVIEW: ["en revisión", "raro"], IN_PROCESS: ["en preparación", "raro"],
+  PAUSED: ["apagado", "off"], CAMPAIGN_PAUSED: ["apagado", "off"], ADSET_PAUSED: ["apagado", "off"], ARCHIVED: ["archivado", "off"], DELETED: ["borrado", "off"] };
+function estadoTxt(x) {
+  let [t, c] = ESTADO_COL[x.estado] || (prendido(x.estado) ? ["activo", "on"] : [String(x.estado || "—").toLowerCase(), "off"]);
+  if (prendido(x.estado) && x.aprendizaje === "aprendizaje") [t, c] = ["aprendizaje", "apr"];
+  if (prendido(x.estado) && x.aprendizaje === "limitado") [t, c] = ["aprendizaje limitado", "raro"];
+  return `<span class="est-col ${c}">${esc(t)}</span>`;
+}
+// (24/10, Lorenzo) Columna Acciones: lo que sugiere el manual de la CBO (dash_acciones) + días del testeo / del mínimo + techo.
+// Tocar un chip abre la nubecita con el porqué. Nada se aplica solo: la acción la hace uno con la barra de siempre.
+const AC_TX = { surf_sug: (a) => a.ac === "s-30" ? "bajar 30 %" : "surfear +30 %", testeo_dia1: () => "bajar 30 %", testeo_matar: () => "apagar", reno_minimo: () => "sacar mínimo",
+  reno_matar: () => "apagar", techo: () => "bajar 30 % · techo", lista_horizontal: () => "escala horizontal" };
+const AC_COLOR = { surf_sug: (a) => a.ac === "s-30" ? "naranja" : "ok", testeo_dia1: () => "naranja", testeo_matar: () => "mal", reno_minimo: () => "acento", reno_matar: () => "mal", techo: () => "naranja", lista_horizontal: () => "ok" };
+const diaDe = (iso) => { if (!iso) return null; const hoy = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" })); const d = new Date(new Date(iso).toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
+  hoy.setHours(12, 0, 0, 0); d.setHours(12, 0, 0, 0); return Math.round((hoy - d) / 86400e3) + 1; };
+function accionesDe(id) { return (ACC.data?.acciones || []).filter((a) => a.id === id); }
+function accionesCelda(x, nivel) {
+  const chips = accionesDe(x.id).map((a, i) => `<button type="button" class="chip-ac ${AC_COLOR[a.tipo]?.(a) || "acento"}" data-nube="${esc(x.id)}" data-nube-i="${i}" data-nosel>${esc(AC_TX[a.tipo]?.(a) || a.tipo)}</button>`);
+  const info = [];
+  if (nivel === "campana" && /testeo/i.test(x.nombre) && prendido(x.estado)) { const n = diaDe(x.inicio); if (n && n <= 3) info.push(`testeo día ${n}/3`); }
+  if (nivel === "conjunto" && x.minimo && prendido(x.estado)) { const n = diaDe(x.inicio); info.push(n && n > 3 ? "mín. vencido" : `mín. día ${n ?? "?"}/3`); }
+  if (nivel === "campana" && x.techo) info.push(`techo ~${NF0.format(x.techo)}`);
+  return chips.join("") + info.map((t) => `<span class="ac-info">${esc(t)}</span>`).join("");
+}
 // (24/10, Lorenzo) estado en texto chiquito al lado del punto; rechazado / con problemas en rojo
 function estadoConTx(e) {
   const on = prendido(e), mal = e === "DISAPPROVED" || e === "WITH_ISSUES";
@@ -648,6 +725,8 @@ const roiDe = (x) => x.roi !== undefined ? x.roi : (nulo(x.ganancia) || !x.gasto
 const aovDe = (x) => x.ticket_promedio !== undefined ? x.ticket_promedio : (x.ventas ? x.facturacion / x.ventas : null);
 // [clave, título, formato(x) -> html, clase extra(x)]
 const COLS = [
+  ["estado", "Estado", (x, nivel) => nivel ? estadoTxt(x) : ""],          // (24/10, Lorenzo)
+  ["acciones", "Acciones", (x, nivel) => nivel ? accionesCelda(x, nivel) : ""],
   ["ganancia", "Ganancia / pérdida", (x) => usdG(x.ganancia), (x) => signo(x.ganancia)],
   ["margen", "Margen %", (x) => pctN(x.margen), (x) => signo(x.margen ?? x.ganancia)],
   ["roi", "ROI %", (x) => pctN(roiDe(x)), (x) => signo(roiDe(x))],
@@ -692,16 +771,23 @@ function elegirColumnas() {
   enlazar();
 }
 function pintarBotonCols() { const b = $("#b-cols"); if (b) b.textContent = colsOcultas.size ? `Columnas (${COLS.length - colsOcultas.size}/${COLS.length})` : "Columnas"; }
+function filaNube(x) {
+  if (!S.nube || S.nube.id !== x.id) return "";
+  const a = S.nube.acc;
+  return `<tr class="fila-nube"><td colspan="${nCols()}"><div class="nube" role="note"><button type="button" class="nube-x" data-nube-x aria-label="Cerrar">✕</button>
+    <b>${esc(AC_TX[a.tipo]?.(a) || "Sugerencia")}${a.antes != null && a.despues != null ? ` · ${usdG(a.antes)} → ${usdG(a.despues)}` : ""}</b>
+    <p>${esc(a.texto || "")}</p><p class="mut">${esc(a.porque || "")}</p>
+    <p class="mut nube-pie">Hacelo con la barra de abajo (ya quedó seleccionado). Nada se aplica solo.</p></div></td></tr>`;
+}
 function fila({ nivel, n, x, act, sub, abrible, abierto, extraEstado }) {
   const k = `${nivel}:${x.id}`;
   const sel = S.sel.has(k);
   const etiquetaTg = nivel === "campana" ? "conjuntos" : "anuncios";
   return `<tr class="fila nivel-${n}${abierto ? " abierta" : ""}${sel ? " sel" : ""}" data-k="${esc(k)}" data-act="${esc(act)}" tabindex="0" aria-selected="${sel}">
-    <td class="nom"><div class="nomwrap">
+    <td class="nom">${dotEstado(x.estado).replace('class="dot ', 'class="dot dot-esq ')}<div class="nomwrap">
       ${abrible ? `<button type="button" class="tg" data-tg="${esc((nivel === "campana" ? "c:" : "s:") + x.id)}" aria-expanded="${abierto}" aria-label="${abierto ? "Ocultar" : "Ver"} ${etiquetaTg} de ${esc(x.nombre)}"><span aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9.5 5.5 C 12 8, 14 10.5, 15.5 12.2 C 13.6 14, 11.6 16.4, 9.2 18.6" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>` : `<span class="tg-hueco" aria-hidden="true"></span>`}
-      ${estadoConTx(x.estado)}
       <div class="txt"><span class="niv-tag niv-${nivel}">${NIVEL[nivel][0]}</span><div class="n">${esc(x.nombre)}</div>${sub ? `<div class="sub">${sub}</div>` : ""}</div>
-    </div></td>${celdas(x, nivel)}</tr>`;
+    </div></td>${celdas(x, nivel)}</tr>${filaNube(x)}`;
 }
 function subCampana(c) {
   const p = [];
@@ -2372,6 +2458,13 @@ const EV_TIPOS = {
   campana_topada: ["grafico", "ok", "Campaña topada"],      // (11/10 tarde) avisos de escala nuevos
   escala_funciona: ["cohete", "ok", "La escala funciona"],
   winner_fatiga: ["vuelve", "naranja", "Winner cansado"],
+  surf_sug: ["sube", "ok", "Surfeo sugerido"],               // (24/10) manual de la CBO
+  testeo_dia1: ["baja", "naranja", "Testeo día 1"],
+  testeo_matar: ["x", "peligro", "Testeo para apagar"],
+  reno_minimo: ["reloj", "acento", "Gasto mínimo vencido"],
+  reno_matar: ["x", "peligro", "Renovación para apagar"],
+  techo: ["grafico", "naranja", "Techo de la cuenta"],
+  lista_horizontal: ["cohete", "ok", "Lista para horizontal"],
   escala: ["cohete", "ok", "Escala"],
   categoria: ["etiqueta", "acento", "Categoría de testeo"],
   alerta: ["triangulo", "peligro", "Alerta"],
@@ -2429,6 +2522,13 @@ function tituloEvento(ev) {
     case "margen": return "Te está comiendo margen";
     case "campana_topada": return n > 1 ? `${n} campañas topadas: subiles presupuesto o metele BidCap` : "Topada: subile presupuesto o metele BidCap";
     case "escala_funciona": return n > 1 ? `${n} escalas funcionando: duplicalas o sumales Pocket` : "La escala funciona: duplicala o sumale Pocket";
+    case "surf_sug": return n > 1 ? `Surfeo: ${n} campañas para mover` : i0.ac === "s-30" ? "Bajá 30 % esta campaña" : "Surfeá +30 % esta campaña";
+    case "testeo_dia1": return n > 1 ? `${n} testeos con día 1 en pérdida: bajá 30 %` : "Día 1 en pérdida: bajá 30 %";
+    case "testeo_matar": return n > 1 ? `${n} testeos sin ganancia en 3 días: apagalos` : "3 días sin ganancia: apagá este testeo";
+    case "reno_minimo": return n > 1 ? `Sacale el mínimo a ${n} conjuntos` : "Sacale el mínimo a este conjunto";
+    case "reno_matar": return n > 1 ? `${n} renovaciones sin ventas en 3 días: apagalas` : "Renovación sin ventas en 3 días: apagala";
+    case "techo": return n > 1 ? `${n} campañas pasaron el techo de su cuenta` : "Pasó el techo de la cuenta: bajá 30 % o escalá horizontal";
+    case "lista_horizontal": return n > 1 ? `${n} campañas listas para escala horizontal` : "Lista para escala horizontal";
     case "winner_fatiga": return n > 1 ? `${n} winners cansados: pedí 5 renos de cada uno` : "Winner cansado: pedí 5 renos de este";
     case "escala": return n ? `${cuantas(its)} ${n === 1 ? "listo" : "listos"} para escalar` : "Hay para escalar";
     case "categoria": return "Nueva categoría de testeo";
@@ -2501,7 +2601,8 @@ function mostrarEvento(evRaw) {
   let caps = adsEsc.length ? [...new Set(adsEsc.flatMap((i) => [...(i.sg || "cb" + (adsEsc.length === 1 ? "a" : ""))]))] : [];
   if (adsEsc.length !== 1) caps = caps.filter((c) => c !== "a"); // la aislada es de 1 solo anuncio
   const CAP = { c: ["costcap", "CostCap"], b: ["bidcap", "BidCap"], a: ["aislada", "Aislada"] };
-  let escalarCon = null;
+  let escalarCon = null, hzCon = false;
+  const campsHz = ["techo", "lista_horizontal", "campana_topada"].includes(ev.t) ? ev.items.filter((i) => i.n === "campana") : []; // (24/10)
   const html = `<div class="ev ev-${color}">
       <div class="ev-ico boceto">${icoEvento(ico)}</div>
       <div class="ev-rotulo">${esc(rotulo)}</div>
@@ -2511,11 +2612,12 @@ function mostrarEvento(evRaw) {
       ${ev.items.length ? `<ul class="ev-items">${ev.items.map((it, i) => itemEventoHTML(it, i, pedir)).join("")}</ul>` : ""}
       ${caps.length ? `<p class="ev-sig">Escalá ${adsEsc.length === 1 ? "este anuncio" : `estos ${adsEsc.length} anuncios`} por Post ID: elegís la estructura, te muestro el cálculo y confirmás antes de crear.</p>` : ""}
     </div>
-    <div class="botones">${["c", "b", "a"].filter((c) => caps.includes(c)).map((c) => `<button type="button" class="btn" data-cap="${CAP[c][0]}">${CAP[c][1]}</button>`).join("")}<button type="button" class="btn pri" data-ver data-foco>${navegables.length ? "Ver en la tabla" : "Listo"}</button></div>`;
+    <div class="botones">${["c", "b", "a"].filter((c) => caps.includes(c)).map((c) => `<button type="button" class="btn" data-cap="${CAP[c][0]}">${CAP[c][1]}</button>`).join("")}${campsHz.length ? `<button type="button" class="btn" data-hz>Escala horizontal</button>` : ""}<button type="button" class="btn pri" data-ver data-foco>${navegables.length ? "Ver en la tabla" : "Listo"}</button></div>`;
   eventoAbierto = true;
   const m = abrirModal(html, { alCerrar: () => {
     eventoAbierto = false;
     if (escalarCon) return escalarDesdeAviso(escalarCon, adsEsc);
+    if (hzCon && prep) return mostrarEnTabla(prep).then(() => { S.sel.clear(); for (const i of campsHz) { const c = campanaPorId(i.id); if (c) S.sel.set("campana:" + c.id, { id: c.id, act: c.act, nivel: "campana", nombre: c.nombre, estado: c.estado }); } pintarTodo(); escalaCampanas(); });
     if (prep) mostrarEnTabla(prep); else irAlDash();
   } });
   m.dlg.classList.add("dialogo-ev");
@@ -2525,6 +2627,7 @@ function mostrarEvento(evRaw) {
   x.onclick = m.cerrar; m.dlg.prepend(x);
   $("[data-ver]", m.dlg).onclick = m.cerrar;
   $$("[data-cap]", m.dlg).forEach((b) => b.onclick = () => { escalarCon = b.dataset.cap; m.cerrar(); });
+  const bhz = $("[data-hz]", m.dlg); if (bhz) bhz.onclick = () => { hzCon = true; m.cerrar(); };
   // Apagar / Prender por item, con confirmación de doble toque (el primero pregunta, el segundo hace)
   m.dlg.addEventListener("click", async (e) => {
     const b = e.target.closest("[data-estado]"); if (!b || b.disabled) return;
