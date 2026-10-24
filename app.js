@@ -137,7 +137,7 @@ async function api(accion, { q = "", body = null, escritura = false } = {}) {
 let demoP = null;
 function cargarDemo() {
   if (window.DemoAPI) return Promise.resolve();
-  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=33"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=34"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
   return demoP;
 }
 
@@ -320,7 +320,7 @@ async function cargar(forzar = false) {
   try {
     const d = await api("dash", { q: `&periodo=${per}${forzar ? "&forzar=1" : ""}` });
     S.datos[per] = d;
-    if (forzar) { for (const k of [...S.det.keys()]) if (k.startsWith(per + "|")) S.det.delete(k); }
+    if (forzar) { for (const k of [...S.det.keys()]) if (k.startsWith(per + "|")) S.det.delete(k); cargarProblemas(true); }
   } catch (e) {
     if (e.code === 401) { ls.del("dash_clave"); return login("Clave incorrecta"); }
     S.error = e.message;
@@ -393,7 +393,8 @@ function montar() {
       </div>
       <div class="filtro-camp"><label class="sr" for="f-buscar">Buscar por nombre</label><input type="search" id="f-buscar" class="campo f-buscar" placeholder="Buscar campaña, conjunto o anuncio…" autocomplete="off" value="${esc(S.buscar)}"><label class="sr" for="f-cuenta">Cuenta publicitaria</label><select id="f-cuenta" class="campo f-cuenta"></select></div>
       <div class="tabla-con-reloj"><div class="tabla-caja boceto"><div class="tabla-scroll" id="tabla-scroll"></div></div><div class="riel-reloj" id="riel-reloj" aria-label="Historial de cambios por campaña"></div></div>
-    </section>`;
+    </section>
+    <section class="seccion-prob" id="sec-prob" aria-labelledby="t-prob"></section>`;
   $$("[data-per]").forEach((b) => b.onclick = () => cambiarPeriodo(b.dataset.per));
   $("#sel-grupo").onchange = (e) => irA(+e.target.value);
   $("#b-prev").onclick = () => paso(-1);
@@ -401,7 +402,7 @@ function montar() {
   $("#b-cols").onclick = elegirColumnas; pintarBotonCols();
   $("#t-apagadas").onclick = () => { S.verApagadas = !S.verApagadas; ls.set("dash_ver_apagadas", S.verApagadas ? "1" : "0"); $("#t-apagadas").setAttribute("aria-checked", S.verApagadas); pintarTabla(); };
   $("#t-solosel").onclick = alternarSoloSel;
-  $("#f-cuenta").onchange = (e) => { S.cuenta = e.target.value; ls.set("dash_cuenta", S.cuenta); pintarTabla(); };
+  $("#f-cuenta").onchange = (e) => { S.cuenta = e.target.value; ls.set("dash_cuenta", S.cuenta); pintarTabla(); pintarProblemas(); };
   let tb = null;
   $("#f-buscar").oninput = (e) => { clearTimeout(tb); tb = setTimeout(() => { S.buscar = e.target.value; pintarTabla(); }, 150); };
   gestosCarrusel($("#carr"));
@@ -409,7 +410,41 @@ function montar() {
   $("#tabla-scroll").addEventListener("keydown", teclaTabla);
   pintarTodo();
   if (!S.datos[S.periodo]) cargar();
+  cargarProblemas();
 }
+// (24/10, Lorenzo) Anuncios rechazados o con problemas en campañas prendidas. No gastan, así que en la tabla no se veían.
+// Lista al fondo del dashboard; sale de dash_problemas (caché 10 min del servidor). Respeta el filtro de cuenta.
+const PB = { st: null, data: null, error: null, abierto: ls.get("dash_prob_abierto") === "1" };
+async function cargarProblemas(forzar = false) {
+  if (PB.st === "cargando") return;
+  PB.st = "cargando"; pintarProblemas();
+  try { PB.data = await api("dash_problemas", { q: forzar ? "&forzar=1" : "" }); PB.st = "ok"; PB.error = null; }
+  catch (e) { PB.st = "error"; PB.error = e.message; }
+  pintarProblemas();
+}
+function pintarProblemas() {
+  const sec = $("#sec-prob"); if (!sec) return;
+  const xs = (PB.data?.anuncios || []).filter((a) => !S.cuenta || a.act === S.cuenta);
+  const nRech = xs.filter((a) => a.estado === "DISAPPROVED").length;
+  const cuenta = PB.st === "cargando" && !PB.data ? "…" : String(xs.length);
+  const lm = (a) => `https://adsmanager.facebook.com/adsmanager/manage/ads?act=${encodeURIComponent(a.act)}&selected_ad_ids=${encodeURIComponent(a.id)}`;
+  const cuerpo = PB.st === "error" && !PB.data ? `<p class="mut">No se pudo leer: ${esc(PB.error)} <button class="link" type="button" data-prob-re>Reintentar</button></p>`
+    : !xs.length ? `<p class="mut">${PB.data ? "Ningún anuncio rechazado ni con problemas en campañas prendidas. ✅" : "Revisando…"}</p>`
+    : `<ul class="prob-lista">${xs.map((a) => `<li class="prob">
+        <div class="prob-cab">${estadoConTx(a.estado)}<b class="prob-nom">${esc(a.nombre)}</b></div>
+        <div class="prob-ruta mut">${esc(a.cuenta)} · ${esc(a.campana.nombre)}${a.conjunto?.nombre ? ` › ${esc(a.conjunto.nombre)}` : ""}</div>
+        ${a.motivos?.length ? `<div class="prob-motivo">${a.motivos.map(esc).join(" · ")}</div>` : ""}
+        <a class="prob-link" href="${lm(a)}" target="_blank" rel="noopener">Abrir en Ads Manager ↗</a>
+      </li>`).join("")}</ul>`;
+  const err = PB.data?.errores?.length ? `<p class="mut prob-err">⚠ No se pudieron revisar: ${esc(PB.data.errores.join(" · "))}</p>` : "";
+  sec.innerHTML = `<details class="prob-det"${PB.abierto ? " open" : ""}>
+    <summary><h2 id="t-prob">Anuncios rechazados o con problemas <small class="${xs.length ? "neg" : "mut"}">${cuenta}${nRech ? ` · ${nRech} rechazado${nRech === 1 ? "" : "s"}` : ""}</small></h2></summary>
+    <div class="prob-cuerpo">${cuerpo}${err}<p class="mut prob-pie">Solo campañas prendidas · ${PB.data?.generado ? `revisado ${horaCorta(PB.data.generado)}` : ""} <button class="link" type="button" data-prob-re>Actualizar</button></p></div>
+  </details>`;
+  $("details", sec).ontoggle = (e) => { PB.abierto = e.target.open; ls.set("dash_prob_abierto", PB.abierto ? "1" : "0"); };
+  $$("[data-prob-re]", sec).forEach((b) => b.onclick = () => cargarProblemas(true));
+}
+const horaCorta = (iso) => { try { return new Date(iso).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" }); } catch { return ""; } };
 function pintarTodo() { pintarControles(); pintarAvisos(); pintarCarrusel(); pintarTabla(); pintarBarra(); }
 
 function pintarControles() {
@@ -534,8 +569,14 @@ const estrat = (e) => esc(ESTRAT[e] || String(e).replace(/_/g, " ").toLowerCase(
 const ESTADOS = { PAUSED: "apagado", CAMPAIGN_PAUSED: "campaña apagada", ADSET_PAUSED: "conjunto apagado", WITH_ISSUES: "con problemas", DISAPPROVED: "rechazado", PENDING_REVIEW: "en revisión", IN_PROCESS: "procesando", ARCHIVED: "archivado", DELETED: "borrado" };
 function dotEstado(e) {
   const on = prendido(e);
-  const cls = on ? "on" : (e === "PAUSED" || e === "CAMPAIGN_PAUSED" || e === "ADSET_PAUSED" || e === "ARCHIVED") ? "off" : "raro";
+  const cls = on ? "on" : (e === "DISAPPROVED" || e === "WITH_ISSUES") ? "raro mal" : (e === "PAUSED" || e === "CAMPAIGN_PAUSED" || e === "ADSET_PAUSED" || e === "ARCHIVED") ? "off" : "raro";
   return `<span class="dot ${cls}" role="img" aria-label="${on ? "prendido" : esc(ESTADOS[e] || String(e || "").toLowerCase())}" title="${on ? "Prendido" : esc(ESTADOS[e] || e)}"></span>`;
+}
+// (24/10, Lorenzo) estado en texto chiquito al lado del punto; rechazado / con problemas en rojo
+function estadoConTx(e) {
+  const on = prendido(e), mal = e === "DISAPPROVED" || e === "WITH_ISSUES";
+  const tx = on ? "activo" : (ESTADOS[e] || String(e || "?").toLowerCase());
+  return `<span class="est">${dotEstado(e)}<span class="est-tx${mal ? " mal" : on ? "" : " off"}" aria-hidden="true">${esc(tx)}</span></span>`;
 }
 // (16/10) Filtros: «solo seleccionadas» (ignora grupo y apagadas: muestra todo lo tildado) y búsqueda por nombre.
 const normTx = (t) => String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -603,11 +644,13 @@ const pct1 = (n) => nulo(n) ? "—" : NF1.format(n * 100) + " %";
 const dec2 = (n) => nulo(n) ? "—" : NF2.format(n);
 const signo = (n) => nulo(n) || n === 0 ? "" : n < 0 ? "neg pierde" : "gana";
 const cpaDe = (x) => x.cpa !== undefined ? x.cpa : (x.ventas ? x.gasto / x.ventas : null);
+const roiDe = (x) => x.roi !== undefined ? x.roi : (nulo(x.ganancia) || !x.gasto ? null : x.ganancia / x.gasto); // (24/10) ganancia ÷ gasto
 const aovDe = (x) => x.ticket_promedio !== undefined ? x.ticket_promedio : (x.ventas ? x.facturacion / x.ventas : null);
 // [clave, título, formato(x) -> html, clase extra(x)]
 const COLS = [
   ["ganancia", "Ganancia / pérdida", (x) => usdG(x.ganancia), (x) => signo(x.ganancia)],
   ["margen", "Margen %", (x) => pctN(x.margen), (x) => signo(x.margen ?? x.ganancia)],
+  ["roi", "ROI %", (x) => pctN(roiDe(x)), (x) => signo(roiDe(x))],
   ["roas", "ROAS", (x) => chipRoas(x.roas)],
   ["ventas", "Ventas", (x) => entN(x.ventas)],
   ["ticket_promedio", "AOV", (x) => usdG(aovDe(x))],
@@ -653,12 +696,11 @@ function fila({ nivel, n, x, act, sub, abrible, abierto, extraEstado }) {
   const k = `${nivel}:${x.id}`;
   const sel = S.sel.has(k);
   const etiquetaTg = nivel === "campana" ? "conjuntos" : "anuncios";
-  const raro = !prendido(x.estado) && x.estado !== "PAUSED" ? `<span class="estado-tx">${esc(ESTADOS[x.estado] || String(x.estado || "").toLowerCase())}</span>` : "";
   return `<tr class="fila nivel-${n}${abierto ? " abierta" : ""}${sel ? " sel" : ""}" data-k="${esc(k)}" data-act="${esc(act)}" tabindex="0" aria-selected="${sel}">
     <td class="nom"><div class="nomwrap">
       ${abrible ? `<button type="button" class="tg" data-tg="${esc((nivel === "campana" ? "c:" : "s:") + x.id)}" aria-expanded="${abierto}" aria-label="${abierto ? "Ocultar" : "Ver"} ${etiquetaTg} de ${esc(x.nombre)}"><span aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9.5 5.5 C 12 8, 14 10.5, 15.5 12.2 C 13.6 14, 11.6 16.4, 9.2 18.6" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>` : `<span class="tg-hueco" aria-hidden="true"></span>`}
-      ${dotEstado(x.estado)}
-      <div class="txt"><span class="niv-tag niv-${nivel}">${NIVEL[nivel][0]}</span><div class="n">${esc(x.nombre)}${raro}</div>${sub ? `<div class="sub">${sub}</div>` : ""}</div>
+      ${estadoConTx(x.estado)}
+      <div class="txt"><span class="niv-tag niv-${nivel}">${NIVEL[nivel][0]}</span><div class="n">${esc(x.nombre)}</div>${sub ? `<div class="sub">${sub}</div>` : ""}</div>
     </div></td>${celdas(x, nivel)}</tr>`;
 }
 function subCampana(c) {
@@ -712,6 +754,7 @@ function totalesDe(xs) {
   const div = (a, b, f = 1) => nulo(a) || !b ? null : (a / b) * f;
   t.roas = div(t.facturacion, t.gasto);
   t.margen = div(t.ganancia, t.facturacion);
+  t.roi = div(t.ganancia, t.gasto);
   t.cpa = div(t.gasto, t.ventas);
   t.ticket_promedio = div(t.facturacion, t.ventas);
   t.costo_pago_iniciado = div(t.gasto, t.pagos_iniciados);

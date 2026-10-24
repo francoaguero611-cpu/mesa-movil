@@ -685,7 +685,7 @@ table.camp tbody tr.fila.sel td { background: var(--marca); }
   .camp td.nom { vertical-align: top; }
   .camp td.nom .nomwrap { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "txt dot" "tg tg"; align-items: start; gap: 6px 6px; }
   .camp td.nom .nomwrap > .txt { grid-area: txt; }
-  .camp td.nom .nomwrap > .dot { grid-area: dot; margin-top: 2px; }
+  .camp td.nom .nomwrap > .est { grid-area: dot; margin-top: 2px; flex-direction: column; gap: 2px; }
   .camp td.nom .nomwrap > .tg { grid-area: tg; justify-self: start; }
   .camp td.nom .nomwrap > .tg-hueco { display: none; }
   .niv-tag { margin-bottom: 4px; }
@@ -1173,3 +1173,30 @@ input.campo.f-buscar { font-size: 16px; padding: 9px 12px; max-width: 460px; }
 .ph-frases p:first-child { font-weight: inherit; }
 .ph-frases.v-mejoro .ph-ver { color: var(--ok); } .ph-frases.v-empeoro .ph-ver { color: var(--peligro); }
 .ph-frases.v-mejoro p:not(.ph-ver), .ph-frases.v-empeoro p:not(.ph-ver) { color: inherit; }
+
+/* (24/10, Lorenzo) Estado en texto chiquito al lado del punto: discreto; rechazado / con problemas en rojo */
+.est { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.est-tx { font-size: 10px; line-height: 1; color: var(--mut); opacity: .7; white-space: nowrap; }
+.est-tx.off { opacity: .55; }
+.est-tx.mal { color: var(--peligro); opacity: 1; font-weight: 700; }
+
+/* (24/10) Anuncios rechazados o con problemas: al fondo del dashboard, plegable */
+.seccion-prob { margin-top: 34px; }
+.prob-det > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 8px; }
+.prob-det > summary::-webkit-details-marker { display: none; }
+.prob-det > summary::before { content: "›"; font-weight: 700; transition: transform .15s ease; display: inline-block; }
+.prob-det[open] > summary::before { transform: rotate(90deg); }
+.prob-det > summary h2 { margin: 0; font-size: 18px; }
+.prob-det > summary small { font-size: 13px; font-weight: 600; margin-left: 6px; }
+.prob-cuerpo { margin-top: 12px; }
+.prob-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.prob { border: 1.5px solid var(--linea); border-radius: var(--r-card); padding: 10px 12px; display: grid; gap: 4px; min-width: 0; }
+.prob-cab { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.prob-nom { overflow-wrap: anywhere; }
+.prob-ruta { font-size: 12px; overflow-wrap: anywhere; }
+.prob-motivo { font-size: 12.5px; color: var(--peligro); overflow-wrap: anywhere; }
+.prob-link { font-size: 12.5px; color: var(--acento); justify-self: start; }
+.prob-pie, .prob-err { font-size: 12px; margin-top: 10px; }
+@media (prefers-reduced-motion: reduce) { .prob-det > summary::before { transition: none; } }
+.dot.mal { background: var(--peligro); border-color: var(--peligro); }
+.prob-pie .link { font-size: inherit; }

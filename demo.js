@@ -538,6 +538,13 @@
     }
     if (accion.startsWith("reglas_")) { const r = reglasDemo(accion, p, body); if (r !== undefined) return r; }
     if (accion === "dash_log") return { log: LOG.slice(0, 50) };
+    if (accion === "dash_problemas") { // (24/10) anuncios rechazados / con problemas de ejemplo
+      const cs = dash("hoy").campanas.filter((c) => c.estado === "ACTIVE").slice(0, 2);
+      return { generado: new Date().toISOString(), errores: [], anuncios: cs.length ? [
+        { id: "900001", nombre: "AD 7 · hook antes/después", estado: "DISAPPROVED", act: cs[0].act, cuenta: cs[0].cuenta, campana: { id: cs[0].id, nombre: cs[0].nombre }, conjunto: { id: "1", nombre: "Renovaciones 24.10" }, motivos: ["El anuncio no cumple nuestras Políticas de publicidad: afirmaciones de salud o resultados poco realistas"] },
+        { id: "900002", nombre: "AD 3 · testimonio", estado: "WITH_ISSUES", act: (cs[1] || cs[0]).act, cuenta: (cs[1] || cs[0]).cuenta, campana: { id: (cs[1] || cs[0]).id, nombre: (cs[1] || cs[0]).nombre }, conjunto: { id: "2", nombre: "Iteraciones" }, motivos: ["Falta la autenticación del anunciante (#3858385)"] },
+      ] : [] };
+    }
     if (accion === "ranking") return JSON.parse(JSON.stringify(rankingDemo(per === "hoy" && !p.get("periodo") ? "7d" : per)));
     if (accion === "video") throw new Error("en el demo no hay videos de verdad (con la app real se ve el video de Meta)");
     if (accion.startsWith("fabrica_")) return JSON.parse(JSON.stringify(fabricaDemo(accion, body)));
