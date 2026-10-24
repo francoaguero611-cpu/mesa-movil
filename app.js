@@ -320,7 +320,7 @@ async function cargar(forzar = false) {
   try {
     const d = await api("dash", { q: `&periodo=${per}${forzar ? "&forzar=1" : ""}` });
     S.datos[per] = d;
-    if (forzar) { for (const k of [...S.det.keys()]) if (k.startsWith(per + "|")) S.det.delete(k); cargarProblemas(true); cargarAcciones(true); }
+    if (forzar) { for (const k of [...S.det.keys()]) if (k.startsWith(per + "|")) S.det.delete(k); cargarProblemas(true); cargarAcciones(true); cargarUltimos(true); }
   } catch (e) {
     if (e.code === 401) { ls.del("dash_clave"); return login("Clave incorrecta"); }
     S.error = e.message;
@@ -378,7 +378,6 @@ function montar() {
       <div class="periodos" role="group" aria-label="Período">${botonesPer("data-per", S.periodo)}</div>
       <div class="hora" id="hora"></div>
     </div>
-    <div id="acc-barra"></div>
     <div id="avisos"></div>
     <section class="carr" id="carr" aria-roledescription="carrusel" aria-label="Métricas por grupo">
       <button type="button" class="btn flecha prev" id="b-prev" aria-label="Grupo anterior"><span class="izq"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M9.5 5.5 C 12 8, 14 10.5, 15.5 12.2 C 13.6 14, 11.6 16.4, 9.2 18.6" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
@@ -390,7 +389,7 @@ function montar() {
     <section class="seccion-camp" aria-labelledby="t-camp">
       <div class="cab-tabla">
         <h2 id="t-camp">Campañas <small id="n-camp"></small></h2>
-        <span class="cab-der"><button type="button" class="toggle-chico" role="switch" id="t-solosel" aria-checked="${S.soloSel}"><span class="mini" aria-hidden="true"></span><span id="t-solosel-tx">solo seleccionadas</span></button><button type="button" class="btn chico" id="b-cols" aria-haspopup="dialog">Columnas</button><button type="button" class="toggle-chico" role="switch" id="t-apagadas" aria-checked="${S.verApagadas}"><span class="mini" aria-hidden="true"></span><span id="t-apagadas-tx">ver apagadas</span></button></span>
+        <span class="cab-der"><span id="acc-barra"></span><button type="button" class="toggle-chico" role="switch" id="t-solosel" aria-checked="${S.soloSel}"><span class="mini" aria-hidden="true"></span><span id="t-solosel-tx">solo seleccionadas</span></button><button type="button" class="btn chico" id="b-cols" aria-haspopup="dialog">Columnas</button><button type="button" class="toggle-chico" role="switch" id="t-apagadas" aria-checked="${S.verApagadas}"><span class="mini" aria-hidden="true"></span><span id="t-apagadas-tx">ver apagadas</span></button></span>
       </div>
       <div class="filtro-camp"><label class="sr" for="f-buscar">Buscar por nombre</label><input type="search" id="f-buscar" class="campo f-buscar" placeholder="Buscar campaña, conjunto o anuncio…" autocomplete="off" value="${esc(S.buscar)}"><label class="sr" for="f-cuenta">Cuenta publicitaria</label><select id="f-cuenta" class="campo f-cuenta"></select></div>
       <div class="tabla-con-reloj"><div class="tabla-caja boceto"><div class="tabla-scroll" id="tabla-scroll"></div></div><div class="riel-reloj" id="riel-reloj" aria-label="Historial de cambios por campaña"></div></div>
@@ -417,7 +416,7 @@ function montar() {
   $("#tabla-scroll").addEventListener("keydown", teclaTabla);
   pintarTodo();
   if (!S.datos[S.periodo]) cargar();
-  cargarProblemas(); cargarAcciones();
+  cargarProblemas(); cargarAcciones(); cargarUltimos();
 }
 // (24/10, Lorenzo) «Acciones a realizar»: rectángulo arriba de las métricas; al entrar se abre solo (una vez por sesión) con la lista.
 // Tocar una acción → la tabla con esa campaña / conjunto seleccionado y la nubecita con el porqué. Nada se aplica solo.
@@ -435,12 +434,39 @@ async function cargarAcciones(forzar = false) {
   const n = (ACC.data?.acciones || []).length;
   if (n && !visto && S.vista === "dash" && !eventoAbierto && !modalActual) { try { sessionStorage.setItem("dash_acc_visto", "1"); } catch {} abrirAcciones(); }
 }
+// (24/10 b, Lorenzo) lo que se hace afuera (Ads Manager) también saca la acción: el servidor lee estado, presupuesto y cambios de hoy
+// en vivo (caché 5 min); acá se vuelve a pedir cada 5 min y al volver a la app.
+setInterval(() => { if (!document.hidden && S.vista === "dash" && $("#carr")) { cargarAcciones(); cargarUltimos(); } }, 5 * 60000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && S.vista === "dash" && $("#carr")) { cargarAcciones(); cargarUltimos(); } });
+// (24/10 b, Lorenzo) Columna «Última modificación»: el cambio más nuevo de cada campaña / conjunto / anuncio (dash_ultimos, 7 días).
+var ULT = { st: null, data: null };
+async function cargarUltimos(forzar = false) {
+  if (ULT.st === "cargando") return;
+  ULT.st = "cargando";
+  try { ULT.data = await api("dash_ultimos", { q: forzar ? "&forzar=1" : "" }); ULT.st = "ok"; } catch { ULT.st = "error"; }
+  pintarTabla();
+}
+function ultimaCelda(x, nivel) {
+  const d = ULT.data; if (!d) return ULT.st === "cargando" ? `<span class="mut">…</span>` : "—";
+  let e = d.ult?.[x.id], dentro = false;
+  if (!e && nivel === "campana" && d.camp?.[x.id]) { e = d.camp[x.id]; dentro = true; }
+  if (!e) return `<span class="mut">—</span>`;
+  const num = (v) => { const n = Number(v); return v != null && v !== "" && isFinite(n) ? NF2.format(n) : v; };
+  let que;
+  if (/budget|presupuesto/i.test(e.tipo + " " + e.que)) que = e.antes != null && e.despues != null ? `Presupuesto ${num(e.antes)} → ${num(e.despues)}` : "Presupuesto";
+  else if (/run_status|estado/i.test(e.tipo + " " + e.que) && e.despues) que = /inactiv|pausad|apagad/i.test(e.despues) ? "Apagado" : "Prendido";
+  else if (/bid/i.test(e.tipo)) que = e.antes != null && e.despues != null ? `Puja ${num(e.antes)} → ${num(e.despues)}` : "Puja";
+  else que = String(e.que || e.tipo || "Cambio").slice(0, 32);
+  const en = dentro && e.nivel && e.nivel !== "campana" ? ` <span class="mut">(en ${e.nivel === "anuncio" ? "anuncio" : "conjunto"})</span>` : "";
+  const tit = [e.objeto, e.quien ? `por ${e.quien}` : "", new Date(e.t).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })].filter(Boolean).join(" · ");
+  return `<span class="ult-mod" title="${esc(tit)}"><span class="ult-que">${esc(que)}${en}</span><span class="ult-cuando">${esc(haceTx(e.t))}</span></span>`;
+}
 function pintarAccBarra() {
   const b = $("#acc-barra"); if (!b) return;
   const xs = ACC.data?.acciones || [], n = xs.length;
   const urg = xs.filter((a) => /matar|techo/.test(a.tipo)).length;
-  b.innerHTML = `<button type="button" class="acc-btn boceto${n ? "" : " vacio-acc"}" id="b-acc"><span class="acc-tit">Acciones a realizar</span>
-    <span class="acc-n ${urg ? "mal" : n ? "hay" : ""}">${ACC.st === "cargando" && !ACC.data ? "…" : n}</span>${urg ? `<span class="acc-urg">${urg} urgente${urg === 1 ? "" : "s"}</span>` : ""}<span class="acc-ver">ver ›</span></button>`;
+  // (24/10 b) botón chico al lado de «Columnas» (antes un rectángulo amarillo grande arriba de las métricas)
+  b.innerHTML = `<button type="button" class="btn chico acc-btn" id="b-acc" title="Acciones a realizar (manual de la CBO)" aria-label="Acciones a realizar: ${n}${urg ? `, ${urg} urgentes` : ""}">Acciones<span class="acc-n ${urg ? "mal" : n ? "hay" : ""}">${ACC.st === "cargando" && !ACC.data ? "…" : n}</span></button>`;
   $("#b-acc").onclick = abrirAcciones;
 }
 function abrirAcciones() {
@@ -726,6 +752,7 @@ const roiDe = (x) => x.roi !== undefined ? x.roi : (nulo(x.ganancia) || !x.gasto
 const aovDe = (x) => x.ticket_promedio !== undefined ? x.ticket_promedio : (x.ventas ? x.facturacion / x.ventas : null);
 // [clave, título, formato(x) -> html, clase extra(x)]
 const COLS = [
+  ["ultima", "Última modificación", (x, nivel) => nivel ? ultimaCelda(x, nivel) : ""], // (24/10 b, Lorenzo)
   ["estado", "Estado", (x, nivel) => nivel ? estadoTxt(x) : ""],          // (24/10, Lorenzo)
   ["acciones", "Acciones", (x, nivel) => nivel ? accionesCelda(x, nivel) : ""],
   ["ganancia", "Ganancia / pérdida", (x) => usdG(x.ganancia), (x) => signo(x.ganancia)],
@@ -745,6 +772,7 @@ const COLS = [
   ["conv_visitas", "Conv. visitas→venta", (x) => pct1(x.conv_visitas)],
   ["clics", "Clics", (x) => entN(x.clics)],
   ["ctr", "CTR", (x) => pct1(x.ctr)],
+  ["retencion", "Retención %", (x) => pct1(x.retencion)], // (24/10 b) thruplays ÷ impresiones (WIKI/metricas-y-kpis: Santi pide > 10 %)
   ["cpc", "CPC", (x) => usdG(x.cpc)],
   ["cpm", "CPM", (x) => usdG(x.cpm)],
   ["impresiones", "Impresiones", (x) => entN(x.impresiones)],
@@ -848,6 +876,8 @@ function totalesDe(xs) {
   t.costo_carrito = div(t.gasto, t.carritos);
   t.conv_visitas = div(t.ventas, t.visitas);
   t.ctr = div(t.clics, t.impresiones);
+  { const con = xs.filter((x) => !nulo(x.retencion) && x.impresiones); const imp = con.reduce((s, x) => s + x.impresiones, 0);
+    t.retencion = imp ? con.reduce((s, x) => s + x.retencion * x.impresiones, 0) / imp : null; } // ponderada por impresiones
   t.cpc = div(t.gasto, t.clics);
   t.cpm = div(t.gasto, t.impresiones, 1000);
   t.frecuencia = null; // el alcance no se puede sumar entre campañas
@@ -1221,6 +1251,7 @@ function pintarBarraBase() {
   const soloAds = its.every((i) => i.nivel === "anuncio");
   const conPres = its.some((i) => i.nivel !== "anuncio");
   const conCamp = its.some((i) => i.nivel === "campana");
+  const unaCamp = its.length === 1 && its[0].nivel === "campana" && campanaPorId(its[0].id); // (24/10 b) relojito en el celular
   const lbl = est === "true" ? "Prendido" : est === "false" ? "Apagado" : "Mixto";
   const yaVisible = !b.hidden;
   b.hidden = false;
@@ -1232,6 +1263,7 @@ function pintarBarraBase() {
     <span class="sp"></span>
     <div class="acciones-sel">
     ${conPres ? `<button type="button" class="btn chico" id="b-pres">Modificar presupuesto</button>` : ""}
+    ${unaCamp ? `<button type="button" class="btn chico b-reloj-sel" id="b-reloj-sel" aria-label="Historial de cambios de la campaña">${RELOJ_SVG}<span>Historial</span></button>` : ""}
     ${conCamp ? `<button type="button" class="btn chico" id="b-hz" title="CBO 1-1 con los anuncios que elijas en otras cuentas">Escala horizontal</button>` : ""}
     ${soloAds ? `<span class="caps">${its.length === 1 ? `<button type="button" class="btn chico" id="b-aislada">Aislada</button>` : ""}<button type="button" class="btn chico" id="b-bidcap">BidCap</button><button type="button" class="btn chico" id="b-costcap">CostCap</button><button type="button" class="btn chico" id="b-horizontal" title="Madre topada: CBO 1-1-winners en otra cuenta">Escala</button></span>` : ""}
     <div class="grupo-sw"><span class="sw-lbl" id="sw-lbl">${lbl}</span>
@@ -1241,6 +1273,7 @@ function pintarBarraBase() {
   $("#b-limpiar").onclick = () => { S.sel.clear(); pintarTabla(); pintarBarra(); };
   if (conPres) $("#b-pres").onclick = modificarPresupuesto;
   if (conCamp) $("#b-hz").onclick = escalaCampanas;
+  if (unaCamp) $("#b-reloj-sel").onclick = (e) => verHistorial(unaCamp, e.currentTarget);
   if (soloAds) { $("#b-bidcap").onclick = () => quizCap("bidcap"); $("#b-costcap").onclick = () => quizCap("costcap"); $("#b-horizontal").onclick = () => quizCap("horizontal"); const ba = $("#b-aislada"); if (ba) ba.onclick = () => quizCap("aislada"); }
   switchArrastrable($("#sw"), est);
 }
