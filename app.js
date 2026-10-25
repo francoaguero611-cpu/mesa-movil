@@ -748,37 +748,40 @@ const pct1 = (n) => nulo(n) ? "—" : NF1.format(n * 100) + " %";
 const dec2 = (n) => nulo(n) ? "—" : NF2.format(n);
 const signo = (n) => nulo(n) || n === 0 ? "" : n < 0 ? "neg pierde" : "gana";
 const cpaDe = (x) => x.cpa !== undefined ? x.cpa : (x.ventas ? x.gasto / x.ventas : null);
-const roiDe = (x) => x.roi !== undefined ? x.roi : (nulo(x.ganancia) || !x.gasto ? null : x.ganancia / x.gasto); // (24/10) ganancia ÷ gasto
 const aovDe = (x) => x.ticket_promedio !== undefined ? x.ticket_promedio : (x.ventas ? x.facturacion / x.ventas : null);
+// (25/10, Lorenzo) facturado por visita / costo por visita (WIKI/metricas-y-kpis)
+const porVisita = (x) => !x.visitas ? "—" : `${usdG(nulo(x.facturacion) ? null : x.facturacion / x.visitas)} / ${usdG(nulo(x.gasto) ? null : x.gasto / x.visitas)}`;
 // [clave, título, formato(x) -> html, clase extra(x)]
+// (25/10, Lorenzo) sin ROI; orden fijo de métricas. Las que no pidió quedan ocultas de arranque (se prenden en «Columnas»).
 const COLS = [
   ["ultima", "Última modificación", (x, nivel) => nivel ? ultimaCelda(x, nivel) : ""], // (24/10 b, Lorenzo)
   ["estado", "Estado", (x, nivel) => nivel ? estadoTxt(x) : ""],          // (24/10, Lorenzo)
   ["acciones", "Acciones", (x, nivel) => nivel ? accionesCelda(x, nivel) : ""],
-  ["ganancia", "Ganancia / pérdida", (x) => usdG(x.ganancia), (x) => signo(x.ganancia)],
-  ["margen", "Margen %", (x) => pctN(x.margen), (x) => signo(x.margen ?? x.ganancia)],
-  ["roi", "ROI %", (x) => pctN(roiDe(x)), (x) => signo(roiDe(x))],
-  ["roas", "ROAS", (x) => chipRoas(x.roas)],
   ["ventas", "Ventas", (x) => entN(x.ventas)],
+  ["roas", "ROAS", (x) => chipRoas(x.roas)],
+  ["margen", "Margen %", (x) => pctN(x.margen), (x) => signo(x.margen ?? x.ganancia)],
+  ["ganancia", "Ganancia / pérdida", (x) => usdG(x.ganancia), (x) => signo(x.ganancia)],
   ["ticket_promedio", "AOV", (x) => usdG(aovDe(x))],
   ["gasto", "Importe gastado", (x) => usdG(x.gasto)],
-  ["presupuesto", "Presupuesto", (x, nivel) => nivel === "campana" && x.tipo_presupuesto === "ABO" ? `<span class="chip-tp" title="Presupuesto por conjunto: abrí la campaña para verlo y cambiarlo">Presupuesto ABO</span>` : `${usdG(x.presupuesto)}${x.tipo_presupuesto ? ` <span class="chip-tp">${esc(x.tipo_presupuesto)}</span>` : ""}${editaPres(x, nivel) ? ` <button type="button" class="lapiz" data-pres="${esc(nivel + ":" + x.id)}" aria-label="Cambiar presupuesto de ${esc(x.nombre)}" title="Cambiar presupuesto"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z M14 6l4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg></button>` : ""}`],
   ["cpa", "CPA", (x) => usdG(cpaDe(x))],
-  ["costo_pago_iniciado", "Costo x pago iniciado", (x) => usdG(x.costo_pago_iniciado)],
+  ["costo_pago_iniciado", "C/pago iniciado", (x) => usdG(x.costo_pago_iniciado)],
+  ["retencion", "Retención %", (x) => pct1(x.retencion)], // (24/10 b) thruplays ÷ impresiones (WIKI/metricas-y-kpis: Santi pide > 10 %)
+  ["ctr", "CTR", (x) => pct1(x.ctr)],
+  ["conv_visitas", "Conversión", (x) => pct1(x.conv_visitas)],
+  ["por_visita", "Facturado / costo por visita", porVisita],
+  ["presupuesto", "Presupuesto", (x, nivel) => nivel === "campana" && x.tipo_presupuesto === "ABO" ? `<span class="chip-tp" title="Presupuesto por conjunto: abrí la campaña para verlo y cambiarlo">Presupuesto ABO</span>` : `${usdG(x.presupuesto)}${x.tipo_presupuesto ? ` <span class="chip-tp">${esc(x.tipo_presupuesto)}</span>` : ""}${editaPres(x, nivel) ? ` <button type="button" class="lapiz" data-pres="${esc(nivel + ":" + x.id)}" aria-label="Cambiar presupuesto de ${esc(x.nombre)}" title="Cambiar presupuesto"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z M14 6l4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg></button>` : ""}`],
   ["costo_carrito", "Costo x carrito", (x) => usdG(x.costo_carrito)],
   ["pagos_iniciados", "Pagos iniciados", (x) => entN(x.pagos_iniciados)],
   ["carritos", "Carritos", (x) => entN(x.carritos)],
   ["visitas", "Visitas", (x) => entN(x.visitas)],
-  ["conv_visitas", "Conv. visitas→venta", (x) => pct1(x.conv_visitas)],
   ["clics", "Clics", (x) => entN(x.clics)],
-  ["ctr", "CTR", (x) => pct1(x.ctr)],
-  ["retencion", "Retención %", (x) => pct1(x.retencion)], // (24/10 b) thruplays ÷ impresiones (WIKI/metricas-y-kpis: Santi pide > 10 %)
   ["cpc", "CPC", (x) => usdG(x.cpc)],
   ["cpm", "CPM", (x) => usdG(x.cpm)],
   ["impresiones", "Impresiones", (x) => entN(x.impresiones)],
   ["frecuencia", "Frecuencia", (x) => dec2(x.frecuencia)],
 ];
-const colsOcultas = (() => { try { return new Set(JSON.parse(ls.get("dash_cols_ocultas", "[]"))); } catch { return new Set(); } })();
+const COLS_EXTRA = ["presupuesto", "costo_carrito", "pagos_iniciados", "carritos", "visitas", "clics", "cpc", "cpm", "impresiones", "frecuencia"];
+const colsOcultas = (() => { try { const v = ls.get("dash_cols_ocultas2", null); return new Set(v == null ? COLS_EXTRA : JSON.parse(v)); } catch { return new Set(COLS_EXTRA); } })();
 const colsVisibles = () => COLS.filter((c) => !colsOcultas.has(c[0]));
 const nCols = () => 1 + colsVisibles().length;
 // (14/10) lapicito: campaña CBO o conjunto ABO (donde vive el presupuesto diario)
@@ -791,7 +794,7 @@ function elegirColumnas() {
     <div class="cols-lista">${COLS.map(([k, t]) => `<label class="col-op"><input type="checkbox" data-col="${k}" ${colsOcultas.has(k) ? "" : "checked"}> ${esc(t)}</label>`).join("")}</div>
     <div class="botones"><button type="button" class="btn chico" data-todas>Mostrar todas</button><button type="button" class="btn pri" data-x>Listo</button></div>`;
   const m = abrirModal(pinta());
-  const guardar = () => { ls.set("dash_cols_ocultas", JSON.stringify([...colsOcultas])); pintarTabla(); pintarBotonCols(); };
+  const guardar = () => { ls.set("dash_cols_ocultas2", JSON.stringify([...colsOcultas])); pintarTabla(); pintarBotonCols(); };
   const enlazar = () => {
     $$("[data-col]", m.dlg).forEach((c) => c.onchange = () => { c.checked ? colsOcultas.delete(c.dataset.col) : colsOcultas.add(c.dataset.col); guardar(); });
     $("[data-todas]", m.dlg).onclick = () => { colsOcultas.clear(); guardar(); m.set(pinta()); enlazar(); };
@@ -869,7 +872,6 @@ function totalesDe(xs) {
   const div = (a, b, f = 1) => nulo(a) || !b ? null : (a / b) * f;
   t.roas = div(t.facturacion, t.gasto);
   t.margen = div(t.ganancia, t.facturacion);
-  t.roi = div(t.ganancia, t.gasto);
   t.cpa = div(t.gasto, t.ventas);
   t.ticket_promedio = div(t.facturacion, t.ventas);
   t.costo_pago_iniciado = div(t.gasto, t.pagos_iniciados);
