@@ -830,7 +830,7 @@ function subCampana(c) {
 }
 function subConjunto(s) {
   const p = [];
-  if (s.bid) p.push(`bid ${usd0(s.bid)}`);
+  if (s.bid) p.push(`bid US$ ${NF2.format(s.bid)}`); // (25/10) exacto, con centavos
   if (s.estrategia) p.push(estrat(s.estrategia));
   return p.join(" · ");
 }
