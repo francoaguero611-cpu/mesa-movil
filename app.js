@@ -757,6 +757,7 @@ const COLS = [
   ["ultima", "Última modificación", (x, nivel) => nivel ? ultimaCelda(x, nivel) : ""], // (24/10 b, Lorenzo)
   ["estado", "Estado", (x, nivel) => nivel ? estadoTxt(x) : ""],          // (24/10, Lorenzo)
   ["acciones", "Acciones", (x, nivel) => nivel ? accionesCelda(x, nivel) : ""],
+  ["presupuesto", "Presupuesto", (x, nivel) => nivel === "campana" && x.tipo_presupuesto === "ABO" ? `<span class="chip-tp" title="Presupuesto por conjunto: abrí la campaña para verlo y cambiarlo">Presupuesto ABO</span>` : `${usdG(x.presupuesto)}${x.tipo_presupuesto ? ` <span class="chip-tp">${esc(x.tipo_presupuesto)}</span>` : ""}${editaPres(x, nivel) ? ` <button type="button" class="lapiz" data-pres="${esc(nivel + ":" + x.id)}" aria-label="Cambiar presupuesto de ${esc(x.nombre)}" title="Cambiar presupuesto"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z M14 6l4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg></button>` : ""}`], // (26/10, Lorenzo) antes de Ventas
   ["ventas", "Ventas", (x) => entN(x.ventas)],
   ["roas", "ROAS", (x) => chipRoas(x.roas)],
   ["margen", "Margen %", (x) => pctN(x.margen), (x) => signo(x.margen ?? x.ganancia)],
@@ -769,7 +770,6 @@ const COLS = [
   ["ctr", "CTR", (x) => pct1(x.ctr)],
   ["conv_visitas", "Conversión", (x) => pct1(x.conv_visitas)],
   ["por_visita", "Facturado / costo por visita", porVisita],
-  ["presupuesto", "Presupuesto", (x, nivel) => nivel === "campana" && x.tipo_presupuesto === "ABO" ? `<span class="chip-tp" title="Presupuesto por conjunto: abrí la campaña para verlo y cambiarlo">Presupuesto ABO</span>` : `${usdG(x.presupuesto)}${x.tipo_presupuesto ? ` <span class="chip-tp">${esc(x.tipo_presupuesto)}</span>` : ""}${editaPres(x, nivel) ? ` <button type="button" class="lapiz" data-pres="${esc(nivel + ":" + x.id)}" aria-label="Cambiar presupuesto de ${esc(x.nombre)}" title="Cambiar presupuesto"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z M14 6l4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg></button>` : ""}`],
   ["costo_carrito", "Costo x carrito", (x) => usdG(x.costo_carrito)],
   ["pagos_iniciados", "Pagos iniciados", (x) => entN(x.pagos_iniciados)],
   ["carritos", "Carritos", (x) => entN(x.carritos)],
@@ -780,8 +780,9 @@ const COLS = [
   ["impresiones", "Impresiones", (x) => entN(x.impresiones)],
   ["frecuencia", "Frecuencia", (x) => dec2(x.frecuencia)],
 ];
-const COLS_EXTRA = ["presupuesto", "costo_carrito", "pagos_iniciados", "carritos", "visitas", "clics", "cpc", "cpm", "impresiones", "frecuencia"];
-const colsOcultas = (() => { try { const v = ls.get("dash_cols_ocultas2", null); return new Set(v == null ? COLS_EXTRA : JSON.parse(v)); } catch { return new Set(COLS_EXTRA); } })();
+const COLS_EXTRA = ["costo_carrito", "pagos_iniciados", "carritos", "visitas", "clics", "cpc", "cpm", "impresiones", "frecuencia"];
+// (26/10) Presupuesto pasa a verse siempre: se saca de lo oculto que cada dispositivo tenía guardado
+const colsOcultas = (() => { try { const v = ls.get("dash_cols_ocultas3", null) ?? ls.get("dash_cols_ocultas2", null); const o = new Set(v == null ? COLS_EXTRA : JSON.parse(v)); if (ls.get("dash_cols_ocultas3", null) == null) o.delete("presupuesto"); return o; } catch { return new Set(COLS_EXTRA); } })();
 const colsVisibles = () => COLS.filter((c) => !colsOcultas.has(c[0]));
 const nCols = () => 1 + colsVisibles().length;
 // (14/10) lapicito: campaña CBO o conjunto ABO (donde vive el presupuesto diario)
@@ -794,7 +795,7 @@ function elegirColumnas() {
     <div class="cols-lista">${COLS.map(([k, t]) => `<label class="col-op"><input type="checkbox" data-col="${k}" ${colsOcultas.has(k) ? "" : "checked"}> ${esc(t)}</label>`).join("")}</div>
     <div class="botones"><button type="button" class="btn chico" data-todas>Mostrar todas</button><button type="button" class="btn pri" data-x>Listo</button></div>`;
   const m = abrirModal(pinta());
-  const guardar = () => { ls.set("dash_cols_ocultas2", JSON.stringify([...colsOcultas])); pintarTabla(); pintarBotonCols(); };
+  const guardar = () => { ls.set("dash_cols_ocultas3", JSON.stringify([...colsOcultas])); pintarTabla(); pintarBotonCols(); };
   const enlazar = () => {
     $$("[data-col]", m.dlg).forEach((c) => c.onchange = () => { c.checked ? colsOcultas.delete(c.dataset.col) : colsOcultas.add(c.dataset.col); guardar(); });
     $("[data-todas]", m.dlg).onclick = () => { colsOcultas.clear(); guardar(); m.set(pinta()); enlazar(); };
