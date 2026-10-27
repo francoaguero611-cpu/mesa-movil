@@ -2977,6 +2977,8 @@ const SECCIONES = [
     montar: () => montarTaller() }, // (22/10) el tablero en vivo (ex «Taller») reemplazó al Workspace viejo de etapas; montarWorkspace queda sin usar
   { id: "creativos", nombre: "Creativos", raiz: "#cr", icono: "M3.6 7 C 3.5 6, 4.1 5.3, 5 5.3 L9.3 5.2 L11.1 7.2 L19 7.1 C 20 7.1, 20.6 7.7, 20.5 8.6 L20.3 17.9 C 20.2 18.8, 19.6 19.3, 18.8 19.3 L5.1 19.1 C 4.2 19.1, 3.7 18.5, 3.7 17.7 Z M10.2 10.8 L14.6 13.2 L10.3 15.6 Z",
     montar: (o) => montarCreativos(o), ya: (o) => window.Creativos?.abrir(o.ruta || {}) }, // tocarla estando adentro = volver a todas las carpetas
+  { id: "atc", nombre: "ATC", raiz: "#atc", icono: "M4.5 5.2 C 9.5 5, 14.5 5.1, 19.6 5 C 20.3 5, 20.6 5.4, 20.6 6 L20.5 14.2 C 20.5 14.9, 20.1 15.3, 19.4 15.3 L11 15.4 L6.6 19 L6.8 15.4 L4.6 15.4 C 3.9 15.4, 3.5 15, 3.5 14.3 L3.6 6.1 C 3.6 5.5, 3.9 5.2, 4.5 5.2 Z M7.8 9.4 H16.2 M7.8 12 H13",
+    montar: () => montarAtc() }, // (27/10) atención al cliente: comentarios, privados, mails y reclamos
 ];
 const seccionDe = (id) => SECCIONES.find((x) => x.id === (id === "taller" ? "workspace" : id)) || null; // #taller = nombre viejo
 
@@ -3068,6 +3070,44 @@ async function montarCazador(o = {}) {
   }
   if (S.vista !== "cazador" || !$("#caz")) return;
   window.Cazador.montar($("#caz"), { login: (msg) => login(msg), pedido: o?.pedido ?? null });
+}
+
+// ---------- ATC (27/10): atc.js se carga la primera vez. Backend: Edge Function «atc» ----------
+let atcCarga = null;
+function cargarAtc() {
+  if (window.Atc) return Promise.resolve();
+  if (atcCarga) return atcCarga;
+  const css = new Promise((ok) => {
+    if ($('link[href^="atc.css"]')) return ok();
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "atc.css?v=1";
+    l.onload = l.onerror = () => ok(); document.head.appendChild(l);
+  });
+  const js = new Promise((ok, mal) => {
+    const sc = document.createElement("script"); sc.src = "atc.js?v=1";
+    sc.onload = () => window.Atc ? ok() : mal(new Error("Atención al cliente no arrancó"));
+    sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar Atención al cliente. ¿Hay conexión?")); };
+    document.head.appendChild(sc);
+  });
+  atcCarga = Promise.all([css, js]).catch((e) => { atcCarga = null; throw e; });
+  return atcCarga;
+}
+async function montarAtc() {
+  cerrarMenu(); pararRanking();
+  S.vista = "atc"; ls.set("dash_seccion", "atc");
+  try { history.replaceState(null, "", location.pathname + location.search + "#atc"); } catch {}
+  pintarNav();
+  $("#main").innerHTML = `<section class="atc-sec" id="atc" aria-labelledby="atc-t"><h2 class="sr" id="atc-t">Atención al cliente</h2><p class="vacio"><span class="cargador"></span>Abriendo Atención al cliente…</p></section>`;
+  pintarBarra();
+  window.scrollTo(0, 0);
+  try { await cargarAtc(); }
+  catch (e) {
+    if (S.vista !== "atc" || !$("#atc")) return;
+    $("#atc").innerHTML = `<div class="err-box" role="alert"><b>No se pudo abrir Atención al cliente.</b> ${esc(e.message)}<div><button type="button" class="btn chico" id="atc-reintentar">Reintentar</button></div></div>`;
+    $("#atc-reintentar").onclick = () => montarAtc();
+    return;
+  }
+  if (S.vista !== "atc" || !$("#atc")) return;
+  window.Atc.montar($("#atc"), { login: (msg) => login(msg), toast });
 }
 
 // ---------- Creativos (12/10): creativos.js se carga la primera vez. Backend: app-movil/creativos.ts ----------

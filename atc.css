@@ -1,0 +1,70 @@
+/* ATC — atención al cliente (27/10). Usa las variables de styles.css: anda en claro y oscuro. */
+.atc { display: grid; gap: 16px; padding-bottom: 40px; }
+.atc-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.atc-aviso { margin: 0; padding: 10px 14px; border: 2px solid var(--tinta); border-radius: var(--r-card, 10px); background: var(--r-ama-bg); color: var(--r-ama-tx); font-weight: 600; }
+.atc-mut { color: var(--mut); font-size: 13.5px; }
+
+.atc-tabs { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 6px; scrollbar-width: thin; }
+.atc-tab { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 6px 16px; border: 2px solid var(--tinta); border-radius: var(--r-btn); background: var(--tarjeta); color: var(--tinta); box-shadow: 3px 3px 0 var(--sombra); font: 700 15.5px var(--f-titulo); cursor: pointer; }
+.atc-tab:hover { background: var(--papel-2); }
+.atc-tab[aria-selected="true"] { background: var(--tinta); color: var(--papel); transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--sombra); }
+.atc-tab:focus-visible { outline: 3px solid var(--foco); outline-offset: 2px; }
+.atc-badge { min-width: 22px; padding: 1px 7px; border-radius: 999px; background: var(--peligro); color: #fff; font-size: 12.5px; line-height: 18px; text-align: center; }
+
+.atc-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+.atc-tile { display: grid; gap: 2px; padding: 12px 14px; border: 2px solid var(--tinta); border-radius: var(--r-card, 10px); background: var(--tarjeta); box-shadow: 3px 3px 0 var(--sombra); }
+.atc-tile b { font: 700 26px var(--f-titulo); font-variant-numeric: tabular-nums; }
+.atc-tile b.chico { font-size: 16px; }
+.atc-tile span { color: var(--mut); font-size: 13.5px; }
+.atc-tile.bot { background: var(--r-ver-bg); color: var(--r-ver-tx); }
+.atc-tile.tomi { background: var(--r-gris-bg); color: var(--r-gris-tx); }
+.atc-tile.alerta { background: var(--r-rojo-bg); color: var(--r-rojo-tx); }
+.atc-tile.bot span, .atc-tile.tomi span, .atc-tile.alerta span { color: inherit; opacity: .85; }
+
+.atc-rep { padding: 14px 16px; border: 2px solid var(--tinta); border-radius: var(--r-card, 10px); background: var(--papel-2); }
+.atc-rep h3 { margin: 0 0 6px; font: 700 16px var(--f-titulo); }
+.atc-rep ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.atc-rep li { font-size: 14.5px; line-height: 1.4; }
+
+.atc-lista { display: grid; gap: 12px; }
+.atc-item { display: grid; gap: 8px; padding: 12px 14px; border: 2px solid var(--tinta); border-radius: var(--r-card, 10px); background: var(--tarjeta); box-shadow: 3px 3px 0 var(--sombra); min-width: 0; }
+.atc-cab { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.atc-cab time { margin-left: auto; }
+.atc-quien { padding: 2px 9px; border-radius: 999px; font-size: 12.5px; font-weight: 700; border: 1.5px solid currentColor; }
+.atc-quien.bot { background: var(--r-ver-bg); color: var(--r-ver-tx); }
+.atc-quien.tomi { background: var(--r-gris-bg); color: var(--r-gris-tx); }
+.atc-quien.nadie { background: var(--r-rojo-bg); color: var(--r-rojo-tx); }
+.atc-oferta { padding: 1px 8px; border-radius: 6px; background: var(--marca); color: var(--tinta); font-size: 12.5px; font-weight: 700; }
+.atc-trad { margin: 0; font-size: 13px; color: var(--mut); }
+.atc-link { padding: 0; border: 0; background: none; color: var(--acento); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.atc-asunto { margin: 0; font-weight: 700; font-size: 14px; }
+.atc-cli { margin: 0; font-size: 15px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.atc-resp { padding: 8px 12px; border-left: 4px solid var(--linea); border-radius: 6px; background: var(--papel-2); }
+.atc-resp.bot { border-left-color: var(--ok); }
+.atc-resp.tomi { border-left-color: var(--mut); }
+.atc-resp.nadie { border-left-color: var(--peligro); }
+.atc-resp span { font-size: 12.5px; font-weight: 700; color: var(--mut); }
+.atc-resp p { margin: 2px 0 0; font-size: 14.5px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.atc-det summary { cursor: pointer; font-size: 13px; color: var(--mut); }
+.atc-det p { margin: 6px 0 0; font-size: 14px; white-space: pre-wrap; }
+.atc-pie { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.atc-estado { font-size: 13.5px; font-weight: 600; margin-right: auto; }
+.atc-mas { display: flex; justify-content: center; }
+
+.atc-modal-fondo { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 16px; background: rgba(0, 0, 0, .45); }
+.atc-modal { width: min(640px, 100%); max-height: min(86vh, 900px); display: grid; grid-template-rows: auto 1fr; border: 2px solid var(--tinta); border-radius: 12px; background: var(--papel); box-shadow: 5px 5px 0 var(--sombra); overflow: hidden; }
+.atc-modal header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border-bottom: 2px solid var(--tinta); }
+.atc-modal-cuerpo { overflow-y: auto; padding: 14px; display: grid; gap: 10px; align-content: start; }
+.atc-chat { display: grid; gap: 8px; }
+.atc-burbuja { max-width: 85%; padding: 8px 12px; border: 2px solid var(--tinta); border-radius: 12px; background: var(--tarjeta); }
+.atc-burbuja.pagina { justify-self: end; background: var(--r-ver-bg); color: var(--r-ver-tx); }
+.atc-burbuja.pagina .atc-mut { color: inherit; opacity: .8; }
+.atc-burbuja p { margin: 3px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14.5px; }
+.atc-burbuja .atc-orig { font-size: 12.5px; opacity: .7; font-style: italic; }
+.atc-burbuja img { display: block; max-width: 100%; margin-top: 6px; border-radius: 8px; }
+
+@media (max-width: 560px) {
+  .atc-cab time { margin-left: 0; width: 100%; }
+  .atc-tile b { font-size: 22px; }
+}
+@media (prefers-reduced-motion: reduce) { .atc-tab { transition: none; } }
