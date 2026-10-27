@@ -26,7 +26,8 @@ const TABS = [
   { id: "reclamos", nombre: "Reclamos", filtros: [["todos", "Todos"], ["pendientes", "Abiertos"], ["bot", "Respondidos por el bot"]] },
 ];
 const PERIODOS = [["hoy", "Hoy"], ["7d", "7 días"], ["30d", "30 días"]];
-const A = { raiz: null, ctx: {}, tab: ls.get("atc_tab", "comentarios"), periodo: ls.get("atc_periodo", "hoy"), filtro: "todos", res: null, items: [], pag: 0, hayMas: false, cargando: false, original: new Set() };
+const A = { raiz: null, ctx: {}, tab: ls.get("atc_tab", "comentarios"), periodo: ls.get("atc_periodo", "hoy"), oferta: ls.get("atc_oferta", ""), ofertas: [], filtro: "todos", res: null, items: [], pag: 0, hayMas: false, cargando: false, original: new Set() };
+const qOferta = () => A.oferta ? `&oferta=${encodeURIComponent(A.oferta)}` : "";
 
 async function api(q) {
   const r = await fetch(`${API}?${q}`, { headers: { "x-app-clave": clave() }, cache: "no-store" }).catch(() => null);
@@ -52,6 +53,14 @@ function tiles() {
     : [["Recibidos", t.recibidos], ["Respondió el bot", t.bot, "bot"], ["Respondió Tomi", t.tomi, "tomi"], ["Sin responder", t.sin_responder, t.sin_responder ? "alerta" : ""]].concat(A.tab === "comentarios" ? [["Ocultos", t.ocultos]] : []);
   const juego = A.tab === "reclamos" && r.reclamos?.en_juego ? Object.entries(r.reclamos.en_juego).map(([m, v]) => `${m} ${num(Math.round(v))}`).join(" · ") : "";
   return `<div class="atc-tiles">${L.map(([n, v, c]) => `<div class="atc-tile ${c || ""}"><b>${num(v)}</b><span>${esc(n)}</span></div>`).join("")}${juego ? `<div class="atc-tile"><b class="chico">${esc(juego)}</b><span>En juego</span></div>` : ""}</div>`;
+}
+// selector de oferta: «Todas» + las que tuvieron movimiento en el período (con su total de casos del canal abierto)
+function ofertasBar() {
+  if (!A.ofertas.length) return "";
+  const k = A.tab;
+  const opts = [["", "Todas las ofertas"]].concat(A.ofertas.map((o) => [o.oferta, `${o.oferta === "sin" ? "Sin oferta" : o.oferta} · ${o[k] ?? 0}`]));
+  if (A.oferta && !A.ofertas.some((o) => o.oferta === A.oferta)) opts.push([A.oferta, `${A.oferta === "sin" ? "Sin oferta" : A.oferta} · 0`]);
+  return `<div class="atc-ofertas" aria-label="Filtrar por oferta">${seg("atc-of", opts, A.oferta)}</div>`;
 }
 function reporte() {
   const lineas = A.res?.[A.tab]?.reporte ?? [];
@@ -86,6 +95,7 @@ function pintar() {
   const ped = A.res?.pedidos_pendientes ?? 0;
   r.innerHTML = `<div class="atc">
     <div class="atc-top">${seg("atc-per", PERIODOS, A.periodo)}<button type="button" class="btn chico" id="atc-ref" aria-label="Actualizar">↻ Actualizar</button></div>
+    ${ofertasBar()}
     ${ped ? `<p class="atc-aviso">🛠️ Hay ${ped} pedido${ped > 1 ? "s" : ""} de clientes esperando tu OK (los ves en el reporte diario o en Discord).</p>` : ""}
     <div class="atc-tabs" role="tablist">${TABS.map((t) => { const n = pendDe(t.id); return `<button type="button" role="tab" class="atc-tab" aria-selected="${t.id === A.tab}" data-tab="${t.id}">${esc(t.nombre)}${n ? `<span class="atc-badge">${n}</span>` : ""}</button>`; }).join("")}</div>
     ${A.res ? tiles() + reporte() : `<p class="vacio"><span class="cargador"></span>Armando el reporte…</p>`}
@@ -94,6 +104,7 @@ function pintar() {
   </div>`;
   $$('input[name="atc-per"]', r).forEach((x) => x.onchange = () => { A.periodo = x.value; ls.set("atc_periodo", A.periodo); todo(); });
   $$('input[name="atc-fil"]', r).forEach((x) => x.onchange = () => { A.filtro = x.value; cargarLista(); });
+  $$('input[name="atc-of"]', r).forEach((x) => x.onchange = () => { A.oferta = x.value; ls.set("atc_oferta", A.oferta); A.res = null; pintar(); cargarResumen(); cargarLista(); });
   $$("[data-tab]", r).forEach((b) => b.onclick = () => { A.tab = b.dataset.tab; ls.set("atc_tab", A.tab); A.filtro = "todos"; pintar(); cargarLista(); });
   $("#atc-ref", r).onclick = () => todo();
   enlazarLista();
@@ -108,16 +119,19 @@ function pintarLista() { const n = $("#atc-lista", A.raiz); if (n) { n.innerHTML
 
 // ---------- datos ----------
 async function cargarResumen() {
-  try { A.res = await api(`accion=resumen&periodo=${A.periodo}`); }
+  try {
+    const [res, of] = await Promise.all([api(`accion=resumen&periodo=${A.periodo}${qOferta()}`), api(`accion=ofertas&periodo=${A.periodo}`).catch(() => null)]);
+    A.res = res; if (of) A.ofertas = of.ofertas ?? [];
+  }
   catch (e) { A.res = null; A.ctx.toast?.(`No se pudo armar el reporte: ${e.message}`, "error"); }
   pintar();
 }
 async function cargarLista(mas = false) {
   if (!mas) { A.items = []; A.pag = 0; A.original.clear(); } else A.pag++;
   A.cargando = true; pintarLista();
-  const pedido = `${A.tab}|${A.filtro}|${A.periodo}|${A.pag}`; A.ultimo = pedido;
+  const pedido = `${A.tab}|${A.filtro}|${A.periodo}|${A.oferta}|${A.pag}`; A.ultimo = pedido;
   try {
-    const j = await api(`accion=lista&tipo=${A.tab}&filtro=${A.filtro}&periodo=${A.periodo}&pag=${A.pag}`);
+    const j = await api(`accion=lista&tipo=${A.tab}&filtro=${A.filtro}&periodo=${A.periodo}&pag=${A.pag}${qOferta()}`);
     if (A.ultimo !== pedido) return;
     A.items = A.items.concat(j.items ?? []); A.hayMas = !!j.hay_mas;
   } catch (e) { if (A.ultimo === pedido) A.ctx.toast?.(`No se pudo cargar la lista: ${e.message}`, "error"); }

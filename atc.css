@@ -4,6 +4,9 @@
 .atc-aviso { margin: 0; padding: 10px 14px; border: 2px solid var(--tinta); border-radius: var(--r-card, 10px); background: var(--r-ama-bg); color: var(--r-ama-tx); font-weight: 600; }
 .atc-mut { color: var(--mut); font-size: 13.5px; }
 
+.atc-ofertas .segs { flex-wrap: nowrap; overflow-x: auto; padding: 2px 2px 6px; scrollbar-width: thin; }
+.atc-ofertas .seg { flex: 0 0 auto; }
+.atc-ofertas .seg span { min-height: 32px; font-size: 13.5px; padding: 4px 10px; }
 .atc-tabs { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 6px; scrollbar-width: thin; }
 .atc-tab { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 6px 16px; border: 2px solid var(--tinta); border-radius: var(--r-btn); background: var(--tarjeta); color: var(--tinta); box-shadow: 3px 3px 0 var(--sombra); font: 700 15.5px var(--f-titulo); cursor: pointer; }
 .atc-tab:hover { background: var(--papel-2); }
