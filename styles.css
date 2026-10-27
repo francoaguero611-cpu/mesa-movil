@@ -701,7 +701,7 @@ table.camp tbody tr.fila.sel td { background: var(--marca); }
 .secciones.hay-izq.hay-der .sec-pista { -webkit-mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent); mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent); }
 .sec-flecha { display: none; position: absolute; top: 50%; z-index: 2; width: 36px; height: 36px; margin-top: -20px; padding: 0; place-items: center; border: 2px solid var(--tinta); border-radius: 50%; background: var(--tarjeta); color: var(--tinta); box-shadow: 2px 2px 0 var(--sombra); cursor: pointer; }
 .sec-flecha:hover { background: var(--papel-2); }
-.sec-flecha.izq { left: -8px; }
+.sec-flecha.izq { left: -8px; transform: none; } /* (27/10) la regla general .izq daba vuelta el botón y el svg otra vez: quedaba mirando a la derecha */
 .sec-flecha.der { right: -8px; }
 .sec-flecha.izq svg { transform: scaleX(-1); }
 @media (hover: hover) and (pointer: fine) { .secciones.hay-izq .sec-flecha.izq, .secciones.hay-der .sec-flecha.der { display: grid; } }
@@ -738,7 +738,7 @@ table.camp tbody tr.fila.sel td { background: var(--marca); }
 .rk-flechas { margin-left: auto; display: inline-flex; gap: 8px; align-self: center; }
 .rk-flechas.nada { visibility: hidden; }
 .flecha-rk { width: 38px; padding: 0; }
-.flecha-rk.izq svg { transform: scaleX(-1); }
+.flecha-rk.izq svg { transform: none; } /* (27/10) el botón ya va dado vuelta por .izq */
 .rk-garabato { display: block; width: 120px; height: 10px; margin: 1px 0 4px -2px; color: var(--acento); }
 .rk-esq-t { height: 28px; width: 220px; border-radius: 8px; }
 
