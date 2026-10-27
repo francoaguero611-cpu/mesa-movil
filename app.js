@@ -373,6 +373,7 @@ function montar() {
   if (location.hash && seccionDe(location.hash.slice(1))) { try { history.replaceState(null, "", location.pathname + location.search); } catch {} }
   pintarNav();
   $("#main").innerHTML = `
+    <div class="whop-barra" id="whop-barra" role="status" aria-live="polite"></div>
     <div class="sel-grupo-caja boceto"><label class="sr" for="sel-grupo">Oferta y mercado</label><select id="sel-grupo" class="sel-grupo"></select><span class="sel-flecha" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M5.5 9.5 C 8 12, 10.5 14, 12.2 15.5 C 14 13.6, 16.4 11.6, 18.6 9.2" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
     <div class="controles">
       <div class="periodos" role="group" aria-label="Período">${botonesPer("data-per", S.periodo)}</div>
@@ -523,19 +524,21 @@ function pintarProblemas() {
   $("details", sec).ontoggle = (e) => { PB.abierto = e.target.open; ls.set("dash_prob_abierto", PB.abierto ? "1" : "0"); };
   $$("[data-prob-re]", sec).forEach((b) => b.onclick = () => cargarProblemas(true));
 }
-// (27/10, Lorenzo) Cuentas publicitarias y umbral: cuánto lleva gastado sin cobrar cada cuenta, cuál es su umbral,
-// cuándo cobra, y si la tarjeta de Whop alcanza. Sale de la función cuentas-umbral (Meta cada 30 min; Whop desde la Mac cada 15 min).
-// Meta no da el umbral por API: se aprende solo al ver un cobro, o se carga con el lápiz (manda el manual).
+// (27/10, Lorenzo) Cuentas publicitarias y umbral. Arriba del dashboard: barra fina «Saldo en Whop» (se refresca cada minuto;
+// la Mac lo lee de Whop cada 2 min). Al final: solo cuentas en uso (activas con campañas prendidas o gastando), una fila por cuenta
+// con barra cuyo LARGO es proporcional al umbral y que se llena con lo gastado sin cobrar. Sale de la función cuentas-umbral.
+// El umbral sale de los cobros reales (registro de Meta o tarjeta Whop propia); el lápiz lo pisa a mano.
 const API_UMB = "https://tppcpnfzcxxusdhrlmdx.supabase.co/functions/v1/cuentas-umbral";
-const UB = { st: null, data: null, error: null, edit: null, abierto: ls.get("dash_umb_abierto") !== "0" };
+const UB = { st: null, data: null, error: null, edit: null, whop: null, timer: null, abierto: ls.get("dash_umb_abierto") !== "0" };
+const DEMO_UMB = () => { const h = new Date(Date.now() - 3 * 60e3).toISOString(); return { necesita: 2249.5, en24: 70.5, actualizado: h, whop: { saldo: 2800.26, leido_en: h, rechazos: [] },
+  cuentas: [{ act: "1", nombre: "COL ManualBid", moneda: "USD", saldo: 4.17, umbral: 20, origen: "cobros", falta: 15.83, gasto_dia: 494.2, cobra_en_h: 0.8 },
+    { act: "2", nombre: "A1 WINNER", moneda: "USD", saldo: 2.03, umbral: 50.5, origen: "cobros", falta: 48.47, gasto_dia: 401.65, cobra_en_h: 2.9 },
+    { act: "3", nombre: "AR y MX", moneda: "USD", saldo: 400, umbral: 900, origen: "manual", falta: 500, gasto_dia: 1650.2, cobra_en_h: 7.3 },
+    { act: "4", nombre: "MX ManualBid", moneda: "USD", saldo: 40.64, umbral: 179, origen: "cobros", falta: 138.36, gasto_dia: 89.55, cobra_en_h: 37.1 },
+    { act: "5", nombre: "TESTEOS", moneda: "USD", saldo: 1250, umbral: 2000, origen: "cobros", falta: 750, gasto_dia: 380, cobra_en_h: 47.4 },
+    { act: "6", nombre: "CLEAN NUTRA", moneda: "USD", saldo: 0, umbral: null, origen: null, falta: null, gasto_dia: 401.65, cobra_en_h: null }] }; };
 async function apiUmb(accion, body = null) {
-  if (DEMO) { const h = new Date(Date.now() - 6 * 60e3).toISOString(); return { necesita: 1310.5, en24: 395, sin_umbral: 1, actualizado: h, whop: { saldo: 1876.82, leido_en: h },
-    cuentas: [{ act: "1", nombre: "MEXICO Cuenta publicitaria USD", moneda: "USD", estado: 3, saldo: 808.97 },
-      { act: "2", nombre: "TESTEOS Cuenta publicitaria USD", moneda: "USD", estado: 1, saldo: 312.4, umbral: 350, origen: "aprendido", falta: 37.6, ritmo_hora: 21.3, cobra_en_h: 1.8, tarjeta: "Mastercard *9760", ultimo_cobro: 349.8, ultimo_cobro_en: new Date(Date.now() - 20 * 3600e3).toISOString() },
-      { act: "3", nombre: "GALILEO SHOPS", moneda: "USD", estado: 1, saldo: 41.05, umbral: 50, origen: "manual", falta: 8.95, ritmo_hora: 2.4, cobra_en_h: 3.7 },
-      { act: "4", nombre: "AR y MX Cuenta publicitaria USD", moneda: "USD", estado: 1, saldo: 22.31, umbral: 250, origen: "aprendido", falta: 227.69, ritmo_hora: 4.1, cobra_en_h: 55.5 },
-      { act: "5", nombre: "COL ManualBid Cuenta publicitaria", moneda: "USD", estado: 1, saldo: 11.36, umbral: null, ritmo_hora: 0.8 },
-      { act: "6", nombre: "A2 WINNER", moneda: "USD", estado: 1, saldo: 0 }] }; }
+  if (DEMO) return DEMO_UMB();
   const r = await fetch(`${API_UMB}?accion=${accion}`, { method: body ? "POST" : "GET", cache: "no-store",
     headers: { "x-app-clave": clave(), ...(body ? { "content-type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined });
   const j = await r.json().catch(() => null);
@@ -545,64 +548,67 @@ async function apiUmb(accion, body = null) {
 async function cargarUmbrales(forzar = false) {
   if (UB.st === "cargando") return;
   UB.st = "cargando"; pintarUmbrales();
-  try { UB.data = await apiUmb(forzar ? "ver&forzar=1" : "ver"); UB.st = "ok"; UB.error = null; }
+  try { UB.data = await apiUmb(forzar ? "ver&forzar=1" : "ver"); UB.whop = UB.data.whop; UB.st = "ok"; UB.error = null; }
   catch (e) { UB.st = "error"; UB.error = e.message; }
-  pintarUmbrales();
+  pintarUmbrales(); pintarWhop();
+  clearInterval(UB.timer); // la barra de Whop se refresca sola cada minuto mientras el Dashboard está abierto
+  UB.timer = setInterval(async () => {
+    if (S.vista !== "dash" || !$("#whop-barra")) { clearInterval(UB.timer); UB.timer = null; return; }
+    if (document.hidden) return;
+    try { UB.whop = (await apiUmb("whop_ver")).whop; pintarWhop(); } catch { /* queda el último */ }
+  }, 60e3);
 }
 async function guardarUmbral(act, valor) {
   try { UB.data = await apiUmb("umbral", { act, umbral: valor }); UB.edit = null; toast("Umbral guardado"); }
   catch (e) { toast(esc(e.message), "error"); }
-  pintarUmbrales();
+  pintarUmbrales(); pintarWhop();
 }
-const plataUmb = (n, mon) => String(mon || "USD").toUpperCase() === "USD" ? usd(n) : `${NF2.format(n || 0)} ${esc(mon)}`;
+const plataUmb = (n, mon) => { if (n == null) return "—"; const v = n < 100 ? NF2.format(n) : NF0.format(Math.round(n)); return String(mon || "USD").toUpperCase() === "USD" ? `US$ ${v}` : `${v} ${esc(mon)}`; }; // centavos solo en montos chicos
 const haceUmb = (iso) => { const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return !iso || isNaN(m) ? "" : m < 1 ? "recién" : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} días`; };
-const cuandoCobra = (h) => h == null ? "" : h < 1 ? "cobra en menos de 1 h" : h < 24 ? `cobra en ~${Math.round(h)} h` : `cobra en ~${Math.round(h / 24)} días`;
-function filaUmb(c) {
-  const pend = c.estado === 3;
-  const pct = pend ? 100 : c.umbral ? Math.min(100, (c.saldo / c.umbral) * 100) : 0;
-  const nivel = pend ? "pend" : pct >= 90 ? "alto" : pct >= 70 ? "medio" : "bajo";
+const tiempoUmb = (h) => h == null ? "" : h < 1 ? "< 1 h" : h < 24 ? `~${Math.round(h)} h` : `~${Math.round(h / 24 * 10) / 10} días`.replace(".", ",");
+function pintarWhop() {
+  const el = $("#whop-barra"); if (!el) return;
+  const w = UB.whop, d = UB.data;
+  if (!w) { el.innerHTML = UB.st === "error" ? "" : `<span class="wb-et">Saldo en Whop</span><span class="mut">leyendo…</span>`; return; }
+  const viejo = Date.now() - Date.parse(w.leido_en) > 10 * 60e3;
+  const falta = d ? d.necesita - w.saldo : 0;
+  const nRech = (w.rechazos || []).length;
+  const ant = el.dataset.saldo;
+  el.classList.toggle("mal", falta > 0 || nRech > 0);
+  el.innerHTML = `<span class="wb-et">Saldo en Whop</span><b class="wb-saldo num">${usd(w.saldo)}</b>
+    <span class="wb-tx">${d ? (falta > 0 ? `<span class="neg">⚠ faltan ${usd0(Math.ceil(falta))} para cubrir los umbrales</span>` : `<span class="wb-ok">✓ cubre todos los umbrales</span>`) : ""}${nRech ? ` · <span class="neg">${nRech} cobro${nRech === 1 ? "" : "s"} rechazado${nRech === 1 ? "" : "s"} hoy</span>` : ""}</span>
+    <span class="wb-hora mut${viejo ? " neg" : ""}">${viejo ? "⚠ dato viejo · abrí Whop en la Mac" : haceUmb(w.leido_en)}</span>`;
+  if (ant && ant !== String(w.saldo)) { el.classList.remove("cambio"); void el.offsetWidth; el.classList.add("cambio"); }
+  el.dataset.saldo = String(w.saldo);
+}
+function filaUmb(c, maxU) {
+  const u = c.umbral;
+  // largo de la barra ∝ umbral (raíz cuadrada para que US$ 2 y US$ 2.000 se vean los dos); relleno = gastado / umbral
+  const largo = u ? Math.max(6, Math.sqrt(u / maxU) * 100) : 6; // sin umbral: barrita mínima punteada
+  const pct = u ? Math.min(100, (c.saldo / u) * 100) : 0;
+  const nivel = pct >= 90 ? "alto" : pct >= 70 ? "medio" : "bajo";
   const editando = UB.edit === c.act;
-  const detalle = pend
-    ? `<b class="neg">Pago pendiente: ${plataUmb(c.saldo, c.moneda)}</b> · Meta no pudo cobrar, revisá la tarjeta de la cuenta`
-    : c.umbral
-      ? `<b>${plataUmb(c.saldo, c.moneda)}</b> de ${plataUmb(c.umbral, c.moneda)} · faltan ${plataUmb(c.falta, c.moneda)}${c.cobra_en_h != null ? ` · <b>${cuandoCobra(c.cobra_en_h)}</b>` : ""}`
-      : `<b>${plataUmb(c.saldo, c.moneda)}</b> gastado · umbral sin dato (se aprende con el próximo cobro, o cargalo con ✏️)`;
-  const extra = [c.ritmo_hora ? `gasta ${plataUmb(c.ritmo_hora, c.moneda)}/h` : "", c.origen === "aprendido" ? "umbral aprendido" : c.origen === "manual" ? "umbral cargado a mano" : "",
-    c.tarjeta ? esc(c.tarjeta) : "", c.ultimo_cobro_en ? `último cobro ${plataUmb(c.ultimo_cobro, c.moneda)} ${haceUmb(c.ultimo_cobro_en)}` : ""].filter(Boolean).join(" · ");
-  return `<li class="umb ${nivel}">
-    <div class="umb-cab"><b class="umb-nom">${esc(c.nombre)}</b>${pend ? "" : `<button type="button" class="link umb-lapiz" data-umb-edit="${esc(c.act)}" aria-label="Cargar umbral de ${esc(c.nombre)}">✏️</button>`}</div>
-    <div class="umb-barra" role="progressbar" aria-label="Gastado sobre el umbral" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><span style="width:${pct.toFixed(1)}%"></span></div>
-    <div class="umb-det num">${detalle}</div>
-    ${extra ? `<div class="umb-extra mut">${extra}</div>` : ""}
-    ${editando ? `<form class="umb-form" data-umb-form="${esc(c.act)}"><label class="sr" for="umb-in">Umbral</label><input id="umb-in" class="campo" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Umbral en ${esc(c.moneda)}" value="${c.origen === "manual" ? c.umbral : ""}"><button class="btn chico pri" type="submit">Guardar</button>${c.origen === "manual" ? `<button class="btn chico" type="button" data-umb-borrar="${esc(c.act)}">Usar el aprendido</button>` : ""}<button class="btn chico" type="button" data-umb-cancelar>Cancelar</button></form>` : ""}
+  const der = u ? `<b>${plataUmb(c.saldo, c.moneda)}</b> / ${plataUmb(u, c.moneda)} · falta <b>${plataUmb(c.falta, c.moneda)}</b>${c.cobra_en_h != null ? ` · cobra en <b>${tiempoUmb(c.cobra_en_h)}</b>` : ""}`
+    : `<b>${plataUmb(c.saldo, c.moneda)}</b> / <span class="mut">umbral ?</span>`;
+  const tip = [c.gasto_dia ? `gasta ~${plataUmb(c.gasto_dia, c.moneda)}/día` : "", c.origen === "manual" ? "umbral cargado a mano" : c.origen === "cobros" ? "umbral según sus últimos cobros" : c.origen === "aprendido" ? "umbral aprendido" : "sin cobros todavía: cargalo con ✏️"].filter(Boolean).join(" · ");
+  return `<li class="umb ${nivel}" title="${esc(tip)}">
+    <span class="umb-nom"><span class="umb-punto" aria-hidden="true"></span>${esc(c.nombre)}</span>
+    <span class="umb-pista"><span class="umb-barra${u ? "" : " sin"}" style="width:${largo.toFixed(1)}%" role="progressbar" aria-label="Gastado sobre el umbral" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><span style="width:${pct.toFixed(1)}%"></span></span></span>
+    <span class="umb-num num">${der}<button type="button" class="umb-lapiz" data-umb-edit="${esc(c.act)}" aria-label="Cargar umbral de ${esc(c.nombre)}">✏️</button></span>
+    ${editando ? `<form class="umb-form" data-umb-form="${esc(c.act)}"><span class="mut">${esc(tip)}</span><label class="sr" for="umb-in">Umbral</label><input id="umb-in" class="campo" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Umbral ${esc(c.moneda)}" value="${c.origen === "manual" ? u : ""}"><button class="btn chico pri" type="submit">Guardar</button>${c.origen === "manual" ? `<button class="btn chico" type="button" data-umb-borrar="${esc(c.act)}">Automático</button>` : ""}<button class="btn chico" type="button" data-umb-cancelar>Cancelar</button></form>` : ""}
   </li>`;
 }
 function pintarUmbrales() {
   const sec = $("#sec-umb"); if (!sec) return;
-  const d = UB.data;
-  const xs = d?.cuentas || [];
-  const conAlgo = xs.filter((c) => c.estado === 3 || c.saldo >= 0.01 || c.umbral);
-  const quietas = xs.length - conAlgo.length;
-  const w = d?.whop;
-  let tarjeta = "";
-  if (d) {
-    const viejo = w && Date.now() - Date.parse(w.leido_en) > 45 * 60e3;
-    const falta = w ? Math.max(0, d.necesita - w.saldo) : null;
-    const veredicto = !w ? `<span class="mut">Todavía no leí el saldo de Whop (tiene que estar abierta la ventana de Whop en la Mac).</span>`
-      : falta > 0 ? `<b class="neg">⚠️ No alcanza: faltan ${usd(falta)}</b> para cubrir todos los umbrales y pagos pendientes (${usd(d.necesita)}).`
-      : `<b class="pos">✅ Alcanza</b> para cubrir todos los umbrales y pagos pendientes (${usd(d.necesita)}); sobran ${usd(w.saldo - d.necesita)}.`;
-    tarjeta = `<div class="umb-whop">
-      <div class="umb-whop-cab"><span>Tarjeta Whop</span><b class="umb-whop-saldo num">${w ? usd(w.saldo) : "—"}</b></div>
-      <div class="umb-whop-tx">${veredicto}${d.en24 ? ` En las próximas 24 h se cobran ~${usd(d.en24)}.` : ""}${d.sin_umbral ? ` <span class="mut">(${d.sin_umbral} cuenta${d.sin_umbral === 1 ? "" : "s"} sin umbral todavía: para esas se cuenta lo que llevan gastado.)</span>` : ""}</div>
-      ${w ? `<div class="mut umb-whop-pie">Saldo leído ${haceUmb(w.leido_en)}${viejo ? ` · <span class="neg">dato viejo: abrí la ventana de Whop en la Mac</span>` : ""}</div>` : ""}
-    </div>`;
-  }
+  const d = UB.data, xs = d?.cuentas || [];
+  const maxU = Math.max(1, ...xs.map((c) => c.umbral || 0));
   const cuerpo = UB.st === "error" && !d ? `<p class="mut">No se pudo leer: ${esc(UB.error)} <button class="link" type="button" data-umb-re>Reintentar</button></p>`
     : !d ? `<p class="mut">Leyendo cuentas…</p>`
-    : `${tarjeta}<ul class="umb-lista">${conAlgo.map(filaUmb).join("")}</ul>${quietas ? `<p class="mut umb-quietas">+ ${quietas} cuenta${quietas === 1 ? "" : "s"} sin gasto pendiente</p>` : ""}`;
-  const nPend = xs.filter((c) => c.estado === 3).length;
-  sec.innerHTML = `<details class="prob-det umb-det-sec"${UB.abierto ? " open" : ""}>
-    <summary><h2 id="t-umb">Cuentas publicitarias y umbral <small class="${nPend ? "neg" : "mut"}">${d ? `${xs.length}${nPend ? ` · ${nPend} con pago pendiente` : ""}` : "…"}</small></h2></summary>
+    : !xs.length ? `<p class="mut">Ninguna cuenta activa con campañas prendidas.</p>`
+    : `<ul class="umb-lista">${xs.map((c) => filaUmb(c, maxU)).join("")}</ul>
+       <p class="mut umb-pie num">Próximos cobros: ${usd0(Math.round(d.necesita))}${d.en24 ? ` · en 24 h: ${usd0(Math.round(d.en24))}` : ""} · el tiempo sale de lo que vienen gastando y del presupuesto de lo prendido</p>`;
+  sec.innerHTML = `<details class="prob-det"${UB.abierto ? " open" : ""}>
+    <summary><h2 id="t-umb">Cuentas y umbral <small class="mut">${d ? xs.length : "…"}</small></h2></summary>
     <div class="prob-cuerpo">${cuerpo}${d?.errores?.length ? `<p class="mut prob-err">⚠ ${esc(d.errores.join(" · "))}</p>` : ""}<p class="mut prob-pie">${d?.actualizado ? `Meta leído ${haceUmb(d.actualizado)}` : ""} <button class="link" type="button" data-umb-re>Actualizar</button></p></div>
   </details>`;
   $("details", sec).ontoggle = (e) => { UB.abierto = e.target.open; ls.set("dash_umb_abierto", UB.abierto ? "1" : "0"); };
