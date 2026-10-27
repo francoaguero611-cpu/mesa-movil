@@ -394,7 +394,8 @@ function montar() {
       <div class="filtro-camp"><label class="sr" for="f-buscar">Buscar por nombre</label><input type="search" id="f-buscar" class="campo f-buscar" placeholder="Buscar campaña, conjunto o anuncio…" autocomplete="off" value="${esc(S.buscar)}"><label class="sr" for="f-cuenta">Cuenta publicitaria</label><select id="f-cuenta" class="campo f-cuenta"></select></div>
       <div class="tabla-con-reloj"><div class="tabla-caja boceto"><div class="tabla-scroll" id="tabla-scroll"></div></div><div class="riel-reloj" id="riel-reloj" aria-label="Historial de cambios por campaña"></div></div>
     </section>
-    <section class="seccion-prob" id="sec-prob" aria-labelledby="t-prob"></section>`;
+    <section class="seccion-prob" id="sec-prob" aria-labelledby="t-prob"></section>
+    <section class="seccion-umb" id="sec-umb" aria-labelledby="t-umb"></section>`;
   $$("[data-per]").forEach((b) => b.onclick = () => cambiarPeriodo(b.dataset.per));
   $("#sel-grupo").onchange = (e) => irA(+e.target.value);
   $("#b-prev").onclick = () => paso(-1);
@@ -416,7 +417,7 @@ function montar() {
   $("#tabla-scroll").addEventListener("keydown", teclaTabla);
   pintarTodo();
   if (!S.datos[S.periodo]) cargar();
-  cargarProblemas(); cargarAcciones(); cargarUltimos();
+  cargarProblemas(); cargarAcciones(); cargarUltimos(); cargarUmbrales();
 }
 // (24/10, Lorenzo) «Acciones a realizar»: rectángulo arriba de las métricas; al entrar se abre solo (una vez por sesión) con la lista.
 // Tocar una acción → la tabla con esa campaña / conjunto seleccionado y la nubecita con el porqué. Nada se aplica solo.
@@ -521,6 +522,95 @@ function pintarProblemas() {
   </details>`;
   $("details", sec).ontoggle = (e) => { PB.abierto = e.target.open; ls.set("dash_prob_abierto", PB.abierto ? "1" : "0"); };
   $$("[data-prob-re]", sec).forEach((b) => b.onclick = () => cargarProblemas(true));
+}
+// (27/10, Lorenzo) Cuentas publicitarias y umbral: cuánto lleva gastado sin cobrar cada cuenta, cuál es su umbral,
+// cuándo cobra, y si la tarjeta de Whop alcanza. Sale de la función cuentas-umbral (Meta cada 30 min; Whop desde la Mac cada 15 min).
+// Meta no da el umbral por API: se aprende solo al ver un cobro, o se carga con el lápiz (manda el manual).
+const API_UMB = "https://tppcpnfzcxxusdhrlmdx.supabase.co/functions/v1/cuentas-umbral";
+const UB = { st: null, data: null, error: null, edit: null, abierto: ls.get("dash_umb_abierto") !== "0" };
+async function apiUmb(accion, body = null) {
+  if (DEMO) { const h = new Date(Date.now() - 6 * 60e3).toISOString(); return { necesita: 1310.5, en24: 395, sin_umbral: 1, actualizado: h, whop: { saldo: 1876.82, leido_en: h },
+    cuentas: [{ act: "1", nombre: "MEXICO Cuenta publicitaria USD", moneda: "USD", estado: 3, saldo: 808.97 },
+      { act: "2", nombre: "TESTEOS Cuenta publicitaria USD", moneda: "USD", estado: 1, saldo: 312.4, umbral: 350, origen: "aprendido", falta: 37.6, ritmo_hora: 21.3, cobra_en_h: 1.8, tarjeta: "Mastercard *9760", ultimo_cobro: 349.8, ultimo_cobro_en: new Date(Date.now() - 20 * 3600e3).toISOString() },
+      { act: "3", nombre: "GALILEO SHOPS", moneda: "USD", estado: 1, saldo: 41.05, umbral: 50, origen: "manual", falta: 8.95, ritmo_hora: 2.4, cobra_en_h: 3.7 },
+      { act: "4", nombre: "AR y MX Cuenta publicitaria USD", moneda: "USD", estado: 1, saldo: 22.31, umbral: 250, origen: "aprendido", falta: 227.69, ritmo_hora: 4.1, cobra_en_h: 55.5 },
+      { act: "5", nombre: "COL ManualBid Cuenta publicitaria", moneda: "USD", estado: 1, saldo: 11.36, umbral: null, ritmo_hora: 0.8 },
+      { act: "6", nombre: "A2 WINNER", moneda: "USD", estado: 1, saldo: 0 }] }; }
+  const r = await fetch(`${API_UMB}?accion=${accion}`, { method: body ? "POST" : "GET", cache: "no-store",
+    headers: { "x-app-clave": clave(), ...(body ? { "content-type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => null);
+  if (!r.ok || !j || j.error) throw new Error((j && j.error) || `Error ${r.status}`);
+  return j;
+}
+async function cargarUmbrales(forzar = false) {
+  if (UB.st === "cargando") return;
+  UB.st = "cargando"; pintarUmbrales();
+  try { UB.data = await apiUmb(forzar ? "ver&forzar=1" : "ver"); UB.st = "ok"; UB.error = null; }
+  catch (e) { UB.st = "error"; UB.error = e.message; }
+  pintarUmbrales();
+}
+async function guardarUmbral(act, valor) {
+  try { UB.data = await apiUmb("umbral", { act, umbral: valor }); UB.edit = null; toast("Umbral guardado"); }
+  catch (e) { toast(esc(e.message), "error"); }
+  pintarUmbrales();
+}
+const plataUmb = (n, mon) => String(mon || "USD").toUpperCase() === "USD" ? usd(n) : `${NF2.format(n || 0)} ${esc(mon)}`;
+const haceUmb = (iso) => { const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return !iso || isNaN(m) ? "" : m < 1 ? "recién" : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} días`; };
+const cuandoCobra = (h) => h == null ? "" : h < 1 ? "cobra en menos de 1 h" : h < 24 ? `cobra en ~${Math.round(h)} h` : `cobra en ~${Math.round(h / 24)} días`;
+function filaUmb(c) {
+  const pend = c.estado === 3;
+  const pct = pend ? 100 : c.umbral ? Math.min(100, (c.saldo / c.umbral) * 100) : 0;
+  const nivel = pend ? "pend" : pct >= 90 ? "alto" : pct >= 70 ? "medio" : "bajo";
+  const editando = UB.edit === c.act;
+  const detalle = pend
+    ? `<b class="neg">Pago pendiente: ${plataUmb(c.saldo, c.moneda)}</b> · Meta no pudo cobrar, revisá la tarjeta de la cuenta`
+    : c.umbral
+      ? `<b>${plataUmb(c.saldo, c.moneda)}</b> de ${plataUmb(c.umbral, c.moneda)} · faltan ${plataUmb(c.falta, c.moneda)}${c.cobra_en_h != null ? ` · <b>${cuandoCobra(c.cobra_en_h)}</b>` : ""}`
+      : `<b>${plataUmb(c.saldo, c.moneda)}</b> gastado · umbral sin dato (se aprende con el próximo cobro, o cargalo con ✏️)`;
+  const extra = [c.ritmo_hora ? `gasta ${plataUmb(c.ritmo_hora, c.moneda)}/h` : "", c.origen === "aprendido" ? "umbral aprendido" : c.origen === "manual" ? "umbral cargado a mano" : "",
+    c.tarjeta ? esc(c.tarjeta) : "", c.ultimo_cobro_en ? `último cobro ${plataUmb(c.ultimo_cobro, c.moneda)} ${haceUmb(c.ultimo_cobro_en)}` : ""].filter(Boolean).join(" · ");
+  return `<li class="umb ${nivel}">
+    <div class="umb-cab"><b class="umb-nom">${esc(c.nombre)}</b>${pend ? "" : `<button type="button" class="link umb-lapiz" data-umb-edit="${esc(c.act)}" aria-label="Cargar umbral de ${esc(c.nombre)}">✏️</button>`}</div>
+    <div class="umb-barra" role="progressbar" aria-label="Gastado sobre el umbral" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><span style="width:${pct.toFixed(1)}%"></span></div>
+    <div class="umb-det num">${detalle}</div>
+    ${extra ? `<div class="umb-extra mut">${extra}</div>` : ""}
+    ${editando ? `<form class="umb-form" data-umb-form="${esc(c.act)}"><label class="sr" for="umb-in">Umbral</label><input id="umb-in" class="campo" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Umbral en ${esc(c.moneda)}" value="${c.origen === "manual" ? c.umbral : ""}"><button class="btn chico pri" type="submit">Guardar</button>${c.origen === "manual" ? `<button class="btn chico" type="button" data-umb-borrar="${esc(c.act)}">Usar el aprendido</button>` : ""}<button class="btn chico" type="button" data-umb-cancelar>Cancelar</button></form>` : ""}
+  </li>`;
+}
+function pintarUmbrales() {
+  const sec = $("#sec-umb"); if (!sec) return;
+  const d = UB.data;
+  const xs = d?.cuentas || [];
+  const conAlgo = xs.filter((c) => c.estado === 3 || c.saldo >= 0.01 || c.umbral);
+  const quietas = xs.length - conAlgo.length;
+  const w = d?.whop;
+  let tarjeta = "";
+  if (d) {
+    const viejo = w && Date.now() - Date.parse(w.leido_en) > 45 * 60e3;
+    const falta = w ? Math.max(0, d.necesita - w.saldo) : null;
+    const veredicto = !w ? `<span class="mut">Todavía no leí el saldo de Whop (tiene que estar abierta la ventana de Whop en la Mac).</span>`
+      : falta > 0 ? `<b class="neg">⚠️ No alcanza: faltan ${usd(falta)}</b> para cubrir todos los umbrales y pagos pendientes (${usd(d.necesita)}).`
+      : `<b class="pos">✅ Alcanza</b> para cubrir todos los umbrales y pagos pendientes (${usd(d.necesita)}); sobran ${usd(w.saldo - d.necesita)}.`;
+    tarjeta = `<div class="umb-whop">
+      <div class="umb-whop-cab"><span>Tarjeta Whop</span><b class="umb-whop-saldo num">${w ? usd(w.saldo) : "—"}</b></div>
+      <div class="umb-whop-tx">${veredicto}${d.en24 ? ` En las próximas 24 h se cobran ~${usd(d.en24)}.` : ""}${d.sin_umbral ? ` <span class="mut">(${d.sin_umbral} cuenta${d.sin_umbral === 1 ? "" : "s"} sin umbral todavía: para esas se cuenta lo que llevan gastado.)</span>` : ""}</div>
+      ${w ? `<div class="mut umb-whop-pie">Saldo leído ${haceUmb(w.leido_en)}${viejo ? ` · <span class="neg">dato viejo: abrí la ventana de Whop en la Mac</span>` : ""}</div>` : ""}
+    </div>`;
+  }
+  const cuerpo = UB.st === "error" && !d ? `<p class="mut">No se pudo leer: ${esc(UB.error)} <button class="link" type="button" data-umb-re>Reintentar</button></p>`
+    : !d ? `<p class="mut">Leyendo cuentas…</p>`
+    : `${tarjeta}<ul class="umb-lista">${conAlgo.map(filaUmb).join("")}</ul>${quietas ? `<p class="mut umb-quietas">+ ${quietas} cuenta${quietas === 1 ? "" : "s"} sin gasto pendiente</p>` : ""}`;
+  const nPend = xs.filter((c) => c.estado === 3).length;
+  sec.innerHTML = `<details class="prob-det umb-det-sec"${UB.abierto ? " open" : ""}>
+    <summary><h2 id="t-umb">Cuentas publicitarias y umbral <small class="${nPend ? "neg" : "mut"}">${d ? `${xs.length}${nPend ? ` · ${nPend} con pago pendiente` : ""}` : "…"}</small></h2></summary>
+    <div class="prob-cuerpo">${cuerpo}${d?.errores?.length ? `<p class="mut prob-err">⚠ ${esc(d.errores.join(" · "))}</p>` : ""}<p class="mut prob-pie">${d?.actualizado ? `Meta leído ${haceUmb(d.actualizado)}` : ""} <button class="link" type="button" data-umb-re>Actualizar</button></p></div>
+  </details>`;
+  $("details", sec).ontoggle = (e) => { UB.abierto = e.target.open; ls.set("dash_umb_abierto", UB.abierto ? "1" : "0"); };
+  $$("[data-umb-re]", sec).forEach((b) => b.onclick = () => cargarUmbrales(true));
+  $$("[data-umb-edit]", sec).forEach((b) => b.onclick = () => { UB.edit = UB.edit === b.dataset.umbEdit ? null : b.dataset.umbEdit; pintarUmbrales(); $("#umb-in", sec)?.focus(); });
+  $$("[data-umb-cancelar]", sec).forEach((b) => b.onclick = () => { UB.edit = null; pintarUmbrales(); });
+  $$("[data-umb-borrar]", sec).forEach((b) => b.onclick = () => guardarUmbral(b.dataset.umbBorrar, null));
+  $$("[data-umb-form]", sec).forEach((f) => f.onsubmit = (e) => { e.preventDefault(); const v = $("#umb-in", f).value.trim(); if (v === "") return; guardarUmbral(f.dataset.umbForm, Number(v.replace(",", "."))); });
 }
 const horaCorta = (iso) => { try { return new Date(iso).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" }); } catch { return ""; } };
 function pintarTodo() { pintarControles(); pintarAvisos(); pintarCarrusel(); pintarTabla(); pintarBarra(); }

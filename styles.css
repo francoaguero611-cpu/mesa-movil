@@ -1249,3 +1249,28 @@ input.campo.f-buscar { font-size: 16px; padding: 9px 12px; max-width: 460px; }
 .acc-nom { font-weight: 600; overflow-wrap: anywhere; min-width: 0; } .acc-ir { grid-row: 1; grid-column: 3; font-size: 13px; color: var(--acento); }
 .acc-camp, .acc-tx { grid-column: 1 / -1; font-size: 12.5px; overflow-wrap: anywhere; } .acc-tx { color: var(--tinta); }
 .acc-pie { font-size: 12px; }
+
+/* (27/10) Cuentas publicitarias y umbral: al final del dashboard */
+.seccion-umb { margin-top: 28px; }
+.umb-whop { border: 2px solid var(--tinta); border-radius: var(--r-card); padding: 12px 14px; display: grid; gap: 6px; margin-bottom: 12px; background: var(--tarjeta); }
+.umb-whop-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-weight: 600; }
+.umb-whop-saldo { font-size: 22px; }
+.umb-whop-tx { font-size: 13.5px; line-height: 1.45; }
+.umb-whop-pie, .umb-quietas { font-size: 12px; }
+.umb-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.umb { border: 1.5px solid var(--linea); border-radius: var(--r-card); padding: 10px 12px; display: grid; gap: 6px; min-width: 0; }
+.umb-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.umb-nom { overflow-wrap: anywhere; }
+.umb-lapiz { font-size: 14px; text-decoration: none; }
+.umb-barra { height: 10px; border-radius: 99px; background: var(--papel-2); border: 1.5px solid var(--linea); overflow: hidden; }
+.umb-barra > span { display: block; height: 100%; border-radius: inherit; background: var(--acento); transition: width .4s cubic-bezier(.2,.8,.2,1); }
+.umb.medio .umb-barra > span { background: var(--r-ama-tx); }
+.umb.alto .umb-barra > span { background: var(--r-nar-tx); }
+.umb.pend { border-color: var(--peligro); }
+.umb.pend .umb-barra > span { background: var(--peligro); }
+.umb-det { font-size: 13px; overflow-wrap: anywhere; }
+.umb-extra { font-size: 12px; overflow-wrap: anywhere; }
+.umb-form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.umb-form .campo { width: 150px; max-width: 100%; }
+@media (prefers-reduced-motion: reduce) { .umb-barra > span { transition: none; } }
+.umb-whop .pos { color: var(--ok); }
