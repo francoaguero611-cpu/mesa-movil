@@ -535,7 +535,7 @@ const DEMO_UMB = () => { const h = new Date(Date.now() - 3 * 60e3).toISOString()
     { act: "2", nombre: "A1 WINNER", moneda: "USD", saldo: 2.03, umbral: 50.5, origen: "cobros", falta: 48.47, gasto_dia: 401.65, cobra_en_h: 2.9 },
     { act: "3", nombre: "AR y MX", moneda: "USD", saldo: 400, umbral: 900, origen: "manual", falta: 500, gasto_dia: 1650.2, cobra_en_h: 7.3 },
     { act: "4", nombre: "MX ManualBid", moneda: "USD", saldo: 40.64, umbral: 179, origen: "cobros", falta: 138.36, gasto_dia: 89.55, cobra_en_h: 37.1 },
-    { act: "5", nombre: "TESTEOS", moneda: "USD", saldo: 1250, umbral: 2000, origen: "cobros", falta: 750, gasto_dia: 380, cobra_en_h: 47.4 },
+    { act: "5", nombre: "TESTEOS", moneda: "USD", saldo: 100, umbral: 2000, origen: "cobros", falta: 1900, gasto_dia: 380, cobra_en_h: 47.4 },
     { act: "6", nombre: "CLEAN NUTRA", moneda: "USD", saldo: 0, umbral: null, origen: null, falta: null, gasto_dia: 401.65, cobra_en_h: null }] }; };
 async function apiUmb(accion, body = null) {
   if (DEMO) return DEMO_UMB();
@@ -581,10 +581,11 @@ function pintarWhop() {
   if (ant && ant !== String(w.saldo)) { el.classList.remove("cambio"); void el.offsetWidth; el.classList.add("cambio"); }
   el.dataset.saldo = String(w.saldo);
 }
+const pctUmb = (p) => (p < 10 ? NF2.format(Math.floor(p * 10) / 10).replace(/,?0+$/, "") : NF0.format(Math.floor(p))) + "%";
 function filaUmb(c, maxU) {
   const u = c.umbral;
-  // largo de la barra ∝ umbral (raíz cuadrada para que US$ 2 y US$ 2.000 se vean los dos); relleno = gastado / umbral
-  const largo = u ? Math.max(6, Math.sqrt(u / maxU) * 100) : 6; // sin umbral: barrita mínima punteada
+  // largo de la barra directamente proporcional al umbral (el mayor = todo el ancho); relleno = gastado / umbral, con el % adentro
+  const f = u ? u / maxU : 0;
   const pct = u ? Math.min(100, (c.saldo / u) * 100) : 0;
   const nivel = pct >= 90 ? "alto" : pct >= 70 ? "medio" : "bajo";
   const editando = UB.edit === c.act;
@@ -593,11 +594,22 @@ function filaUmb(c, maxU) {
   const tip = [c.gasto_dia ? `gasta ~${plataUmb(c.gasto_dia, c.moneda)}/día` : "", c.origen === "manual" ? "umbral cargado a mano" : c.origen === "cobros" ? "umbral según sus últimos cobros" : c.origen === "aprendido" ? "umbral aprendido" : "sin cobros todavía: cargalo con ✏️"].filter(Boolean).join(" · ");
   return `<li class="umb ${nivel}" title="${esc(tip)}">
     <span class="umb-nom"><span class="umb-punto" aria-hidden="true"></span>${esc(c.nombre)}</span>
-    <span class="umb-pista"><span class="umb-barra${u ? "" : " sin"}" style="width:${largo.toFixed(1)}%" role="progressbar" aria-label="Gastado sobre el umbral" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><span style="width:${pct.toFixed(1)}%"></span></span></span>
-    <span class="umb-num num">${der}<button type="button" class="umb-lapiz" data-umb-edit="${esc(c.act)}" aria-label="Cargar umbral de ${esc(c.nombre)}">✏️</button></span>
+    <span class="umb-pista">
+      <span class="umb-barra${u ? "" : " sin"}" style="--f:${f.toFixed(4)}" role="progressbar" aria-label="Gastado sobre el umbral" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><span class="umb-relleno" style="width:${pct.toFixed(2)}%">${u ? `<i class="umb-pct">${pctUmb(pct)}</i>` : ""}</span></span>
+      ${u ? `<b class="umb-pct-afuera num">${pctUmb(pct)}</b>` : ""}<span class="umb-num num"><span>${der}</span><button type="button" class="umb-lapiz" data-umb-edit="${esc(c.act)}" aria-label="Cargar umbral de ${esc(c.nombre)}">✏️</button></span>
+    </span>
     ${editando ? `<form class="umb-form" data-umb-form="${esc(c.act)}"><span class="mut">${esc(tip)}</span><label class="sr" for="umb-in">Umbral</label><input id="umb-in" class="campo" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Umbral ${esc(c.moneda)}" value="${c.origen === "manual" ? u : ""}"><button class="btn chico pri" type="submit">Guardar</button>${c.origen === "manual" ? `<button class="btn chico" type="button" data-umb-borrar="${esc(c.act)}">Automático</button>` : ""}<button class="btn chico" type="button" data-umb-cancelar>Cancelar</button></form>` : ""}
   </li>`;
 }
+// El % va adentro del relleno si entra; si el relleno es muy corto, va a la derecha de la barra
+function ubicarPctUmb() {
+  $$("#sec-umb .umb").forEach((li) => {
+    const r = $(".umb-relleno", li), t = $(".umb-pct", li); if (!r || !t) return;
+    li.classList.toggle("pct-fuera", r.getBoundingClientRect().width < t.scrollWidth + 14);
+  });
+}
+let umbResize = null;
+window.addEventListener("resize", () => { clearTimeout(umbResize); umbResize = setTimeout(ubicarPctUmb, 150); });
 function pintarUmbrales() {
   const sec = $("#sec-umb"); if (!sec) return;
   const d = UB.data, xs = d?.cuentas || [];
@@ -616,6 +628,7 @@ function pintarUmbrales() {
   $$("[data-umb-edit]", sec).forEach((b) => b.onclick = () => { UB.edit = UB.edit === b.dataset.umbEdit ? null : b.dataset.umbEdit; pintarUmbrales(); $("#umb-in", sec)?.focus(); });
   $$("[data-umb-cancelar]", sec).forEach((b) => b.onclick = () => { UB.edit = null; pintarUmbrales(); });
   $$("[data-umb-borrar]", sec).forEach((b) => b.onclick = () => guardarUmbral(b.dataset.umbBorrar, null));
+  ubicarPctUmb();
   $$("[data-umb-form]", sec).forEach((f) => f.onsubmit = (e) => { e.preventDefault(); const v = $("#umb-in", f).value.trim(); if (v === "") return; guardarUmbral(f.dataset.umbForm, Number(v.replace(",", "."))); });
 }
 const horaCorta = (iso) => { try { return new Date(iso).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" }); } catch { return ""; } };

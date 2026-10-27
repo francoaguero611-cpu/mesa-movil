@@ -1261,27 +1261,33 @@ input.campo.f-buscar { font-size: 16px; padding: 9px 12px; max-width: 460px; }
 .whop-barra.cambio .wb-saldo { animation: wb-pulso .9s ease-out; }
 @keyframes wb-pulso { from { color: var(--acento); transform: translateY(-2px); } to { transform: none; } }
 .seccion-umb { margin-top: 28px; }
-.umb-lista { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(110px, 190px) 1fr auto; column-gap: 12px; }
+.umb-lista { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(110px, 180px) 1fr; column-gap: 12px; }
 /* subgrid: todas las filas comparten el ancho de la columna de la barra, así el largo compara umbrales de verdad */
-.umb { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; row-gap: 4px; padding: 6px 4px; border-bottom: 1px solid var(--linea); font-size: 13px; min-width: 0; }
+.umb { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; row-gap: 6px; padding: 8px 4px; border-bottom: 1px solid var(--linea); font-size: 13px; min-width: 0; }
 .umb-nom { display: flex; align-items: center; gap: 6px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .umb-punto { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
-.umb-pista { min-width: 0; }
-.umb-barra { display: block; height: 12px; border-radius: 99px; background: var(--papel-2); border: 1.5px solid var(--linea); overflow: hidden; }
-.umb-barra.sin { border-style: dashed; background: none; }
-.umb-barra > span { display: block; height: 100%; background: var(--acento); transition: width .5s cubic-bezier(.2,.8,.2,1); }
-.umb.medio .umb-barra > span { background: var(--r-ama-tx); }
-.umb.alto .umb-barra > span { background: var(--r-nar-tx); }
-.umb-num { white-space: nowrap; display: flex; align-items: center; gap: 4px; }
+/* la barra mide (ancho disponible − lugar del texto) × umbral/umbral mayor; el texto va pegado a su derecha */
+.umb-pista { --reserva: 440px; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.umb-barra { position: relative; flex: none; width: calc((100% - var(--reserva)) * var(--f)); min-width: 30px; height: 26px; border-radius: 7px; background: var(--papel-2); border: 1.5px solid var(--linea); overflow: hidden; }
+.umb-barra.sin { width: 30px; border-style: dashed; background: none; }
+.umb-relleno { position: relative; display: block; height: 100%; background: var(--acento); transition: width .5s cubic-bezier(.2,.8,.2,1); }
+.umb.medio .umb-relleno { background: var(--r-ama-tx); }
+.umb.alto .umb-relleno { background: var(--r-nar-tx); }
+.umb-pct { position: absolute; right: 7px; top: 50%; transform: translateY(-50%); font-style: normal; font-weight: 700; font-size: 12px; color: var(--acento-tx); white-space: nowrap; }
+.umb-pct-afuera { display: none; font-size: 13px; }
+.umb.pct-fuera .umb-pct { display: none; }
+.umb.pct-fuera .umb-pct-afuera { display: inline; }
+.umb-pista .umb-pct-afuera + .umb-num, .umb-pista .umb-barra + .umb-num { margin-left: 0; }
+.umb-num { white-space: nowrap; display: flex; align-items: center; gap: 6px; min-width: 0; }
 .umb-lapiz { background: none; border: 0; padding: 2px 4px; cursor: pointer; font-size: 12px; opacity: .55; }
 .umb-lapiz:hover, .umb-lapiz:focus-visible { opacity: 1; }
 .umb-form { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; }
 .umb-form .campo { width: 130px; max-width: 100%; }
 .umb-pie { font-size: 12px; margin-top: 8px; }
 @media (max-width: 640px) {
-  .umb-lista { grid-template-columns: 1fr; }
-  .umb { grid-template-columns: 1fr; }
-  .umb-num { font-size: 12px; white-space: normal; flex-wrap: wrap; }
+  .umb-lista, .umb { grid-template-columns: 1fr; }
+  .umb-pista { --reserva: 0px; flex-wrap: wrap; row-gap: 4px; }
+  .umb-num { flex-basis: 100%; font-size: 12px; white-space: normal; flex-wrap: wrap; }
   .umb-lapiz { margin-left: auto; }
 }
-@media (prefers-reduced-motion: reduce) { .umb-barra > span { transition: none; } .whop-barra.cambio .wb-saldo { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .umb-relleno { transition: none; } .whop-barra.cambio .wb-saldo { animation: none; } }
