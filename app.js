@@ -534,7 +534,7 @@ const DEMO_UMB = () => { const h = new Date(Date.now() - 3 * 60e3).toISOString()
   cuentas: [{ act: "1", nombre: "COL ManualBid", moneda: "USD", saldo: 4.17, umbral: 20, origen: "cobros", falta: 15.83, gasto_dia: 494.2, cobra_en_h: 0.8 },
     { act: "2", nombre: "A1 WINNER", moneda: "USD", saldo: 2.03, umbral: 50.5, origen: "cobros", falta: 48.47, gasto_dia: 401.65, cobra_en_h: 2.9 },
     { act: "3", nombre: "AR y MX", moneda: "USD", saldo: 400, umbral: 900, origen: "manual", falta: 500, gasto_dia: 1650.2, cobra_en_h: 7.3 },
-    { act: "4", nombre: "MX ManualBid", moneda: "USD", saldo: 40.64, umbral: 179, origen: "cobros", falta: 138.36, gasto_dia: 89.55, cobra_en_h: 37.1 },
+    { act: "4", nombre: "MX ManualBid", moneda: "USD", saldo: 70, umbral: 179, origen: "cobros", falta: 109, gasto_dia: 89.55, cobra_en_h: 37.1 },
     { act: "5", nombre: "TESTEOS", moneda: "USD", saldo: 100, umbral: 2000, origen: "cobros", falta: 1900, gasto_dia: 380, cobra_en_h: 47.4 },
     { act: "6", nombre: "CLEAN NUTRA", moneda: "USD", saldo: 0, umbral: null, origen: null, falta: null, gasto_dia: 401.65, cobra_en_h: null }] }; };
 async function apiUmb(accion, body = null) {
@@ -601,11 +601,14 @@ function filaUmb(c, maxU) {
     ${editando ? `<form class="umb-form" data-umb-form="${esc(c.act)}"><span class="mut">${esc(tip)}</span><label class="sr" for="umb-in">Umbral</label><input id="umb-in" class="campo" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Umbral ${esc(c.moneda)}" value="${c.origen === "manual" ? u : ""}"><button class="btn chico pri" type="submit">Guardar</button>${c.origen === "manual" ? `<button class="btn chico" type="button" data-umb-borrar="${esc(c.act)}">Automático</button>` : ""}<button class="btn chico" type="button" data-umb-cancelar>Cancelar</button></form>` : ""}
   </li>`;
 }
-// El % va adentro del relleno si entra; si el relleno es muy corto, va a la derecha de la barra
+// El % va adentro del relleno (pegado a su borde derecho) si entra; si no, justo a la derecha del relleno; si la barra es muy corta, afuera
 function ubicarPctUmb() {
   $$("#sec-umb .umb").forEach((li) => {
-    const r = $(".umb-relleno", li), t = $(".umb-pct", li); if (!r || !t) return;
-    li.classList.toggle("pct-fuera", r.getBoundingClientRect().width < t.scrollWidth + 14);
+    const r = $(".umb-relleno", li), t = $(".umb-pct", li), bar = $(".umb-barra", li); if (!r || !t || !bar) return;
+    const lleno = r.getBoundingClientRect().width, total = bar.getBoundingClientRect().width, w = t.scrollWidth;
+    const adentro = lleno >= w + 16, alLado = !adentro && total - lleno >= w + 12;
+    li.classList.toggle("pct-al-lado", alLado);
+    li.classList.toggle("pct-fuera", !adentro && !alLado);
   });
 }
 let umbResize = null;

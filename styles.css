@@ -1268,13 +1268,16 @@ input.campo.f-buscar { font-size: 16px; padding: 9px 12px; max-width: 460px; }
 .umb-punto { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
 /* la barra mide (ancho disponible − lugar del texto) × umbral/umbral mayor; el texto va pegado a su derecha */
 .umb-pista { --reserva: 440px; display: flex; align-items: center; gap: 10px; min-width: 0; }
-.umb-barra { position: relative; flex: none; width: calc((100% - var(--reserva)) * var(--f)); min-width: 30px; height: 26px; border-radius: 7px; background: var(--papel-2); border: 1.5px solid var(--linea); overflow: hidden; }
-.umb-barra.sin { width: 30px; border-style: dashed; background: none; }
-.umb-relleno { position: relative; display: block; height: 100%; background: var(--acento); transition: width .5s cubic-bezier(.2,.8,.2,1); }
-.umb.medio .umb-relleno { background: var(--r-ama-tx); }
-.umb.alto .umb-relleno { background: var(--r-nar-tx); }
-.umb-pct { position: absolute; right: 7px; top: 50%; transform: translateY(-50%); font-style: normal; font-weight: 700; font-size: 12px; color: var(--acento-tx); white-space: nowrap; }
-.umb-pct-afuera { display: none; font-size: 13px; }
+.umb-barra { position: relative; flex: none; width: calc((100% - var(--reserva)) * var(--f)); min-width: 30px; height: 26px; border-radius: 999px; background: var(--umb-pista); overflow: hidden; }
+.umb-barra.sin { width: 30px; border: 1.5px dashed var(--linea); background: none; }
+.umb-relleno { position: relative; display: block; height: 100%; min-width: 4px; border-radius: 999px; background: linear-gradient(90deg, var(--umb-1), var(--umb-2)); transition: width .5s cubic-bezier(.2,.8,.2,1); }
+.umb.medio .umb-relleno { background: linear-gradient(90deg, #f0b429, #de911d); }
+.umb.alto .umb-relleno { background: linear-gradient(90deg, #f0784a, #d64545); }
+/* % gastado: adentro del relleno pegado a su borde derecho, en blanco; con poco relleno, justo a la derecha del relleno;
+   si la barra entera es muy corta, afuera a la derecha de la barra */
+.umb-pct { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); font-style: normal; font-weight: 700; font-size: 12px; color: #fff; white-space: nowrap; }
+.umb.pct-al-lado .umb-pct { right: auto; left: calc(100% + 6px); color: var(--umb-tx); }
+.umb-pct-afuera { display: none; font-size: 13px; color: var(--umb-tx); }
 .umb.pct-fuera .umb-pct { display: none; }
 .umb.pct-fuera .umb-pct-afuera { display: inline; }
 .umb-pista .umb-pct-afuera + .umb-num, .umb-pista .umb-barra + .umb-num { margin-left: 0; }
@@ -1291,3 +1294,8 @@ input.campo.f-buscar { font-size: 16px; padding: 9px 12px; max-width: 460px; }
   .umb-lapiz { margin-left: auto; }
 }
 @media (prefers-reduced-motion: reduce) { .umb-relleno { transition: none; } .whop-barra.cambio .wb-saldo { animation: none; } }
+
+/* (27/10) colores de las barras de umbral */
+:root { --umb-1: #7c83ff; --umb-2: #4f46e5; --umb-pista: #e9e8fb; --umb-tx: #3730a3; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --umb-1: #a5abff; --umb-2: #6d67f0; --umb-pista: #2c2b45; --umb-tx: #c7c9ff; } }
+:root[data-theme="dark"] { --umb-1: #a5abff; --umb-2: #6d67f0; --umb-pista: #2c2b45; --umb-tx: #c7c9ff; }
