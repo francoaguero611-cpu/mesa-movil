@@ -1261,39 +1261,77 @@ input.campo.f-buscar { font-size: 16px; padding: 9px 12px; max-width: 460px; }
 .whop-barra.cambio .wb-saldo { animation: wb-pulso .9s ease-out; }
 @keyframes wb-pulso { from { color: var(--acento); transform: translateY(-2px); } to { transform: none; } }
 .seccion-umb { margin-top: 28px; }
-.umb-lista { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(110px, 180px) 1fr; column-gap: 12px; }
-/* subgrid: todas las filas comparten el ancho de la columna de la barra, así el largo compara umbrales de verdad */
-.umb { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; row-gap: 6px; padding: 8px 4px; border-bottom: 1px solid var(--linea); font-size: 13px; min-width: 0; }
-.umb-nom { display: flex; align-items: center; gap: 6px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.umb-punto { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
-/* la barra mide (ancho disponible − lugar del texto) × umbral/umbral mayor; el texto va pegado a su derecha */
-.umb-pista { --reserva: 440px; display: flex; align-items: center; gap: 10px; min-width: 0; }
-.umb-barra { position: relative; flex: none; width: calc((100% - var(--reserva)) * var(--f)); min-width: 30px; height: 26px; border-radius: 999px; background: var(--umb-pista); overflow: hidden; }
-.umb-barra.sin { width: 30px; border: 1.5px dashed var(--linea); background: none; }
-.umb-relleno { position: relative; display: block; height: 100%; min-width: 4px; border-radius: 999px; background: linear-gradient(90deg, var(--umb-1), var(--umb-2)); transition: width .5s cubic-bezier(.2,.8,.2,1); }
+/* (27/10 b) tarjetas de arriba: saldo Whop · retenido por Meta · próximo cobro */
+.ut-fila { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin: 4px 0 18px; }
+.ut { position: relative; padding: 12px 14px 12px; border: 2px solid var(--tinta); border-radius: var(--r-card); background: var(--tarjeta); box-shadow: 4px 4px 0 var(--sombra); min-width: 0; animation: utEntra .45s cubic-bezier(.2, .8, .2, 1) both; }
+.ut:nth-child(2) { animation-delay: .06s; } .ut:nth-child(3) { animation-delay: .12s; }
+@keyframes utEntra { from { opacity: 0; transform: translateY(8px); } }
+.ut-lbl { font-family: var(--f-titulo); font-size: 14px; color: var(--mut); display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.ut-val { margin-top: 4px; font-size: clamp(24px, 2.4vw, 30px); font-weight: 700; line-height: 1.1; letter-spacing: -.4px; white-space: nowrap; }
+.ut-sub { margin-top: 6px; font-size: 12.5px; color: var(--mut); overflow-wrap: anywhere; }
+.ut-sub b { color: var(--tinta); }
+.ut.bien .ut-val { color: var(--ok); }
+.ut.mal { border-color: var(--peligro); } .ut.mal .ut-val { color: var(--peligro); }
+.ut-medidor { margin-top: 8px; height: 8px; border-radius: 999px; background: var(--umb-pista); overflow: hidden; }
+.ut-medidor i { display: block; height: 100%; width: calc(var(--x) * 100%); border-radius: 999px; background: var(--ok); transform-origin: left; animation: utCrece .9s cubic-bezier(.2, .8, .2, 1) both; }
+.ut.mal .ut-medidor i { background: var(--peligro); }
+@keyframes utCrece { from { transform: scaleX(0); } }
+.ut-dif { font-size: 12px; font-weight: 700; padding: 1px 6px; border-radius: var(--r-chip); }
+.ut-dif.sube { background: var(--r-rojo-bg); color: var(--r-rojo-tx); }
+.ut-dif.baja { background: var(--r-ver-bg); color: var(--r-ver-tx); }
+.ut-graf { margin-top: 8px; height: 34px; display: grid; grid-template-columns: repeat(48, 1fr); gap: 1px; align-items: end; }
+.ut-graf span { position: relative; height: 100%; display: flex; flex-direction: column-reverse; }
+.ut-graf span::before, .ut-graf span::after { content: ""; display: block; min-height: 0; border-radius: 2px; transform-origin: bottom; animation: utSube .6s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i) * 12ms); }
+.ut-graf span::before { height: calc(var(--a) * 100%); background: var(--umb-1); }
+.ut-graf span::after { height: calc(var(--b) * 100%); background: var(--mut); opacity: .55; }
+.ut-graf span:hover::before { background: var(--umb-2); }
+@keyframes utSube { from { transform: scaleY(0); } }
+.ut-eje { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--mut); margin-top: 2px; }
+.ut.prox.ya .ut-val { color: var(--peligro); animation: utLate 1.6s ease-in-out infinite; }
+@keyframes utLate { 50% { opacity: .55; } }
+
+/* filas: nombre · barra (lo gastado adentro) · «umbral US$ X» */
+.umb-lista { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(110px, 170px) 1fr; column-gap: 14px; }
+.umb { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; row-gap: 6px; padding: 7px 2px; font-size: 13px; min-width: 0; }
+.umb-nom { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.umb-pista { --reserva: 150px; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.umb-barra { position: relative; flex: none; width: calc((100% - var(--reserva)) * var(--f)); min-width: 64px; height: 30px; border: 2px solid var(--tinta); border-radius: 999px; background: var(--umb-pista); overflow: hidden; box-shadow: 3px 3px 0 var(--sombra); }
+.umb-barra.sin { width: 64px; border-style: dashed; box-shadow: none; }
+.umb-relleno { position: relative; display: block; height: 100%; min-width: 6px; border-radius: 999px; background: linear-gradient(90deg, var(--umb-1), var(--umb-2)); transition: width 1.1s cubic-bezier(.2, .8, .2, 1); }
+/* rayitas que caminan adentro del relleno */
+.umb-relleno::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(115deg, rgba(255,255,255,.16) 0 10px, transparent 10px 20px); background-size: 44px 100%; animation: umbRayas 1.4s linear infinite; border-radius: inherit; }
+@keyframes umbRayas { to { background-position: 44px 0; } }
 .umb.medio .umb-relleno { background: linear-gradient(90deg, #f0b429, #de911d); }
 .umb.alto .umb-relleno { background: linear-gradient(90deg, #f0784a, #d64545); }
-/* % gastado: adentro del relleno pegado a su borde derecho, en blanco; con poco relleno, justo a la derecha del relleno;
-   si la barra entera es muy corta, afuera a la derecha de la barra */
-.umb-pct { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); font-style: normal; font-weight: 700; font-size: 12px; color: #fff; white-space: nowrap; }
-.umb.pct-al-lado .umb-pct { right: auto; left: calc(100% + 6px); color: var(--umb-tx); }
-.umb-pct-afuera { display: none; font-size: 13px; color: var(--umb-tx); }
+.umb.alto .umb-barra { animation: umbLatido 1.4s ease-in-out infinite; }
+@keyframes umbLatido { 50% { box-shadow: 3px 3px 0 var(--sombra), 0 0 0 4px rgba(214, 69, 69, .28); } }
+.umb-pct { position: absolute; z-index: 1; right: 10px; top: 50%; transform: translateY(-50%); font-style: normal; font-weight: 700; font-size: 12.5px; color: #fff; white-space: nowrap; text-shadow: 0 1px 1px rgba(0,0,0,.25); }
+.umb.pct-al-lado .umb-pct { right: auto; left: calc(100% + 7px); color: var(--umb-tx); text-shadow: none; }
+.umb-pct-afuera { display: none; font-size: 13px; color: var(--umb-tx); white-space: nowrap; }
 .umb.pct-fuera .umb-pct { display: none; }
 .umb.pct-fuera .umb-pct-afuera { display: inline; }
-.umb-pista .umb-pct-afuera + .umb-num, .umb-pista .umb-barra + .umb-num { margin-left: 0; }
-.umb-num { white-space: nowrap; display: flex; align-items: center; gap: 6px; min-width: 0; }
-.umb-lapiz { background: none; border: 0; padding: 2px 4px; cursor: pointer; font-size: 12px; opacity: .55; }
-.umb-lapiz:hover, .umb-lapiz:focus-visible { opacity: 1; }
+.umb-u { background: none; border: 0; padding: 2px 0; cursor: pointer; font: inherit; font-size: 13px; color: var(--mut); white-space: nowrap; }
+.umb-u b { color: var(--tinta); }
+.umb-u:hover b, .umb-u:focus-visible b { text-decoration: underline; }
 .umb-form { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; }
 .umb-form .campo { width: 130px; max-width: 100%; }
-.umb-pie { font-size: 12px; margin-top: 8px; }
-@media (max-width: 640px) {
-  .umb-lista, .umb { grid-template-columns: 1fr; }
-  .umb-pista { --reserva: 0px; flex-wrap: wrap; row-gap: 4px; }
-  .umb-num { flex-basis: 100%; font-size: 12px; white-space: normal; flex-wrap: wrap; }
-  .umb-lapiz { margin-left: auto; }
+@media (max-width: 720px) {
+  .ut-fila { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ut.ret { grid-column: 1 / -1; order: -1; }
+  .ut-val { font-size: 22px; }
+  /* celular: arriba nombre y «umbral», abajo la barra a todo el ancho */
+  .umb-lista { grid-template-columns: 1fr; }
+  .umb { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "nom u" "bar bar" "form form"; row-gap: 5px; column-gap: 8px; padding: 6px 2px; }
+  .umb-pista { display: contents; --reserva: 0px; }
+  .umb-nom { grid-area: nom; } .umb-u { grid-area: u; } .umb-barra { grid-area: bar; }
+  .umb-pct-afuera { grid-area: bar; justify-self: start; margin-left: calc(max(64px, 100% * var(--f)) + 8px); }
+  .umb-barra.sin + .umb-pct-afuera { margin-left: 72px; }
+  .umb-form { grid-area: form; }
 }
-@media (prefers-reduced-motion: reduce) { .umb-relleno { transition: none; } .whop-barra.cambio .wb-saldo { animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .umb-relleno { transition: none; } .umb-relleno::after, .umb.alto .umb-barra, .ut, .ut-medidor i, .ut-graf span::before, .ut-graf span::after, .ut.prox.ya .ut-val { animation: none; }
+  .whop-barra.cambio .wb-saldo { animation: none; }
+}
 
 /* (27/10) colores de las barras de umbral */
 :root { --umb-1: #7c83ff; --umb-2: #4f46e5; --umb-pista: #e9e8fb; --umb-tx: #3730a3; }

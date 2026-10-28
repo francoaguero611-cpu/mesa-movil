@@ -530,7 +530,9 @@ function pintarProblemas() {
 // El umbral sale de los cobros reales (registro de Meta o tarjeta Whop propia); el lápiz lo pisa a mano.
 const API_UMB = "https://tppcpnfzcxxusdhrlmdx.supabase.co/functions/v1/cuentas-umbral";
 const UB = { st: null, data: null, error: null, edit: null, whop: null, timer: null, abierto: ls.get("dash_umb_abierto") !== "0" };
-const DEMO_UMB = () => { const h = new Date(Date.now() - 3 * 60e3).toISOString(); return { necesita: 2249.5, en24: 70.5, actualizado: h, whop: { saldo: 2800.26, leido_en: h, rechazos: [] },
+const DEMO_UMB = () => { const h = new Date(Date.now() - 3 * 60e3).toISOString(); return { necesita: 2249.5, en24: 70.5, actualizado: h, whop: { saldo: 2800.26, leido_en: h, rechazos: [], ret_hist: [[Date.now() / 1000 - 86400, 2200], [Date.now() / 1000 - 43200, 2820], [Date.now() / 1000, 3008]],
+    retenciones: { total: 3008.24, n: 243, chicas: { n: 223, usd: 458.84 }, grandes: { n: 20, usd: 2549.4 }, liberadas24: 60, cobradas24: 757.67,
+      proximas: Array.from({ length: 46 }, (_, i) => [Math.floor(Date.now() / 3600e3) * 3600 + (i + 1) * 3600, [14, 4, 0, 6, 58, 34, 62, 54][i % 8] * (i < 30 ? 1 : .4), i === 40 ? 2040 : i % 5 === 0 ? 43.43 : 0]) } },
   cuentas: [{ act: "1", nombre: "COL ManualBid", moneda: "USD", saldo: 4.17, umbral: 20, origen: "cobros", falta: 15.83, gasto_dia: 494.2, cobra_en_h: 0.8 },
     { act: "2", nombre: "A1 WINNER", moneda: "USD", saldo: 2.03, umbral: 50.5, origen: "cobros", falta: 48.47, gasto_dia: 401.65, cobra_en_h: 2.9 },
     { act: "3", nombre: "AR y MX", moneda: "USD", saldo: 400, umbral: 900, origen: "manual", falta: 500, gasto_dia: 1650.2, cobra_en_h: 7.3 },
@@ -555,7 +557,7 @@ async function cargarUmbrales(forzar = false) {
   UB.timer = setInterval(async () => {
     if (S.vista !== "dash" || !$("#whop-barra")) { clearInterval(UB.timer); UB.timer = null; return; }
     if (document.hidden) return;
-    try { UB.whop = (await apiUmb("whop_ver")).whop; pintarWhop(); } catch { /* queda el último */ }
+    try { UB.whop = (await apiUmb("whop_ver")).whop; pintarWhop(); const f = $("#sec-umb .ut-fila"); if (f && UB.data) { f.outerHTML = tarjetasUmb(UB.data); contarUmb($("#sec-umb")); } } catch { /* queda el último */ }
   }, 60e3);
 }
 async function guardarUmbral(act, valor) {
@@ -577,39 +579,97 @@ function pintarWhop() {
   el.classList.toggle("mal", falta > 0 || nRech > 0);
   el.innerHTML = `<span class="wb-et">Saldo en Whop</span><b class="wb-saldo num">${usd(w.saldo)}</b>
     <span class="wb-tx">${d ? (falta > 0 ? `<span class="neg">⚠ faltan ${usd0(Math.ceil(falta))} para cubrir los umbrales</span>` : `<span class="wb-ok">✓ cubre todos los umbrales</span>`) : ""}${nRech ? ` · <span class="neg">${nRech} cobro${nRech === 1 ? "" : "s"} rechazado${nRech === 1 ? "" : "s"} hoy</span>` : ""}</span>
+    ${w.retenciones ? `<span class="wb-tx">🔒 retenido <b class="num">${usd0(Math.round(w.retenciones.total))}</b></span>` : ""}
     <span class="wb-hora mut${viejo ? " neg" : ""}">${viejo ? "⚠ dato viejo · abrí Whop en la Mac" : haceUmb(w.leido_en)}</span>`;
   if (ant && ant !== String(w.saldo)) { el.classList.remove("cambio"); void el.offsetWidth; el.classList.add("cambio"); }
   el.dataset.saldo = String(w.saldo);
 }
 const pctUmb = (p) => (p < 10 ? NF2.format(Math.floor(p * 10) / 10).replace(/,?0+$/, "") : NF0.format(Math.floor(p))) + "%";
+// (27/10 b) Más visual: arriba 3 tarjetas (saldo Whop · retenido por Meta · próximo cobro); abajo una fila por cuenta con
+// SOLO nombre, barra (lo gastado adentro) y «umbral US$ X» afuera. Largo = 25 % fijo + 75 % proporcional al umbral.
+const usdC = (n) => n == null ? "—" : "US$ " + (Math.abs(n) < 100 ? NF2.format(n) : NF0.format(Math.round(n)));
+// números que cuentan desde el valor anterior hasta el nuevo
+function contarUmb(raiz) {
+  $$("[data-cuenta]", raiz).forEach((el) => {
+    const fin = Number(el.dataset.cuenta), ini = Number(UB.cuentas?.[el.dataset.k] ?? 0);
+    (UB.cuentas ||= {})[el.dataset.k] = fin;
+    if (reducido() || ini === fin) { el.textContent = usdC(fin); return; }
+    const t0 = performance.now(), dur = 900;
+    const paso = (t) => { const x = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - x, 3); el.textContent = usdC(ini + (fin - ini) * e); if (x < 1) requestAnimationFrame(paso); };
+    requestAnimationFrame(paso);
+  });
+}
+function tarjetasUmb(d) {
+  const w = UB.whop || d?.whop, r = w?.retenciones;
+  const xs = (d?.cuentas || []).filter((c) => c.cobra_en_h != null).sort((a, b) => a.cobra_en_h - b.cobra_en_h);
+  const prox = xs[0];
+  // Saldo en Whop
+  const falta = d && w ? d.necesita - w.saldo : 0, cubre = d && w && d.necesita > 0 ? Math.min(1, w.saldo / d.necesita) : 1;
+  const tSaldo = w ? `<div class="ut ${falta > 0 ? "mal" : "bien"}">
+      <div class="ut-lbl">💳 Saldo en Whop</div>
+      <div class="ut-val num" data-cuenta="${w.saldo}" data-k="saldo">${usdC(w.saldo)}</div>
+      <div class="ut-medidor" aria-hidden="true"><i style="--x:${cubre.toFixed(3)}"></i></div>
+      <div class="ut-sub">${falta > 0 ? `⚠ faltan <b>${usdC(Math.ceil(falta))}</b> para los umbrales` : `✓ cubre los umbrales (${usdC(d?.necesita ?? 0)})`}</div>
+    </div>` : "";
+  // Retenido por Meta: curvita de lo que se libera en las próximas 48 h (violeta = vuelve; gris = cobro que se confirma)
+  let tRet = "";
+  if (r) {
+    const ahora = Date.now() / 1000, slots = Array.from({ length: 48 }, () => [0, 0]);
+    for (const [ts, ch, gr] of r.proximas || []) { const i = Math.floor((ts - ahora) / 3600); const j = Math.max(0, Math.min(47, i)); slots[j][0] += ch; slots[j][1] += gr; }
+    // escala según lo que vuelve (lo de US$ 2); un cobro grande llena la columna y no aplasta al resto
+    const mx = Math.max(1, ...slots.map(([a]) => a), ...slots.map(([, b]) => Math.min(b, 60)));
+    const vuelve24 = slots.slice(0, 24).reduce((s, [a]) => s + a, 0);
+    const hist = (w.ret_hist || []).filter((h) => ahora - h[0] >= 20 * 3600);
+    const ayer = hist.length ? hist[hist.length - 1][1] : null, dif = ayer == null ? null : r.total - ayer;
+    tRet = `<div class="ut ret">
+      <div class="ut-lbl">🔒 Retenido por Meta${dif != null && Math.abs(dif) >= 1 ? ` <span class="ut-dif ${dif > 0 ? "sube" : "baja"}">${dif > 0 ? "▲" : "▼"} ${usdC(Math.abs(dif))} vs ayer</span>` : ""}</div>
+      <div class="ut-val num" data-cuenta="${r.total}" data-k="ret">${usdC(r.total)}</div>
+      <div class="ut-graf" role="img" aria-label="Lo que se libera en las próximas 48 horas">${slots.map(([a, b], i) => `<span style="--a:${Math.min(1, a / mx).toFixed(3)};--b:${Math.min(1 - Math.min(1, a / mx), b / mx).toFixed(3)};--i:${i}" title="${i ? `en ${i} h` : "esta hora"}: vuelve ${usdC(a)}${b ? ` · se cobra ${usdC(b)}` : ""}"></span>`).join("")}</div>
+      <div class="ut-eje" aria-hidden="true"><span>ahora</span><span>24 h</span><span>48 h</span></div>
+      <div class="ut-sub"><b>${NF0.format(r.chicas.n)}</b> de US$ 2 (${usdC(r.chicas.usd)}) vuelven solas · ${usdC(vuelve24)} en 24 h</div>
+    </div>`;
+  }
+  // Próximo cobro
+  const tProx = prox ? `<div class="ut prox${prox.cobra_en_h < 2 ? " ya" : ""}">
+      <div class="ut-lbl">⏱ Próximo cobro</div>
+      <div class="ut-val">${tiempoUmb(prox.cobra_en_h).replace("~", "")}</div>
+      <div class="ut-sub"><b>${esc(prox.nombre)}</b> · ${usdC(prox.umbral)}${xs[1] ? ` · después ${esc(xs[1].nombre)} en ${tiempoUmb(xs[1].cobra_en_h)}` : ""}</div>
+    </div>` : "";
+  return tSaldo || tRet || tProx ? `<div class="ut-fila">${tSaldo}${tRet}${tProx}</div>` : "";
+}
 function filaUmb(c, maxU) {
   const u = c.umbral;
-  // largo de la barra directamente proporcional al umbral (el mayor = todo el ancho); relleno = gastado / umbral, con el % adentro
-  const f = u ? u / maxU : 0;
+  const f = u ? .25 + .75 * (u / maxU) : 0;
   const pct = u ? Math.min(100, (c.saldo / u) * 100) : 0;
   const nivel = pct >= 90 ? "alto" : pct >= 70 ? "medio" : "bajo";
   const editando = UB.edit === c.act;
-  const der = u ? `<b>${plataUmb(c.saldo, c.moneda)}</b> / ${plataUmb(u, c.moneda)} · falta <b>${plataUmb(c.falta, c.moneda)}</b>${c.cobra_en_h != null ? ` · cobra en <b>${tiempoUmb(c.cobra_en_h)}</b>` : ""}`
-    : `<b>${plataUmb(c.saldo, c.moneda)}</b> / <span class="mut">umbral ?</span>`;
-  const tip = [c.gasto_dia ? `gasta ~${plataUmb(c.gasto_dia, c.moneda)}/día` : "", c.origen === "manual" ? "umbral cargado a mano" : c.origen === "cobros" ? "umbral según sus últimos cobros" : c.origen === "aprendido" ? "umbral aprendido" : "sin cobros todavía: cargalo con ✏️"].filter(Boolean).join(" · ");
-  return `<li class="umb ${nivel}" title="${esc(tip)}">
-    <span class="umb-nom"><span class="umb-punto" aria-hidden="true"></span>${esc(c.nombre)}</span>
+  const tip = [`${pctUmb(pct)} del umbral`, c.cobra_en_h != null ? `cobra en ${tiempoUmb(c.cobra_en_h)}` : "", c.gasto_dia ? `gasta ~${plataUmb(c.gasto_dia, c.moneda)}/día` : "", c.origen === "manual" ? "umbral cargado a mano" : c.origen === "cobros" ? "umbral según sus últimos cobros" : c.origen === "aprendido" ? "umbral aprendido" : "sin cobros todavía: tocá «umbral ?» para cargarlo"].filter(Boolean).join(" · ");
+  const ant = UB.pAnt?.[c.act] ?? 0;
+  return `<li class="umb ${nivel}" style="--f:${f.toFixed(4)}" title="${esc(tip)}">
+    <span class="umb-nom">${esc(c.nombre)}</span>
     <span class="umb-pista">
-      <span class="umb-barra${u ? "" : " sin"}" style="--f:${f.toFixed(4)}" role="progressbar" aria-label="Gastado sobre el umbral" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><span class="umb-relleno" style="width:${pct.toFixed(2)}%">${u ? `<i class="umb-pct">${pctUmb(pct)}</i>` : ""}</span></span>
-      ${u ? `<b class="umb-pct-afuera num">${pctUmb(pct)}</b>` : ""}<span class="umb-num num"><span>${der}</span><button type="button" class="umb-lapiz" data-umb-edit="${esc(c.act)}" aria-label="Cargar umbral de ${esc(c.nombre)}">✏️</button></span>
+      <span class="umb-barra${u ? "" : " sin"}" role="progressbar" aria-label="Gastado de ${esc(c.nombre)} sobre su umbral" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><span class="umb-relleno" data-p="${pct.toFixed(2)}" style="width:${ant}%"><i class="umb-pct num">${plataUmb(c.saldo, c.moneda)}</i></span></span>
+      <b class="umb-pct-afuera num">${plataUmb(c.saldo, c.moneda)}</b>
+      <button type="button" class="umb-u num" data-umb-edit="${esc(c.act)}" aria-label="Cambiar umbral de ${esc(c.nombre)}">umbral <b>${u ? plataUmb(u, c.moneda) : "?"}</b></button>
     </span>
     ${editando ? `<form class="umb-form" data-umb-form="${esc(c.act)}"><span class="mut">${esc(tip)}</span><label class="sr" for="umb-in">Umbral</label><input id="umb-in" class="campo" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Umbral ${esc(c.moneda)}" value="${c.origen === "manual" ? u : ""}"><button class="btn chico pri" type="submit">Guardar</button>${c.origen === "manual" ? `<button class="btn chico" type="button" data-umb-borrar="${esc(c.act)}">Automático</button>` : ""}<button class="btn chico" type="button" data-umb-cancelar>Cancelar</button></form>` : ""}
   </li>`;
 }
-// El % va adentro del relleno (pegado a su borde derecho) si entra; si no, justo a la derecha del relleno; si la barra es muy corta, afuera
+// Lo gastado va adentro del relleno (pegado a su borde derecho) si entra; si no, justo a su derecha; si la barra es muy corta, afuera
 function ubicarPctUmb() {
   $$("#sec-umb .umb").forEach((li) => {
     const r = $(".umb-relleno", li), t = $(".umb-pct", li), bar = $(".umb-barra", li); if (!r || !t || !bar) return;
-    const lleno = r.getBoundingClientRect().width, total = bar.getBoundingClientRect().width, w = t.scrollWidth;
-    const adentro = lleno >= w + 16, alLado = !adentro && total - lleno >= w + 12;
+    const total = bar.getBoundingClientRect().width, lleno = total * Number(r.dataset.p) / 100, w = t.scrollWidth;
+    const adentro = lleno >= w + 18, alLado = !adentro && total - lleno >= w + 14;
     li.classList.toggle("pct-al-lado", alLado);
     li.classList.toggle("pct-fuera", !adentro && !alLado);
   });
+}
+// el relleno crece desde donde estaba (la primera vez, desde 0)
+function crecerUmb(sec) {
+  const rs = $$(".umb-relleno", sec);
+  requestAnimationFrame(() => requestAnimationFrame(() => rs.forEach((r) => { r.style.width = r.dataset.p + "%"; })));
+  UB.pAnt = Object.fromEntries($$(".umb", sec).map((li) => [$("[data-umb-edit]", li)?.dataset.umbEdit, Number($(".umb-relleno", li)?.dataset.p || 0)]));
 }
 let umbResize = null;
 window.addEventListener("resize", () => { clearTimeout(umbResize); umbResize = setTimeout(ubicarPctUmb, 150); });
@@ -619,19 +679,17 @@ function pintarUmbrales() {
   const maxU = Math.max(1, ...xs.map((c) => c.umbral || 0));
   const cuerpo = UB.st === "error" && !d ? `<p class="mut">No se pudo leer: ${esc(UB.error)} <button class="link" type="button" data-umb-re>Reintentar</button></p>`
     : !d ? `<p class="mut">Leyendo cuentas…</p>`
-    : !xs.length ? `<p class="mut">Ninguna cuenta activa con campañas prendidas.</p>`
-    : `<ul class="umb-lista">${xs.map((c) => filaUmb(c, maxU)).join("")}</ul>
-       <p class="mut umb-pie num">Próximos cobros: ${usd0(Math.round(d.necesita))}${d.en24 ? ` · en 24 h: ${usd0(Math.round(d.en24))}` : ""} · el tiempo sale de lo que vienen gastando y del presupuesto de lo prendido</p>`;
+    : `${tarjetasUmb(d)}${!xs.length ? `<p class="mut">Ninguna cuenta activa con campañas prendidas.</p>` : `<ul class="umb-lista">${xs.map((c) => filaUmb(c, maxU)).join("")}</ul>`}`;
   sec.innerHTML = `<details class="prob-det"${UB.abierto ? " open" : ""}>
     <summary><h2 id="t-umb">Cuentas y umbral <small class="mut">${d ? xs.length : "…"}</small></h2></summary>
     <div class="prob-cuerpo">${cuerpo}${d?.errores?.length ? `<p class="mut prob-err">⚠ ${esc(d.errores.join(" · "))}</p>` : ""}<p class="mut prob-pie">${d?.actualizado ? `Meta leído ${haceUmb(d.actualizado)}` : ""} <button class="link" type="button" data-umb-re>Actualizar</button></p></div>
   </details>`;
-  $("details", sec).ontoggle = (e) => { UB.abierto = e.target.open; ls.set("dash_umb_abierto", UB.abierto ? "1" : "0"); };
+  $("details", sec).ontoggle = (e) => { UB.abierto = e.target.open; ls.set("dash_umb_abierto", UB.abierto ? "1" : "0"); if (UB.abierto) ubicarPctUmb(); };
   $$("[data-umb-re]", sec).forEach((b) => b.onclick = () => cargarUmbrales(true));
   $$("[data-umb-edit]", sec).forEach((b) => b.onclick = () => { UB.edit = UB.edit === b.dataset.umbEdit ? null : b.dataset.umbEdit; pintarUmbrales(); $("#umb-in", sec)?.focus(); });
   $$("[data-umb-cancelar]", sec).forEach((b) => b.onclick = () => { UB.edit = null; pintarUmbrales(); });
   $$("[data-umb-borrar]", sec).forEach((b) => b.onclick = () => guardarUmbral(b.dataset.umbBorrar, null));
-  ubicarPctUmb();
+  ubicarPctUmb(); crecerUmb(sec); contarUmb(sec);
   $$("[data-umb-form]", sec).forEach((f) => f.onsubmit = (e) => { e.preventDefault(); const v = $("#umb-in", f).value.trim(); if (v === "") return; guardarUmbral(f.dataset.umbForm, Number(v.replace(",", "."))); });
 }
 const horaCorta = (iso) => { try { return new Date(iso).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" }); } catch { return ""; } };
