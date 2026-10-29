@@ -340,6 +340,11 @@ details.log pre, .pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12
 .toasts { position: fixed; left: 50%; transform: translateX(-50%); top: calc(14px + env(safe-area-inset-top)); z-index: 50; display: grid; gap: 10px; width: min(480px, calc(100% - 32px)); pointer-events: none; }
 .toast { pointer-events: auto; padding: 11px 14px; background: var(--tinta); color: var(--papel); border-radius: var(--r-card); box-shadow: 4px 4px 0 var(--sombra); font-size: 14.5px; animation: entraModal .2s ease-out; display: flex; gap: 10px; align-items: flex-start; }
 .toast.error { background: var(--peligro); color: #fff; }
+.toast > div { min-width: 0; }
+.toast p { margin: 0 0 6px; }
+.toast .t-grupo { margin: 0 0 8px; }
+.toast .t-grupo ul { margin: 4px 0 0; padding-left: 18px; }
+.toast .t-sel { margin-top: 2px; background: #fff; color: #1b1a17; border-color: #fff; }
 .toast .x { margin-left: auto; background: none; border: 0; color: inherit; cursor: pointer; font-size: 16px; padding: 0 2px; }
 :root[data-theme="dark"] .toast.error { color: #1b1a17; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .toast.error { color: #1b1a17; } }

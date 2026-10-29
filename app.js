@@ -149,7 +149,35 @@ function toast(msg, tipo = "ok", ms = 5200) {
   t.innerHTML = `<div>${msg}</div><button class="x" type="button" aria-label="Cerrar aviso">✕</button>`;
   $(".x", t).onclick = () => t.remove();
   $("#toasts").appendChild(t);
-  setTimeout(() => t.remove(), ms);
+  if (ms) setTimeout(() => t.remove(), ms);
+  return t;
+}
+// Traduce los errores de Meta a algo que se entienda.
+function errorClaro(msg = "") {
+  const m = String(msg);
+  if (/estado de la cuenta|account status|operaciones de escritura|UNSETTLED/i.test(m)) return "la cuenta tiene un pago pendiente o está restringida: Meta no deja editar hasta que se resuelva";
+  if (/permis|permission/i.test(m)) return "el Token no tiene permiso en esa cuenta";
+  if (/too many|demasiad|rate limit|user request limit/i.test(m)) return "Meta frenó por muchos cambios seguidos: probá en unos minutos";
+  return m.replace(/https?:\/\/\S+/g, "").replace(/[:\s]+$/, "").replace(/\s+/g, " ").trim().slice(0, 140) || "error de Meta";
+}
+function cuentaDe(act) {
+  for (const per of Object.keys(S.datos)) { const c = (S.datos[per].campanas || []).find((y) => y.act === act && y.cuenta); if (c) return c.cuenta; }
+  return act ? `act_${String(act).replace(/^act_/, "")}` : "Cuenta sin nombre";
+}
+// Aviso de fallos agrupado por cuenta y motivo, con botón para seleccionarlos en el tablero.
+function avisoFallos({ okTx = "", mal, items, que }) {
+  const filas = mal.map((x) => { const it = items.find((i) => i.id === x.id) || {}; return { ...x, nivel: it.nivel || x.nivel || "campana", act: it.act || x.act, nombre: x.nombre || it.nombre }; });
+  const grupos = new Map();
+  for (const f of filas) { const k = cuentaDe(f.act) + "\u0001" + errorClaro(f.error); if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(f); }
+  const t = toast(`${okTx ? `<p class="t-ok">${okTx}</p>` : ""}<p class="t-tit"><b>✕ ${que} ${filas.length}:</b></p>` +
+    [...grupos].map(([k, fs]) => { const [cta, por] = k.split("\u0001"); return `<div class="t-grupo"><b>${esc(cta)}</b> · ${esc(por)}<ul>${fs.map((f) => `<li>${esc(f.nombre || f.id)}</li>`).join("")}</ul></div>`; }).join("") +
+    `<button type="button" class="btn chico t-sel">Seleccionar ${filas.length === 1 ? "la que falló" : `las ${filas.length} que fallaron`}</button>`, "error", 0);
+  $(".t-sel", t).onclick = () => {
+    S.sel.clear();
+    for (const f of filas) { const k = `${f.nivel}:${f.id}`, it = buscarItem(k) || f; S.sel.set(k, { id: it.id, act: it.act, nivel: it.nivel, nombre: it.nombre, estado: it.estado, camp: it.camp, cj: it.cj }); }
+    t.remove(); pintarTabla(); pintarBarra();
+    toast(`${S.sel.size} seleccionada${S.sel.size === 1 ? "" : "s"} en el tablero.`, "ok", 3000);
+  };
 }
 
 // ---------- modal ----------
@@ -1532,11 +1560,12 @@ async function aplicarEstado(estado, items) {
     const simulado = r.dry || res.some((x) => x.simulado);
     const v = estado === "ACTIVE" ? "prendid" : "apagad";
     if (simulado) {
-      toast(`<b>Modo prueba${DEMO ? " (demo)" : ""}:</b> Meta no se tocó. Se habrían ${estado === "ACTIVE" ? "prendido" : "apagado"} ${ok.length}${mal.length ? `; ${mal.length} con error: ${esc(mal.map((x) => x.error).join(" · "))}` : ""}.`, mal.length ? "error" : "ok", 7000);
+      toast(`<b>Modo prueba${DEMO ? " (demo)" : ""}:</b> Meta no se tocó. Se habrían ${estado === "ACTIVE" ? "prendido" : "apagado"} ${ok.length}${mal.length ? `; ${mal.length} con error: ${esc(mal.map((x) => `${x.nombre || ""} (${cuentaDe((items.find((i) => i.id === x.id) || {}).act)}): ${errorClaro(x.error)}`).join(" · "))}` : ""}.`, mal.length ? "error" : "ok", 7000);
     } else {
       for (const x of ok) { actualizarEstadoLocal(x.id, x.estado || estado); const it = items.find((i) => i.id === x.id); if (it) marcarUltimo(it, { tipo: "run_status", que: "estado", despues: (x.estado || estado) === "ACTIVE" ? "Prendido" : "Apagado" }); }
       if (ok.length) refrescarUltimosLuego();
-      toast(mal.length ? `${ok.length} ${v}os. Fallaron ${mal.length}: ${esc(mal.map((x) => x.error).join(" · "))}` : `✓ ${ok.length} ${v}o${ok.length === 1 ? "" : "s"} en Meta${DEMO ? " (demo)" : ""}.`, mal.length ? "error" : "ok", 7000);
+      if (mal.length) avisoFallos({ okTx: ok.length ? `✓ ${ok.length} ${v}o${ok.length === 1 ? "" : "s"} bien.` : "", mal, items, que: estado === "ACTIVE" ? "No se prendieron" : "No se apagaron" });
+      else toast(`✓ ${ok.length} ${v}o${ok.length === 1 ? "" : "s"} en Meta${DEMO ? " (demo)" : ""}.`, "ok", 7000);
     }
     S.sel.clear();
   } catch (e) {
@@ -1651,7 +1680,7 @@ async function aplicarPresupuesto({ pct = null, items, lote = false }) {
     const res = r.resultados || [], ok = res.filter((x) => x.ok), mal = res.filter((x) => !x.ok);
     const simulado = r.dry || res.some((x) => (x.cambios || []).some((c) => c.simulado));
     const det = (x) => (x.cambios || []).filter((c) => c.ok).map((c) => `${montoTx(c.antes)} → ${montoTx(c.despues)}`).join(", ");
-    const errTx = mal.length ? ` Fallaron ${mal.length}: ${esc(mal.map((x) => `${x.nombre}: ${x.error}`).join(" · "))}` : "";
+    const errTx = mal.length ? ` Fallaron ${mal.length}: ${esc(mal.map((x) => `${x.nombre} (${cuentaDe((items.find((i) => i.id === x.id) || {}).act)}): ${errorClaro(x.error)}`).join(" · "))}` : "";
     if (simulado) toast(`<b>Modo prueba${DEMO ? " (demo)" : ""}:</b> Meta no se tocó. Habría quedado: ${esc(ok.map((x) => `${x.nombre} ${det(x)}`).join(" · "))}.${errTx}`, mal.length ? "error" : "ok", 9000);
     else {
       for (const x of ok) {
@@ -1661,7 +1690,9 @@ async function aplicarPresupuesto({ pct = null, items, lote = false }) {
         marcarUltimo(it, { tipo: "budget", que: "presupuesto", antes, despues });
       }
       if (ok.length) refrescarUltimosLuego();
-      toast(`${ok.length ? `✓ Presupuesto ${pct ? `${pct > 0 ? "+" : "−"}${Math.abs(pct)} %` : "cambiado"} en ${ok.length}: ${esc(ok.map((x) => `${x.nombre} ${det(x)}`).join(" · "))}.` : ""}${errTx}`, mal.length ? "error" : "ok", 9000);
+      const okTx = ok.length ? `✓ Presupuesto ${pct ? `${pct > 0 ? "+" : "−"}${Math.abs(pct)} %` : "cambiado"} en ${ok.length}: ${esc(ok.map((x) => `${x.nombre} ${det(x)}`).join(" · "))}.` : "";
+      if (mal.length) avisoFallos({ okTx, mal, items, que: pct > 0 ? "No se surfearon" : "No se cambiaron" });
+      else toast(okTx, "ok", 9000);
     }
     if ((pct || lote) && !mal.length) S.sel.clear();
   } catch (e) {
