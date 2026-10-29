@@ -451,7 +451,16 @@ async function cargarAcciones(forzar = false) {
 setInterval(() => { if (!document.hidden && S.vista === "dash" && $("#carr")) { cargarAcciones(); cargarUltimos(); } }, 5 * 60000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden && S.vista === "dash" && $("#carr")) { cargarAcciones(); cargarUltimos(); } });
 // (24/10 b, Lorenzo) Columna «Última modificación»: el cambio más nuevo de cada campaña / conjunto / anuncio (dash_ultimos, 7 días).
-var ULT = { st: null, data: null };
+var ULT = { st: null, data: null, local: {} };
+// (29/10, Lorenzo) lo que se cambia desde el Dashboard aparece en «Última modificación» apenas Meta confirma, sin recargar;
+// el registro de actividad de Meta tarda, así que se vuelve a pedir a los 2 y 6 min y gana el cambio más nuevo.
+function marcarUltimo(it, e) {
+  const t = new Date().toISOString(), ent = { t, quien: "vos (Dashboard)", objeto: it.nombre, nivel: it.nivel, ...e };
+  ULT.local[it.id] = ent;
+  if (it.nivel !== "campana" && it.camp) ULT.local["camp:" + it.camp] = ent;
+}
+function refrescarUltimosLuego() { clearTimeout(ULT._t1); clearTimeout(ULT._t2); ULT._t1 = setTimeout(() => cargarUltimos(true), 120000); ULT._t2 = setTimeout(() => cargarUltimos(true), 360000); }
+const masNuevo = (a, b) => !a ? b : !b ? a : Date.parse(a.t) >= Date.parse(b.t) ? a : b;
 async function cargarUltimos(forzar = false) {
   if (ULT.st === "cargando") return;
   ULT.st = "cargando";
@@ -459,9 +468,9 @@ async function cargarUltimos(forzar = false) {
   pintarTabla();
 }
 function ultimaCelda(x, nivel) {
-  const d = ULT.data; if (!d) return ULT.st === "cargando" ? `<span class="mut">…</span>` : "—";
-  let e = d.ult?.[x.id], dentro = false;
-  if (!e && nivel === "campana" && d.camp?.[x.id]) { e = d.camp[x.id]; dentro = true; }
+  const d = ULT.data || {}; if (!ULT.data && !ULT.local[x.id] && !ULT.local["camp:" + x.id]) return ULT.st === "cargando" ? `<span class="mut">…</span>` : "—";
+  let e = masNuevo(d.ult?.[x.id], ULT.local[x.id]), dentro = false;
+  if (nivel === "campana") { const c = masNuevo(d.camp?.[x.id], ULT.local["camp:" + x.id]); if (c && (!e || Date.parse(c.t) > Date.parse(e.t))) { e = c; dentro = true; } }
   if (!e) return `<span class="mut">—</span>`;
   const num = (v) => { const n = Number(v); return v != null && v !== "" && isFinite(n) ? NF2.format(n) : v; };
   let que;
@@ -589,7 +598,7 @@ function pintarWhop() {
   el.classList.toggle("mal", falta > 0 || nRech > 0);
   el.innerHTML = `<span class="wb-et">Saldo en Whop</span><b class="wb-saldo num">${usd(w.saldo)}</b>
     <span class="wb-tx">${d ? (falta > 0 ? `<span class="neg">⚠ faltan ${usd0(Math.ceil(falta))} para cubrir los umbrales</span>` : `<span class="wb-ok">✓ cubre todos los umbrales</span>`) : ""}${nRech ? ` · <span class="neg">${nRech} cobro${nRech === 1 ? "" : "s"} rechazado${nRech === 1 ? "" : "s"} hoy</span>` : ""}</span>
-    ${w.retenciones ? `<span class="wb-tx">🔒 retenido <b class="num">${usd0(Math.round(w.retenciones.total))}</b></span>` : ""}
+    ${w.retenciones ? `<span class="wb-tx">🔒 retenido <b class="num">${usd0(Math.round(w.retenciones.chicas?.usd ?? 0))}</b></span>` : ""}
     <span class="wb-hora mut${viejo ? " neg" : ""}">${viejo ? "⚠ dato viejo · abrí Whop en la Mac" : haceUmb(w.leido_en)}</span>`;
   if (ant && ant !== String(w.saldo)) { el.classList.remove("cambio"); void el.offsetWidth; el.classList.add("cambio"); }
   el.dataset.saldo = String(w.saldo);
@@ -629,14 +638,13 @@ function tarjetasUmb(d) {
     // escala según lo que vuelve (lo de US$ 2); un cobro grande llena la columna y no aplasta al resto
     const mx = Math.max(1, ...slots.map(([a]) => a), ...slots.map(([, b]) => Math.min(b, 60)));
     const vuelve24 = slots.slice(0, 24).reduce((s, [a]) => s + a, 0);
-    const hist = (w.ret_hist || []).filter((h) => ahora - h[0] >= 20 * 3600);
-    const ayer = hist.length ? hist[hist.length - 1][1] : null, dif = ayer == null ? null : r.total - ayer;
     tRet = `<div class="ut ret">
-      <div class="ut-lbl">🔒 Retenido por Meta${dif != null && Math.abs(dif) >= 1 ? ` <span class="ut-dif ${dif > 0 ? "sube" : "baja"}">${dif > 0 ? "▲" : "▼"} ${usdC(Math.abs(dif))} vs ayer</span>` : ""}</div>
-      <div class="ut-val num" data-cuenta="${r.total}" data-k="ret">${usdC(r.total)}</div>
+      <div class="ut-lbl">🔒 Retenido por Meta</div>
+      <div class="ut-val num" data-cuenta="${r.chicas.usd}" data-k="ret">${usdC(r.chicas.usd)}</div>
       <div class="ut-graf" role="img" aria-label="Lo que se libera en las próximas 48 horas">${slots.map(([a, b], i) => `<span style="--a:${Math.min(1, a / mx).toFixed(3)};--b:${Math.min(1 - Math.min(1, a / mx), b / mx).toFixed(3)};--i:${i}" title="${i ? `en ${i} h` : "esta hora"}: vuelve ${usdC(a)}${b ? ` · se cobra ${usdC(b)}` : ""}"></span>`).join("")}</div>
       <div class="ut-eje" aria-hidden="true"><span>ahora</span><span>24 h</span><span>48 h</span></div>
-      <div class="ut-sub"><b>${NF0.format(r.chicas.n)}</b> de US$ 2 (${usdC(r.chicas.usd)}) vuelven solas · ${usdC(vuelve24)} en 24 h</div>
+      <div class="ut-sub"><b>${NF0.format(r.chicas.n)}</b> retenciones de ~US$ 2 · vuelven ${usdC(vuelve24)} en 24 h</div>
+      ${r.grandes?.usd ? `<div class="ut-sub mut">Aparte: ${usdC(r.grandes.usd)} de gasto en anuncios ya cobrado, que Whop asienta en 1–2 días (no vuelve)</div>` : ""}
     </div>`;
   }
   // Próximo cobro
@@ -1526,7 +1534,8 @@ async function aplicarEstado(estado, items) {
     if (simulado) {
       toast(`<b>Modo prueba${DEMO ? " (demo)" : ""}:</b> Meta no se tocó. Se habrían ${estado === "ACTIVE" ? "prendido" : "apagado"} ${ok.length}${mal.length ? `; ${mal.length} con error: ${esc(mal.map((x) => x.error).join(" · "))}` : ""}.`, mal.length ? "error" : "ok", 7000);
     } else {
-      for (const x of ok) actualizarEstadoLocal(x.id, x.estado || estado);
+      for (const x of ok) { actualizarEstadoLocal(x.id, x.estado || estado); const it = items.find((i) => i.id === x.id); if (it) marcarUltimo(it, { tipo: "run_status", que: "estado", despues: (x.estado || estado) === "ACTIVE" ? "Prendido" : "Apagado" }); }
+      if (ok.length) refrescarUltimosLuego();
       toast(mal.length ? `${ok.length} ${v}os. Fallaron ${mal.length}: ${esc(mal.map((x) => x.error).join(" · "))}` : `✓ ${ok.length} ${v}o${ok.length === 1 ? "" : "s"} en Meta${DEMO ? " (demo)" : ""}.`, mal.length ? "error" : "ok", 7000);
     }
     S.sel.clear();
@@ -1645,7 +1654,13 @@ async function aplicarPresupuesto({ pct = null, items, lote = false }) {
     const errTx = mal.length ? ` Fallaron ${mal.length}: ${esc(mal.map((x) => `${x.nombre}: ${x.error}`).join(" · "))}` : "";
     if (simulado) toast(`<b>Modo prueba${DEMO ? " (demo)" : ""}:</b> Meta no se tocó. Habría quedado: ${esc(ok.map((x) => `${x.nombre} ${det(x)}`).join(" · "))}.${errTx}`, mal.length ? "error" : "ok", 9000);
     else {
-      for (const x of ok) actualizarPresLocal(x);
+      for (const x of ok) {
+        actualizarPresLocal(x);
+        const it = items.find((i) => i.id === x.id) || x, c = (x.cambios || []).filter((c) => c.ok);
+        const antes = c.length ? c.reduce((s, y) => s + y.antes, 0) : x.antes, despues = c.length ? c.reduce((s, y) => s + y.despues, 0) : x.despues;
+        marcarUltimo(it, { tipo: "budget", que: "presupuesto", antes, despues });
+      }
+      if (ok.length) refrescarUltimosLuego();
       toast(`${ok.length ? `✓ Presupuesto ${pct ? `${pct > 0 ? "+" : "−"}${Math.abs(pct)} %` : "cambiado"} en ${ok.length}: ${esc(ok.map((x) => `${x.nombre} ${det(x)}`).join(" · "))}.` : ""}${errTx}`, mal.length ? "error" : "ok", 9000);
     }
     if ((pct || lote) && !mal.length) S.sel.clear();
@@ -2863,6 +2878,7 @@ function mostrarEvento(evRaw) {
       if (!res.ok) throw new Error(res.error || "Meta no confirmó el cambio");
       if (r.dry || res.simulado) { toast(`<b>Modo prueba${DEMO ? " (demo)" : ""}:</b> Meta no se tocó. Se habría ${est === "PAUSED" ? "apagado" : "prendido"} ${esc(it.nom || it.id)}.`, "ok", 7000); volver(); return; }
       it.estado = est; actualizarEstadoLocal(it.id, est);
+      marcarUltimo({ id: it.id, nivel: it.n, nombre: it.nom || it.id, camp: it.camp }, { tipo: "run_status", que: "estado", despues: est === "ACTIVE" ? "Prendido" : "Apagado" }); refrescarUltimosLuego(); pintarTabla();
       $("[data-acc]", li).innerHTML = botonEstadoHTML(it);
       toast(`✓ ${esc(it.nom || it.id)}: ${est === "PAUSED" ? "apagado" : "prendido"} en Meta${DEMO ? " (demo)" : ""}.`);
     } catch (err) {
