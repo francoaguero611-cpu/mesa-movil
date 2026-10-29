@@ -276,6 +276,8 @@ function pintarTitulo(sec) {
   t.textContent = (!sec && S.vista === "login") ? "Dashboard" : (seccionDe(sec || S.vista)?.nombre || "Dashboard");
 }
 // ---------- login ----------
+const OJO = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>`;
+const OJO_NO = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7c2 0 3.7.7 5.1 1.6M22 12s-3.5 7-10 7c-2 0-3.7-.7-5.1-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="M3 3l18 18"/></svg>`;
 function login(msg = "") {
   pararRanking(); S.vista = "login"; pintarTitulo();
   const nav = $("#secciones"); if (nav) nav.hidden = true;
@@ -287,11 +289,19 @@ function login(msg = "") {
       <label class="sr" for="mail">Mail</label>
       <input class="campo" id="mail" name="email" type="email" autocomplete="username" placeholder="Mail" required data-foco>
       <label class="sr" for="clave">Contraseña</label>
-      <input class="campo" id="clave" name="password" type="password" autocomplete="current-password" placeholder="Contraseña" required>
+      <div class="con-ojo">
+        <input class="campo" id="clave" name="password" type="password" autocomplete="current-password" placeholder="Contraseña" required>
+        <button type="button" class="ojo" id="b-ojo" aria-label="Mostrar contraseña" aria-pressed="false">${OJO}</button>
+      </div>
       <button class="btn pri" type="submit" id="b-entrar">Entrar</button>
       <div class="error" id="login-err" role="alert">${esc(msg)}</div>
     </form>`;
   $("#mail").focus();
+  $("#b-ojo").onclick = () => { // (28/10) ojito: ver lo que se escribe
+    const c = $("#clave"), ver = c.type === "password";
+    c.type = ver ? "text" : "password";
+    const b = $("#b-ojo"); b.innerHTML = ver ? OJO_NO : OJO; b.setAttribute("aria-pressed", String(ver)); b.setAttribute("aria-label", ver ? "Ocultar contraseña" : "Mostrar contraseña");
+  };
   $("#f-login").onsubmit = async (e) => {
     e.preventDefault();
     const mail = $("#mail").value.trim().toLowerCase(), pass = $("#clave").value;

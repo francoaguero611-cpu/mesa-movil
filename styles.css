@@ -329,6 +329,11 @@ details.log pre, .pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12
 .login h2 { margin: 0 0 4px; font-family: var(--f-titulo); font-size: 30px; }
 .login p { margin: 0 0 16px; color: var(--mut); }
 .login .btn { width: 100%; margin-top: 14px; min-height: 46px; font-size: 19px; }
+.login .con-ojo { position: relative; margin-top: 10px; }
+.login .con-ojo .campo { padding-right: 52px; }
+.login .ojo { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; display: grid; place-items: center; border: 0; background: none; color: var(--mut); cursor: pointer; border-radius: 6px; }
+.login .ojo:hover, .login .ojo[aria-pressed="true"] { color: var(--tinta); }
+.login .ojo:focus-visible { outline: 3px solid var(--foco); outline-offset: 1px; }
 .login .error { color: var(--peligro); font-weight: 600; margin-top: 10px; min-height: 1.4em; }
 
 /* ===== Toasts ===== */
