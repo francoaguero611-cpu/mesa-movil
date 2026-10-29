@@ -944,7 +944,7 @@ const porVisita = (x) => !x.visitas ? "—" : `${usdG(nulo(x.facturacion) ? null
 const COLS = [
   ["ultima", "Última modificación", (x, nivel) => nivel ? ultimaCelda(x, nivel) : ""], // (24/10 b, Lorenzo)
   ["estado", "Estado", (x, nivel) => nivel ? estadoTxt(x) : ""],          // (24/10, Lorenzo)
-  ["acciones", "Acciones", (x, nivel) => nivel ? accionesCelda(x, nivel) : ""],
+  // (29/10, Lorenzo) columna «Acciones» sacada
   ["presupuesto", "Presupuesto", (x, nivel) => nivel === "campana" && x.tipo_presupuesto === "ABO" ? `<span class="chip-tp" title="Presupuesto por conjunto: abrí la campaña para verlo y cambiarlo">Presupuesto ABO</span>` : `${usdG(x.presupuesto)}${x.tipo_presupuesto ? ` <span class="chip-tp">${esc(x.tipo_presupuesto)}</span>` : ""}${editaPres(x, nivel) ? ` <button type="button" class="lapiz" data-pres="${esc(nivel + ":" + x.id)}" aria-label="Cambiar presupuesto de ${esc(x.nombre)}" title="Cambiar presupuesto"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z M14 6l4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg></button>` : ""}`], // (26/10, Lorenzo) antes de Ventas
   ["ventas", "Ventas", (x) => entN(x.ventas)],
   ["roas", "ROAS", (x) => chipRoas(x.roas)],
@@ -1160,7 +1160,7 @@ window.addEventListener("resize", () => pintarRiel());
 document.addEventListener("click", (e) => { const b = e.target.closest && e.target.closest("[data-reloj]"); if (b) { const c = campanaPorId(b.dataset.reloj); if (c) verHistorial(c, b); } });
 function haceTx(iso) {
   const m = Math.round((Date.now() - Date.parse(iso)) / 60e3);
-  if (m < 60) return `hace ${m} min`; const h = Math.round(m / 60); if (h < 48) return `hace ${h} h`; return `hace ${Math.round(h / 24)} días`;
+  if (m < 1) return "recién"; if (m < 60) return `hace ${m} min`; const h = Math.round(m / 60); if (h < 48) return `hace ${h} h`; return `hace ${Math.round(h / 24)} días`;
 }
 // (19/10 c) pop-up ancho y centrado: última modificación, métricas en fila (deslizar Antes ↔ Después) y dos frases cortas
 function cerrarHist() { const m = $("#pop-hist"); if (m) m.remove(); document.removeEventListener("keydown", escHist); }
