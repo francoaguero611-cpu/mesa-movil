@@ -1347,3 +1347,27 @@ input.campo.f-buscar { font-size: 16px; padding: 9px 12px; max-width: 460px; }
 :root { --umb-1: #7c83ff; --umb-2: #4f46e5; --umb-pista: #e9e8fb; --umb-tx: #3730a3; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --umb-1: #a5abff; --umb-2: #6d67f0; --umb-pista: #2c2b45; --umb-tx: #c7c9ff; } }
 :root[data-theme="dark"] { --umb-1: #a5abff; --umb-2: #6d67f0; --umb-pista: #2c2b45; --umb-tx: #c7c9ff; }
+
+/* (30/10) Pagos rechazados: arriba de los umbrales; cada cuenta con portafolio, estado, deuda y botón Pagar */
+.pagos { border: 2px solid var(--peligro); border-radius: var(--r-card); padding: 10px 12px; margin: 0 0 14px; background: color-mix(in srgb, var(--peligro) 7%, var(--tarjeta)); }
+.pagos.ok { border-color: var(--linea); background: transparent; padding: 8px 12px; }
+.pagos h3 { margin: 0 0 6px; font-size: 15px; color: var(--peligro); }
+.pagos.ok h3 { color: var(--tinta); }
+.pagos.ok p { margin: 0; }
+.pagos-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.pago { display: grid; grid-template-columns: minmax(150px, 1.2fr) minmax(170px, 1.6fr) minmax(120px, 1fr) auto; align-items: center; gap: 10px; padding: 6px 2px; font-size: 13px; border-top: 1px solid var(--linea); }
+.pago:first-child { border-top: 0; }
+.pago-nom, .pago-est, .pago-deuda { min-width: 0; overflow-wrap: anywhere; }
+.pago-deuda { font-weight: 700; }
+.pago.gracia .pago-est { color: var(--r-nar-tx); }
+.pago:not(.gracia) .pago-est { color: var(--peligro); }
+.pago .btn { justify-self: end; text-decoration: none; }
+.ev .pagos-lista { margin-top: 10px; text-align: left; }
+.ev .pago { grid-template-columns: 1fr auto; }
+.ev .pago-est, .ev .pago-deuda { grid-column: 1; }
+.ev .pago .btn { grid-column: 2; grid-row: 1 / span 3; }
+@media (max-width: 640px) {
+  .pago { grid-template-columns: 1fr auto; }
+  .pago-est, .pago-deuda { grid-column: 1; }
+  .pago .btn { grid-column: 2; grid-row: 1 / span 3; }
+}

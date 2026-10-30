@@ -580,6 +580,8 @@ const UB = { st: null, data: null, error: null, edit: null, whop: null, timer: n
 const DEMO_UMB = () => { const h = new Date(Date.now() - 3 * 60e3).toISOString(); return { necesita: 2249.5, en24: 70.5, actualizado: h, whop: { saldo: 2800.26, leido_en: h, rechazos: [], ret_hist: [[Date.now() / 1000 - 86400, 2200], [Date.now() / 1000 - 43200, 2820], [Date.now() / 1000, 3008]],
     retenciones: { total: 3008.24, n: 243, chicas: { n: 223, usd: 458.84 }, grandes: { n: 20, usd: 2549.4 }, liberadas24: 60, cobradas24: 757.67,
       proximas: Array.from({ length: 46 }, (_, i) => [Math.floor(Date.now() / 3600e3) * 3600 + (i + 1) * 3600, [14, 4, 0, 6, 58, 34, 62, 54][i % 8] * (i < 30 ? 1 : .4), i === 40 ? 2040 : i % 5 === 0 ? 43.43 : 0]) } },
+  rechazadas: [{ act: "9", nombre: "CP20", portafolio: "Laboratorio Nexora", estado: 9, estado_txt: "Período de gracia: todavía gasta", deuda: 17.31, moneda: "USD", tarjeta: "VISA *2873", desde: new Date(Date.now() - 50 * 60e3).toISOString(), link: "https://business.facebook.com/billing_hub/accounts" },
+    { act: "8", nombre: "CP23", portafolio: "Portafolio Europa", estado: 3, estado_txt: "Pago necesario: anuncios frenados", deuda: 25360.32, moneda: "ARS", tarjeta: "VISA *9022", desde: new Date(Date.now() - 4 * 3600e3).toISOString(), link: "https://business.facebook.com/billing_hub/accounts" }],
   cuentas: [{ act: "1", nombre: "COL ManualBid", moneda: "USD", saldo: 4.17, umbral: 20, origen: "cobros", falta: 15.83, gasto_dia: 494.2, cobra_en_h: 0.8 },
     { act: "2", nombre: "A1 WINNER", moneda: "USD", saldo: 2.03, umbral: 50.5, origen: "cobros", falta: 48.47, gasto_dia: 401.65, cobra_en_h: 2.9 },
     { act: "3", nombre: "AR y MX", moneda: "USD", saldo: 400, umbral: 900, origen: "manual", falta: 500, gasto_dia: 1650.2, cobra_en_h: 7.3 },
@@ -597,13 +599,15 @@ async function apiUmb(accion, body = null) {
 async function cargarUmbrales(forzar = false) {
   if (UB.st === "cargando") return;
   UB.st = "cargando"; pintarUmbrales();
-  try { UB.data = await apiUmb(forzar ? "ver&forzar=1" : "ver"); UB.whop = UB.data.whop; UB.st = "ok"; UB.error = null; }
+  try { UB.data = await apiUmb(forzar ? "ver&forzar=1" : "ver"); UB.ultVer = Date.now(); UB.whop = UB.data.whop; UB.st = "ok"; UB.error = null; }
   catch (e) { UB.st = "error"; UB.error = e.message; }
-  pintarUmbrales(); pintarWhop();
+  pintarUmbrales(); pintarWhop(); avisarPagosNuevos();
   clearInterval(UB.timer); // la barra de Whop se refresca sola cada minuto mientras el Dashboard está abierto
   UB.timer = setInterval(async () => {
     if (S.vista !== "dash" || !$("#whop-barra")) { clearInterval(UB.timer); UB.timer = null; return; }
     if (document.hidden) return;
+    // (30/10) cada 5 min relee la sección entera para ver pagos rechazados nuevos (sin pisar un umbral que se está editando)
+    if (!UB.edit && Date.now() - (UB.ultVer || 0) > 5 * 60e3) { try { UB.data = await apiUmb("ver"); UB.ultVer = Date.now(); UB.whop = UB.data.whop; pintarUmbrales(); pintarWhop(); avisarPagosNuevos(); return; } catch { /* sigue con Whop */ } }
     try { UB.whop = (await apiUmb("whop_ver")).whop; pintarWhop(); const f = $("#sec-umb .ut-fila"); if (f && UB.data) { f.outerHTML = tarjetasUmb(UB.data); contarUmb($("#sec-umb")); } } catch { /* queda el último */ }
   }, 60e3);
 }
@@ -717,6 +721,49 @@ function crecerUmb(sec) {
   requestAnimationFrame(() => requestAnimationFrame(() => rs.forEach((r) => { r.style.width = r.dataset.p + "%"; })));
   UB.pAnt = Object.fromEntries($$(".umb", sec).map((li) => [$("[data-umb-edit]", li)?.dataset.umbEdit, Number($(".umb-relleno", li)?.dataset.p || 0)]));
 }
+// (30/10, Lorenzo) «Pagos rechazados»: cuentas con pago pendiente (3 = frenada) o en período de gracia (9 = todavía gasta),
+// arriba de los umbrales, con portafolio, deuda y link directo a Facturación y pagos. Las nuevas abren un pop-up (y llega push).
+const plataPago = (n, mon) => String(mon || "USD").toUpperCase() === "USD" ? `US$ ${NF2.format(n)}` : `${NF2.format(n)} ${esc(mon)}`;
+function filaPago(c) {
+  return `<li class="pago${c.estado === 9 ? " gracia" : ""}">
+    <span class="pago-nom"><b>${esc(c.nombre)}</b> <span class="mut">${esc(c.portafolio || "")}</span></span>
+    <span class="pago-est">${c.estado === 9 ? "⚠️" : "⛔"} ${esc(c.estado_txt || "")}${c.desde ? ` <span class="mut">· desde ${haceUmb(c.desde)}</span>` : ""}</span>
+    <span class="pago-deuda num">${plataPago(c.deuda, c.moneda)}${c.tarjeta ? ` <span class="mut">${esc(c.tarjeta)}</span>` : ""}</span>
+    <a class="btn chico pri" href="${esc(c.link)}" target="_blank" rel="noopener">Pagar</a>
+  </li>`;
+}
+function pagosHTML(xs) {
+  if (!xs.length) return `<div class="pagos ok"><h3>Pagos rechazados</h3><p class="mut">Ninguna cuenta con pagos rechazados ✓</p></div>`;
+  return `<div class="pagos"><h3>Pagos rechazados <small class="mut">${xs.length}</small></h3><ul class="pagos-lista">${xs.map(filaPago).join("")}</ul></div>`;
+}
+function mostrarPagos(xs, titulo) {
+  if (!xs.length) return;
+  abrirModal(`<div class="ev ev-peligro">
+      <div class="ev-rotulo">Pago rechazado</div>
+      <h3 class="ev-titulo">${esc(titulo || (xs.length === 1 ? `Meta no pudo cobrar en ${xs[0].nombre}` : `Meta no pudo cobrar en ${xs.length} cuentas`))}</h3>
+      <p class="mut">Entrá a Facturación y pagos y tocá «Pagar ahora».</p>
+      <ul class="pagos-lista">${xs.map(filaPago).join("")}</ul>
+    </div>
+    <div class="botones"><button type="button" class="btn" data-foco data-cerrar-pagos>Listo</button></div>`);
+  const b = $("[data-cerrar-pagos]"); if (b) b.onclick = () => cerrarModal();
+}
+// pop-up dentro de la app cuando aparece una cuenta nueva (o pasa de gracia a frenada) desde la última vez que se miró
+function avisarPagosNuevos() {
+  const xs = UB.data?.rechazadas; if (!Array.isArray(xs)) return;
+  let vistos = {}; try { vistos = JSON.parse(ls.get("dash_pagos_vistos") || "{}"); } catch {}
+  const primera = ls.get("dash_pagos_vistos") == null;
+  const nuevas = xs.filter((c) => vistos[c.act] !== c.estado);
+  ls.set("dash_pagos_vistos", JSON.stringify(Object.fromEntries(xs.map((c) => [c.act, c.estado]))));
+  // la primera vez solo avisa lo de las últimas 24 h (no lo viejo)
+  const mostrar = primera ? nuevas.filter((c) => c.desde && Date.now() - Date.parse(c.desde) < 864e5) : nuevas;
+  if (mostrar.length && !eventoAbierto && !modalActual) mostrarPagos(mostrar);
+}
+// push «💳 Pago rechazado» (cuentas-umbral → ev.sec = "pagos", ev.pg = [{a, n, p, e, d, m, t, s, l}])
+function mostrarEventoPagos(ev) {
+  const xs = (ev.pg || []).map((x) => ({ act: x.a, nombre: x.n, portafolio: x.p, estado: x.e, estado_txt: x.e === 9 ? "Período de gracia: todavía gasta" : "Pago necesario: anuncios frenados", deuda: x.d, moneda: x.m, tarjeta: x.t, desde: x.s, link: x.l }));
+  try { const v = JSON.parse(ls.get("dash_pagos_vistos") || "{}"); for (const c of xs) v[c.act] = c.estado; ls.set("dash_pagos_vistos", JSON.stringify(v)); } catch {}
+  mostrarPagos(xs, ev.titulo);
+}
 let umbResize = null;
 window.addEventListener("resize", () => { clearTimeout(umbResize); umbResize = setTimeout(ubicarPctUmb, 150); });
 function pintarUmbrales() {
@@ -725,7 +772,7 @@ function pintarUmbrales() {
   const maxU = Math.max(1, ...xs.map((c) => c.umbral || 0));
   const cuerpo = UB.st === "error" && !d ? `<p class="mut">No se pudo leer: ${esc(UB.error)} <button class="link" type="button" data-umb-re>Reintentar</button></p>`
     : !d ? `<p class="mut">Leyendo cuentas…</p>`
-    : `${tarjetasUmb(d)}${!xs.length ? `<p class="mut">Ninguna cuenta activa con campañas prendidas.</p>` : `<ul class="umb-lista">${xs.map((c) => filaUmb(c, maxU)).join("")}</ul>`}`;
+    : `${pagosHTML(d.rechazadas || [])}${tarjetasUmb(d)}${!xs.length ? `<p class="mut">Ninguna cuenta activa con campañas prendidas.</p>` : `<ul class="umb-lista">${xs.map((c) => filaUmb(c, maxU)).join("")}</ul>`}`;
   sec.innerHTML = `<details class="prob-det"${UB.abierto ? " open" : ""}>
     <summary><h2 id="t-umb">Cuentas y umbral <small class="mut">${d ? xs.length : "…"}</small></h2></summary>
     <div class="prob-cuerpo">${cuerpo}${d?.errores?.length ? `<p class="mut prob-err">⚠ ${esc(d.errores.join(" · "))}</p>` : ""}<p class="mut prob-pie">${d?.actualizado ? `Meta leído ${haceUmb(d.actualizado)}` : ""} <button class="link" type="button" data-umb-re>Actualizar</button></p></div>
@@ -3085,6 +3132,7 @@ async function recibirEvento(ev) {
   if (!ev) return;
   // (12/10) respuesta de Claude en Correcciones: abre la carpeta y el chat
   if (ev.sec === "creativos" && ev.cr) { if (!DEMO && !clave()) { ls.set("dash_ev_pend", JSON.stringify(ev)); return; } irASeccion("creativos", { ruta: { g: ev.cr.g, f: ev.cr.f, chat: ev.cr.chat } }); return; }
+  if (ev.sec === "pagos") { mostrarEventoPagos(ev); return; } // (30/10) el link a Facturación no necesita sesión
   if (ev.demo) { await cargarDemo(); ev = window.DemoAPI.ejemplo(ev.demo); }
   if (!DEMO && !clave()) { ls.set("dash_ev_pend", JSON.stringify(ev)); return; }
   mostrarEvento(ev);
