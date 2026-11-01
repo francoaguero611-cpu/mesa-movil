@@ -478,6 +478,12 @@
     const dry = p.get("dry") === "1";
     await wait(accion === "dash" ? 380 : accion === "dash_detalle" ? 520 : 650);
     const per = p.get("periodo") || "hoy";
+    if (accion === "gastos") return { ingresos: 97824, ventas: 6033, por_pasarela: [{ pasarela: "Mercado Pago", usd: 66912, ventas: 4547 }, { pasarela: "Stripe", usd: 23666, ventas: 1223 }, { pasarela: "Impul Pay", usd: 7077, ventas: 252 }, { pasarela: "Whop", usd: 168, ventas: 11 }],
+      filas: [{ grupo: "pasarelas", concepto: "Mercado Pago", pais: "AR", usd: 4837.6, ventas: 4547, base: 66912, exacta: false }, { grupo: "mercadopago", concepto: "Alquiler cuenta (Tomi)", pais: "AR", usd: 543.8 },
+        { grupo: "pasarelas", concepto: "Stripe", pais: "MX", usd: 1043.3, ventas: 704, base: 11234, exacta: true }, { grupo: "pasarelas", concepto: "Stripe", pais: "FR", usd: 273, ventas: 115, base: 3116, exacta: true }, { grupo: "pasarelas", concepto: "Whop", pais: "MX", usd: 13.9, ventas: 10, base: 152 },
+        { grupo: "impultienda", concepto: "Comisión Impultienda", pais: "Mercado Pago", usd: 1338.3, ventas: 4547, base: 66912 }, { grupo: "impultienda", concepto: "Comisión Impultienda", pais: "Stripe", usd: 473.3, ventas: 1223, base: 23666 },
+        { grupo: "impuestos", concepto: "Ganancias (8,5 %)", pais: "AR", usd: 5687, ventas: 4547, base: 66912 }, { grupo: "impuestos", concepto: "Retenciones IIBB", pais: "AR", usd: 420.2, ventas: 4354, base: 64201 }, { grupo: "impuestos", concepto: "IVA España", pais: "ES", usd: 12.4, ventas: 4, base: 59 },
+        { grupo: "publicidad", concepto: "Publicidad (Meta)", usd: 59422.9 }] };
     if (accion === "dash") return JSON.parse(JSON.stringify(dash(per)));
     if (accion === "dash_detalle") return JSON.parse(JSON.stringify(detalle(p.get("id"), per)));
     if (accion === "dash_paises") { // (15/10) ventas por país, inventadas a partir de las banderas del nombre

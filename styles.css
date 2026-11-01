@@ -1371,3 +1371,26 @@ input.campo.f-buscar { font-size: 16px; padding: 9px 12px; max-width: 460px; }
   .pago-est, .pago-deuda { grid-column: 1; }
   .pago .btn { grid-column: 2; grid-row: 1 / span 3; }
 }
+
+/* (01/11) Gastos (menú ☰) */
+.g-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0 12px; }
+.g-kpi { padding: 10px 12px; border: 2px solid var(--linea); border-radius: var(--r-card); background: var(--papel-2); min-width: 0; }
+.g-kpi .g-v { font: 700 19px var(--f-titulo); margin: 2px 0; overflow-wrap: anywhere; }
+.g-kpi .mut { font-size: 13px; }
+.g-bloque { border: 2px solid var(--tinta); border-radius: var(--r-card); margin: 10px 0; background: var(--tarjeta); }
+.g-bloque > summary { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 10px 14px; cursor: pointer; font: 700 16px var(--f-titulo); list-style: none; }
+.g-bloque > summary::-webkit-details-marker { display: none; }
+.g-bloque > summary::before { content: "▸"; margin-right: 6px; transition: transform .15s ease-out; }
+.g-bloque[open] > summary::before { transform: rotate(90deg); }
+.g-bloque > summary > span:first-child { flex: 1; }
+.g-tot { text-align: right; }
+.g-tot small { display: block; font: 500 12.5px var(--f-texto); color: var(--mut); }
+.g-tabla { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+.g-tabla td { padding: 7px 14px; border-top: 1px solid var(--linea); vertical-align: top; }
+.g-tabla td.r { text-align: right; white-space: nowrap; }
+.g-tabla td .mut { font-size: 12.5px; }
+.g-tabla tr.g-sub td { padding-top: 4px; padding-bottom: 4px; font-size: 13.5px; border-top: 0; }
+.g-tabla tr.g-sub td:first-child { padding-left: 28px; }
+.g-nota { font-size: 13px; padding: 0 14px 10px; margin: 6px 0 0; }
+@media (max-width: 560px) { .g-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .g-tabla td { padding: 6px 10px; } }
+@media (prefers-reduced-motion: reduce) { .g-bloque > summary::before { transition: none; } }

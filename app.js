@@ -137,7 +137,7 @@ async function api(accion, { q = "", body = null, escritura = false } = {}) {
 let demoP = null;
 function cargarDemo() {
   if (window.DemoAPI) return Promise.resolve();
-  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=35"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  if (!demoP) demoP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "demo.js?v=36"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
   return demoP;
 }
 
@@ -249,6 +249,7 @@ function pintarMenu() {
       <span class="toggle-chico" aria-hidden="true" ${temaEfectivo() === "dark" ? 'aria-checked="true"' : ""}><span class="mini"></span></span>
     </button>
     <button class="item" role="menuitem" id="mi-reglas"><span>Reglas<br><small>ver y editar las automáticas</small></span><span aria-hidden="true">⚙</span></button>
+    <button class="item" role="menuitem" id="mi-gastos"><span>Gastos<br><small>comisiones, impuestos, alquiler de MP</small></span><span aria-hidden="true">💸</span></button>
     <button class="item" role="menuitem" id="mi-log"><span>Registro de acciones<br><small>últimas 50</small></span><span aria-hidden="true">📜</span></button>
     <button class="item" role="menuitem" id="mi-avisos"><span>Activar avisos<br><small id="mi-avisos-tx">…</small></span><span aria-hidden="true">🔔</span></button>
     <button class="item" role="menuitem" id="mi-probar"><span>Probar aviso<br><small>${DEMO ? "muestra uno de ejemplo" : "manda uno a tus equipos"}</small></span><span aria-hidden="true">✉</span></button>
@@ -258,6 +259,7 @@ function pintarMenu() {
     ${DEMO ? `<a class="item" role="menuitem" href="${location.pathname}"><span>Salir del demo</span><span aria-hidden="true">↩</span></a>` : `<button class="item" role="menuitem" id="mi-salir"><span>Salir</span><span aria-hidden="true">↩</span></button>`}`;
   $("#mi-dry").onclick = () => { if (DRY_URL) return; ls.set("dash_dry", dryOn() ? "0" : "1"); pintarBadges(); pintarMenu(); toast(dryOn() ? "Modo prueba prendido: las escrituras van con dry=1." : "Modo prueba apagado: las escrituras tocan Meta de verdad."); };
   $("#mi-log").onclick = () => { cerrarMenu(); verRegistro(); };
+  $("#mi-gastos").onclick = () => { cerrarMenu(); verGastos(); };
   $("#mi-reglas").onclick = () => { cerrarMenu(); verReglas(); };
   $("#mi-sistema").onclick = () => { temaSistema(); cerrarMenu(); };
   $("#mi-oscuro").onclick = () => { alternarTema(); pintarMenu(); $("#mi-oscuro").focus(); };
@@ -290,6 +292,81 @@ async function verRegistro() {
   const b = $("[data-cerrar]", m.dlg); if (b) b.onclick = m.cerrar;
 }
 
+
+// ---------- Gastos (01/11): todo lo que se va de cada venta, del período, en USD. Backend: app-movil?accion=gastos (SQL gastos_resumen) ----------
+const GASTOS_PER = [["hoy", "Hoy"], ["ayer", "Ayer"], ["7d", "7 días"], ["mes", "Este mes"], ["mes_ant", "Mes pasado"], ["30d", "30 días"]];
+function rangoGastos(k) {
+  const hoy = new Date(Date.now() - 3 * 3600e3), f = (d) => d.toISOString().slice(0, 10);
+  const menos = (n) => new Date(hoy.getTime() - n * 86400e3);
+  if (k === "ayer") return [f(menos(1)), f(menos(1))];
+  if (k === "7d") return [f(menos(6)), f(hoy)];
+  if (k === "30d") return [f(menos(29)), f(hoy)];
+  if (k === "mes") return [f(hoy).slice(0, 8) + "01", f(hoy)];
+  if (k === "mes_ant") { const fin = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), 0)); return [f(fin).slice(0, 8) + "01", f(fin)]; }
+  return [f(hoy), f(hoy)];
+}
+const banderaPais = (c) => /^[A-Z]{2}$/.test(c || "") && c !== "XX" ? String.fromCodePoint(...[...c].map((x) => 127397 + x.charCodeAt(0))) + " " + c : "sin país";
+async function verGastos(per = ls.get("dash_gastos_per", "mes")) {
+  ls.set("dash_gastos_per", per);
+  const [d, h] = rangoGastos(per);
+  const chips = `<div class="periodos" role="group" aria-label="Período">${GASTOS_PER.map(([k, t]) => `<button type="button" class="btn" data-gper="${k}" aria-pressed="${k === per}">${t}</button>`).join("")}</div>`;
+  const cab = `<h3>Gastos</h3><p class="mut">Lo que se va de cada venta: pasarelas, Impultienda, impuestos y alquiler de Mercado Pago. En dólares.</p>${chips}`;
+  const m = abrirModal(`${cab}<p class="mut"><span class="cargador"></span>Cargando…</p>`, { ancho: true });
+  const enganchar = () => {
+    $$("[data-gper]", m.dlg).forEach((b) => b.onclick = () => verGastos(b.dataset.gper));
+    const c = $("[data-cerrar]", m.dlg); if (c) c.onclick = m.cerrar;
+  };
+  try {
+    const r = await api("gastos", { q: `&desde=${d}&hasta=${h}` });
+    const filas = r.filas || [], ing = Number(r.ingresos) || 0;
+    const pct = (u, b) => b > 0 ? NF2.format(100 * u / b) + " %" : "";
+    const suma = (xs) => xs.reduce((a, x) => a + (Number(x.usd) || 0), 0);
+    const de = (g, c) => filas.filter((x) => x.grupo === g && (!c || x.concepto === c));
+    const fila = (t, x, sub = "") => `<tr><td>${t}${sub ? `<div class="mut">${sub}</div>` : ""}</td><td class="r">${usd(x.usd)}</td><td class="r mut">${x.base ? pct(x.usd, x.base) : ""}</td></tr>`;
+    const bloque = (titulo, tot, xs, nota = "", abierto = false) => {
+      if (!xs.length) return "";
+      return `<details class="g-bloque"${abierto ? " open" : ""}><summary><span>${titulo}</span><span class="g-tot">${usd(tot)}<small>${ing > 0 ? pct(tot, ing) + " de lo vendido" : ""}</small></span></summary>
+        ${xs.length ? `<table class="g-tabla"><tbody>${xs.join("")}</tbody></table>` : ""}${nota ? `<p class="mut g-nota">${nota}</p>` : ""}</details>`;
+    };
+    // Mercado Pago: comisión + alquiler de la cuenta de Tomi
+    const mpCom = de("pasarelas", "Mercado Pago"), mpAlq = de("mercadopago");
+    const mp = [...mpCom.map((x) => fila("Comisión de Mercado Pago", x, `${NF0.format(x.ventas)} ventas${x.exacta ? "" : " · real cuando está conciliada"}`)),
+                ...mpAlq.map((x) => fila(esc(x.concepto), x, "2 % con tope diario"))];
+    // Otras pasarelas, una por medio de pago, con el detalle por país
+    const otras = ["Stripe", "Whop", "Impul Pay"].map((n) => {
+      const xs = de("pasarelas", n), venta = (r.por_pasarela || []).find((p) => p.pasarela === n);
+      if (!xs.length && !(venta && venta.usd > 0)) return "";
+      const tot = { usd: suma(xs), base: xs.reduce((a, x) => a + (Number(x.base) || 0), 0) };
+      const det = xs.map((x) => `<tr class="g-sub"><td>${esc(banderaPais(x.pais))}<span class="mut"> · ${NF0.format(x.ventas)}</span></td><td class="r">${usd(x.usd)}</td><td class="r mut">${pct(x.usd, x.base)}</td></tr>`).join("");
+      const sin = !xs.length ? `<tr class="g-sub"><td colspan="3" class="neg">Vendió ${usd(venta.usd)} y no tiene comisión cargada.</td></tr>` : "";
+      return fila(`<b>${n}</b>`, tot) + det + sin;
+    }).filter(Boolean);
+    const imp = de("impultienda").map((x) => fila(`Por ${esc(x.pais)}`, x, `${NF0.format(x.ventas)} ventas`));
+    const impu = de("impuestos").sort((a, b) => b.usd - a.usd).map((x) => fila(`${esc(x.concepto)}`, x, `${esc(banderaPais(x.pais))} · ${NF0.format(x.ventas)} ventas`));
+    const otros = de("otros").map((x) => fila(esc(x.concepto), x, x.pais ? esc(banderaPais(x.pais)) : "cargado a mano"));
+    const pub = suma(de("publicidad"));
+    const gastos = suma(filas.filter((x) => x.grupo !== "publicidad"));
+    const queda = ing - gastos - pub;
+    const kpi = (t, v, sub = "", cls = "") => `<div class="g-kpi"><div class="mut">${t}</div><div class="g-v ${cls}">${v}</div>${sub ? `<div class="mut">${sub}</div>` : ""}</div>`;
+    m.set(`${cab}
+      <div class="g-kpis">
+        ${kpi("Vendido", usd0(ing), `${NF0.format(r.ventas || 0)} ventas`)}
+        ${kpi("Gastos", usd0(gastos), ing > 0 ? pct(gastos, ing) + " de lo vendido" : "", "neg")}
+        ${kpi("Publicidad", usd0(pub), ing > 0 ? pct(pub, ing) : "")}
+        ${kpi("Te queda", usd0(queda), ing > 0 ? pct(queda, ing) : "", queda < 0 ? "neg" : "")}
+      </div>
+      ${bloque("Mercado Pago", suma([...mpCom, ...mpAlq]), mp, "", true)}
+      ${bloque("Otras pasarelas", suma(filas.filter((x) => x.grupo === "pasarelas" && x.concepto !== "Mercado Pago")), otras)}
+      ${bloque("Impultienda", suma(de("impultienda")), imp)}
+      ${bloque("Impuestos por país", suma(de("impuestos")), impu, "Ganancias 8,5 % sobre lo facturado en pesos (desde el 01/11), IVA que retiene Whop y retenciones de IIBB de Mercado Pago.")}
+      ${bloque("Otros", suma(de("otros")), otros)}
+      <p class="mut g-nota">${d === h ? d : `${d} al ${h}`} · días de Argentina. Los porcentajes de cada fila son sobre lo que vendió esa pasarela o país.</p>
+      <div class="botones"><button class="btn pri" data-cerrar>Cerrar</button></div>`);
+  } catch (e) {
+    m.set(`${cab}<div class="err-box">${esc(e.message)}</div><div class="botones"><button class="btn pri" data-cerrar>Cerrar</button></div>`);
+  }
+  enganchar();
+}
 
 // ---------- usuario (12/10): cada uno con su mail; título = sección actual ----------
 const USUARIOS = { "lorenleiva7@gmail.com": { id: "lorenzo", nombre: "Lorenzo" }, "francoaguero611@gmail.com": { id: "franco", nombre: "Franco" } };
