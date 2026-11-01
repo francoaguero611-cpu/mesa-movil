@@ -1658,7 +1658,10 @@ function pedirEstado(destino, sw, fin) {
     $$("[data-e]", m.dlg).forEach((b) => b.onclick = () => { m.cerrar(); pedirEstado(b.dataset.e, sw); });
     return;
   }
-  const afectados = its.filter((i) => prendido(i.estado) !== (destino === "ACTIVE"));
+  // (01/11) Rechazado, con problemas, en revisión o pausado por el padre siguen PRENDIDOS en Meta (status ACTIVE): al apagar se mandan igual.
+  // Antes se tomaban como «ya apagados» y no se mandaban (33 tildados → 14 apagados).
+  const apagadoReal = (e) => ["PAUSED", "ARCHIVED", "DELETED"].includes(e);
+  const afectados = its.filter((i) => destino === "ACTIVE" ? !prendido(i.estado) : !apagadoReal(i.estado));
   const verbo = destino === "ACTIVE" ? "Prender" : "Apagar";
   const objetivo = afectados.length ? afectados : its;
   const m = abrirModal(`<h3>¿${verbo} ${resumenNiveles(objetivo).replace(/ · /g, " y ")} en Meta?</h3>
