@@ -502,7 +502,7 @@ function montar() {
     <section class="seccion-camp" aria-labelledby="t-camp">
       <div class="cab-tabla">
         <h2 id="t-camp">Campañas <small id="n-camp"></small></h2>
-        <span class="cab-der"><span id="acc-barra"></span><button type="button" class="toggle-chico" role="switch" id="t-solosel" aria-checked="${S.soloSel}"><span class="mini" aria-hidden="true"></span><span id="t-solosel-tx">solo seleccionadas</span></button><button type="button" class="btn chico" id="b-cols" aria-haspopup="dialog">Columnas</button><button type="button" class="toggle-chico" role="switch" id="t-apagadas" aria-checked="${S.verApagadas}"><span class="mini" aria-hidden="true"></span><span id="t-apagadas-tx">ver apagadas</span></button></span>
+        <span class="cab-der"><span id="acc-barra"></span><button type="button" class="btn chico" id="b-malos" title="Tilda los conjuntos y anuncios con ROAS < 1,3 de las campañas con ROAS < 1,3 (últimos 3 días)">Lo que viene mal</button><button type="button" class="toggle-chico" role="switch" id="t-solosel" aria-checked="${S.soloSel}"><span class="mini" aria-hidden="true"></span><span id="t-solosel-tx">solo seleccionadas</span></button><button type="button" class="btn chico" id="b-cols" aria-haspopup="dialog">Columnas</button><button type="button" class="toggle-chico" role="switch" id="t-apagadas" aria-checked="${S.verApagadas}"><span class="mini" aria-hidden="true"></span><span id="t-apagadas-tx">ver apagadas</span></button></span>
       </div>
       <div class="filtro-camp"><label class="sr" for="f-buscar">Buscar por nombre</label><input type="search" id="f-buscar" class="campo f-buscar" placeholder="Buscar campaña, conjunto o anuncio…" autocomplete="off" value="${esc(S.buscar)}"><label class="sr" for="f-cuenta">Cuenta publicitaria</label><select id="f-cuenta" class="campo f-cuenta"></select></div>
       <div class="tabla-con-reloj"><div class="tabla-caja boceto"><div class="tabla-scroll" id="tabla-scroll"></div></div><div class="riel-reloj" id="riel-reloj" aria-label="Historial de cambios por campaña"></div></div>
@@ -516,6 +516,7 @@ function montar() {
   $("#b-cols").onclick = elegirColumnas; pintarBotonCols();
   $("#t-apagadas").onclick = () => { S.verApagadas = !S.verApagadas; ls.set("dash_ver_apagadas", S.verApagadas ? "1" : "0"); $("#t-apagadas").setAttribute("aria-checked", S.verApagadas); pintarTabla(); };
   $("#t-solosel").onclick = alternarSoloSel;
+  $("#b-malos").onclick = () => seleccionarMalos();
   $("#f-cuenta").onchange = (e) => { S.cuenta = e.target.value; ls.set("dash_cuenta", S.cuenta); pintarTabla(); pintarProblemas(); };
   let tb = null;
   $("#f-buscar").oninput = (e) => { clearTimeout(tb); tb = setTimeout(() => { S.buscar = e.target.value; pintarTabla(); }, 150); };
@@ -3132,6 +3133,35 @@ function irAlDash() {
   montar(); window.scrollTo(0, 0);
   return true;
 }
+// (01/11) «Lo que viene mal» en cascada (Lorenzo): campañas prendidas con ROAS < 1,3 → sus conjuntos < 1,3 → sus anuncios < 1,3 con ≥ US$ 10.
+// Tilda conjuntos y anuncios (no campañas: así «Apagar» no mata la campaña entera). Lo que va bien no se toca. Se abre también con ?malos=1.
+const MALOS = { roas: 1.3, gastoMin: 10, periodo: "3d" };
+const esMalo = (x) => prendido(x.estado) && (x.gasto || 0) >= MALOS.gastoMin && (x.roas ?? 0) < MALOS.roas;
+async function seleccionarMalos() {
+  if (!irAlDash()) return;
+  if (S.periodo !== MALOS.periodo) { S.periodo = MALOS.periodo; pintarTodo(); }
+  if (!S.datos[MALOS.periodo]) await cargar();
+  const d = S.datos[MALOS.periodo];
+  if (!d) return toast("No pude traer los datos de los últimos 3 días.", "error");
+  const cs = (d.campanas || []).filter(esMalo);
+  if (!cs.length) return toast("Ninguna campaña prendida viene con ROAS < 1,3 en los últimos 3 días.", "ok", 5000);
+  toast(`Revisando ${cs.length} campaña${cs.length === 1 ? "" : "s"} con ROAS < 1,3…`, "ok", 3000);
+  S.grupoClave = "todas"; ajustarIdx();
+  for (const c of cs) S.open.add("c:" + c.id);
+  pintarTodo();
+  await Promise.all(cs.map(esperarDetalle));
+  S.sel.clear();
+  let nS = 0, nA = 0;
+  for (const c of cs) for (const s of detDe(c)) {
+    if (!esMalo(s)) continue;
+    const ks = ["conjunto:" + s.id, ...(s.anuncios || []).filter(esMalo).map((a) => "anuncio:" + a.id)];
+    S.open.add("s:" + s.id);
+    for (const k of ks) { const it = buscarItem(k); if (it) { S.sel.set(k, { id: it.id, act: it.act, nivel: it.nivel, nombre: it.nombre, estado: it.estado, camp: it.camp, cj: it.cj }); it.nivel === "conjunto" ? nS++ : nA++; } }
+  }
+  S.soloSel = S.sel.size > 0;
+  pintarSoloSel(); pintarTodo();
+  toast(S.sel.size ? `Tildé ${nS} conjunto${nS === 1 ? "" : "s"} y ${nA} anuncio${nA === 1 ? "" : "s"} de ${cs.length} campaña${cs.length === 1 ? "" : "s"} que vienen mal. Revisalos y apagá con la barra de abajo; «solo seleccionadas» los muestra juntos.` : "Las campañas malas no tienen conjuntos prendidos con ROAS < 1,3.", "ok", 9000);
+}
 async function esperarDetalle(c) {
   cargarDetalle(c);
   const k = `${S.periodo}|${c.id}`;
@@ -3277,6 +3307,7 @@ function abrirInicial() {
   const guardada = ls.get("dash_seccion");
   const s = seccionDe(h) || seccionDe(guardada) || SECCIONES[0];
   s.montar({}); pintarTitulo(s.id);
+  if (URLP.get("malos") === "1") { try { history.replaceState(null, "", location.pathname); } catch {} setTimeout(seleccionarMalos, 300); }
 }
 function irASeccion(sec, opts = {}) {
   cerrarMenu();
