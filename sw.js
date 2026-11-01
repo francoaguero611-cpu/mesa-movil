@@ -1,6 +1,6 @@
 /* Service worker — Dashboard Lorenzo */
-const VERSION = "dash-v90";
-const SHELL = ["./", "index.html", "styles.css?v=54", "app.js?v=85", "demo.js?v=36", "manifest.webmanifest", "avisos.css?v=1", "avisos.js?v=1",
+const VERSION = "dash-v91";
+const SHELL = ["./", "index.html", "styles.css?v=55", "app.js?v=86", "demo.js?v=37", "manifest.webmanifest", "avisos.css?v=1", "avisos.js?v=1",
   "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png", "icons/apple-touch-icon.png"];
 // Cazador (antes Buscador de ofertas): se guarda aparte y sin trabar la instalación si algún archivo falta en el hosting.
 // buscador.html quedó como redirección a ./#cazador (links viejos).
