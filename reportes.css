@@ -84,3 +84,5 @@
   .rp-cab time { margin-left: 0; width: 100%; }
   .rp-tabla td:first-child { min-width: 170px; }
 }
+.rp-card-apagada { opacity: .6; }
+.rp-venc summary { cursor: pointer; font-weight: 700; padding: 6px 0; }

@@ -25,10 +25,10 @@ const fecha = (f) => { try { return new Date(f).toLocaleString("es-AR", { timeZo
 const hace = (f) => { const m = Math.round((Date.now() - Date.parse(f)) / 60e3); return m < 60 ? `hace ${m} min` : m < 48 * 60 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} días`; };
 
 const TABS = [
-  ["surfeos", "Surfeos"], ["campanas", "Campañas"], ["cuentas", "Cuentas"], ["gastos", "Gastos"],
-  ["minimos", "Mínimos"], ["escala", "Escala"], ["bot", "Bot"], ["config", "Configuración"],
+  ["bot", "Acciones"], ["surfeos", "Surfeos"], ["campanas", "Campañas"], ["cuentas", "Cuentas"], ["gastos", "Gastos"],
+  ["minimos", "Mínimos"], ["escala", "Escala"], ["config", "Configuración"],
 ];
-const R = { raiz: null, ctx: {}, tab: ls.get("rp_tab", "surfeos"), datos: {}, filtro: ls.get("rp_filtro", "todos"), cfg: null, cargando: false };
+const R = { raiz: null, ctx: {}, tab: ls.get("rp_tab", "bot"), datos: {}, filtro: ls.get("rp_filtro", "todos"), cfg: null, cargando: false };
 
 async function api(q, body = null) {
   const r = await fetch(`${API}?${q}`, { method: body ? "POST" : "GET", headers: { "x-app-clave": clave(), "x-app-usuario": R.ctx.usuario?.() || "", ...(body ? { "content-type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined, cache: "no-store" }).catch(() => null);
@@ -148,7 +148,7 @@ async function abrirLimpieza(x) {
   const ap = d.apagar;
   m.set(`<h3>Limpieza · ${esc(d.desde.slice(8))}/${esc(d.desde.slice(5, 7))} → hoy</h3><p><b>${esc(x.nombre)}</b> · 3 días: ${usd(d.total.g)} · ${d.total.v} ventas · ROAS <b class="${roasCls(d.total.roas)}">${ro(d.total.roas)}</b></p>
     <div class="rp-tabla-caja"><table class="rp-tabla"><thead><tr><th>Conjunto</th><th>Gasto</th><th>Ventas</th><th>ROAS</th><th></th></tr></thead><tbody>${filas || `<tr><td colspan="5" class="mut">Sin datos.</td></tr>`}</tbody></table></div>
-    ${ap.length ? `<h4>Anuncios para apagar (gasto &gt; ${usd(cfg.d_ad_gasto ?? 10)} y ROAS &lt; ${ro(cfg.d_ad_roas ?? 1.3)}, dentro de conjuntos malos)</h4>
+    ${d.nota ? `<p class="techo-aviso">${esc(d.nota)}</p>` : ""}${ap.length ? `<h4>Anuncios para apagar (gasto &gt; ${usd(cfg.d_ad_gasto ?? 10)} y ROAS &lt; ${ro(cfg.d_ad_roas ?? 1.3)}, dentro de conjuntos malos)</h4>
       <ul class="rp-lista-ap">${ap.map((a) => `<li><label><input type="checkbox" data-ap="${esc(a.id)}" checked> ${esc(a.nombre)} <span class="mut">· ${esc(a.conjunto)} · ${usd(a.g)} · ROAS ${ro(a.roas)}</span></label></li>`).join("")}</ul>` : `<p class="mut">No hay anuncios que cumplan la regla para apagar.</p>`}
     <div class="botones"><button class="btn" data-x>Cerrar</button>${x.cbo ? `<button class="btn" data-bajar>Bajar −${cfg.d_pct ?? 30} %</button>` : ""}${ap.length ? `<button class="btn pri" data-apagar>Apagar los tildados</button>` : ""}</div>`);
   $("[data-x]", m.dlg).onclick = m.cerrar;
@@ -256,11 +256,43 @@ function tabEscala(d) {
       <p class="rp-motivo">${esc(e.motivo)}</p>
       <div class="rp-acc">${e.accion === "subir" ? `<button class="btn chico pri" data-esc="${esc(e.id)}" data-pct="30">+30 %</button>` : ""}${e.accion === "bajar" ? `<button class="btn chico pri" data-esc="${esc(e.id)}" data-pct="-30">−30 %</button>` : ""}${e.accion === "apagar" ? `<button class="btn chico pri" data-apagar-c="${esc(e.id)}">Apagar</button>` : ""}</div></article>`).join("") || `<p class="vacio">No hay campañas nuevas de escala en los últimos 4 días.</p>`}</div>`;
 }
-const ICONO_P = { a_subir: "🟢", b_bajo: "🔴", b_nota: "📊", c_bajar: "🟠", c_apagar: "⛔", d_mala: "🟠", e_recuperar: "🔁", f_minimos: "⚖️", g_subir: "🆕", g_bajar: "🆕", g_apagar: "🆕", h_cuenta: "🪫" };
+const ICONO_P = { a_subir: "🟢", b_bajo: "🔴", b_nota: "📊", c_bajar: "🟠", c_apagar: "⛔", d_mala: "🟠", e_recuperar: "🔁", f_minimos: "⚖️", g_subir: "🆕", g_bajar: "🆕", g_apagar: "🆕", h_cuenta: "🪫", t_tiron: "👂" };
+// Botón principal de cada tipo de propuesta (lo que hace el SÍ)
+function siDe(p) {
+  const a = p.a != null ? usd2(p.a) : "";
+  return ({ a_subir: `Sí, subir a ${a}`, e_recuperar: `Sí, subir a ${a}`, g_subir: `Sí, subir a ${a}`, t_tiron: `Sí, bajar a ${a}`, c_bajar: `Sí, bajar a ${a}`, g_bajar: `Sí, bajar a ${a}`,
+    d_mala: `Sí, bajar a ${a} y limpiar`, b_bajo: `Sí, volver a ${a} + 🧱`, c_apagar: "Sí, apagar", g_apagar: "Sí, apagar", f_minimos: "Sí, sacar mínimos de 3+ días", h_cuenta: "Entendido" })[p.tipo]
+    ?? (p.tipo === "b_nota" ? (p.a != null ? `Sí, volver a ${a} + 🧱` : "Entendido") : "Sí");
+}
+function decidir(p, decision, solo) {
+  const titulo = decision === "no" ? "¿Descartar la propuesta?" : `¿${solo === "bajar" ? `Solo bajar a ${usd2(p.a)}` : solo === "apagar" ? "Solo apagar los anuncios malos" : siDe(p).replace(/^Sí, /, "")}?`;
+  const movida = p.ahora && p.de != null && Math.abs(p.ahora.presupuesto - Number(p.de)) > Math.max(1, p.de * 0.01);
+  const m = R.ctx.abrirModal(`<h3>${esc(titulo)}</h3><p><b>${esc(p.nombre || "")}</b>${p.ahora?.cuenta ? ` · ${esc(p.ahora.cuenta)}` : ""}</p><p class="mut">${esc(p.motivo || "")}</p>
+    ${movida && decision === "si" ? `<p class="techo-aviso">Ojo: la propuesta era desde ${usd2(p.de)} y el Dashboard la muestra en ${usd2(p.ahora.presupuesto)}. Antes de aplicar se relee Meta: si alguien la movió, no se aplica.</p>` : ""}
+    <label class="w-lbl" for="rp-dm">Motivo (va al historial y al grupo con Franco)</label><input class="campo" id="rp-dm" maxlength="300" placeholder="${decision === "no" ? "ej. espero a la noche" : "ej. de acuerdo"}" data-foco>
+    <div class="botones"><button class="btn" data-x>Cancelar</button><button class="btn ${decision === "no" ? "" : "pri"}" data-ok>${decision === "no" ? "Sí, descartar" : "Sí, aplicar"}</button></div>`);
+  let enviando = false;
+  $("[data-x]", m.dlg).onclick = m.cerrar;
+  $("[data-ok]", m.dlg).onclick = async (e) => {
+    if (enviando) return; enviando = true; const b = e.currentTarget; b.classList.add("cargando"); b.innerHTML = `<span class="gira">↻</span> ${decision === "no" ? "Guardando…" : "Aplicando en Meta…"}`;
+    try {
+      const r = await api("accion=decidir", { id: p.id, decision, solo, motivo: $("#rp-dm", m.dlg).value });
+      toast(decision === "no" ? "Descartada." : `✓ ${esc(r.pasos.join(" · "))}`, "ok", 9000); m.cerrar();
+      if (decision === "si") R.ctx.recargarTechos?.(); await cargar(true);
+    } catch (err) { enviando = false; b.classList.remove("cargando"); b.textContent = "Reintentar"; toast(`No se aplicó: ${esc(err.message)}`, "error", 10000); }
+  };
+}
 function tabBot(d) {
-  return `<p class="rp-alerta rp-alerta-g">🧪 <b>Modo simulacro.</b> El bot corre en el servidor cada 30 min: sigue los surfeos y arma estas propuestas tal como te van a llegar por WhatsApp. Todavía no manda WhatsApp ni toca Meta. Compará lo que propone con lo que hicieron ustedes.</p>
-    <div class="rp-lista">${(d.propuestas || []).map((p) => `<article class="rp-card"><div class="rp-cab">${ICONO_P[p.tipo] || "•"} <b>${esc(p.nombre || "")}</b><time class="mut">${fecha(p.creada)}</time>${chip(p.estado)}</div>
-      <pre class="rp-wa">${esc(p.texto).replace(/\*([^*\n]+)\*/g, "<b>$1</b>")}</pre><p class="mut">${esc(p.motivo || "")}</p></article>`).join("") || `<p class="vacio">Todavía no hay propuestas. Salen en los horarios configurados (y los avisos de surfeo, en el momento).</p>`}</div>`;
+  const ps = d.propuestas || [], abiertas = ps.filter((p) => p.estado === "abierta" && !p.vencida), vencidas = ps.filter((p) => p.vencida), hechas = ps.filter((p) => ["aplicada", "no"].includes(p.estado));
+  const tarjeta = (p, acc) => `<article class="rp-card ${acc ? "" : "rp-card-apagada"}"><div class="rp-cab">${ICONO_P[p.tipo] || "•"} <b>${esc(p.nombre || "")}</b>${p.ahora?.cuenta ? `<span class="mut">${esc(p.ahora.cuenta)}</span>` : ""}<time class="mut">${fecha(p.creada)}${acc && p.vence ? ` · vence ${fecha(p.vence).split(" ").pop()}` : ""}</time></div>
+    <pre class="rp-wa">${esc(p.texto).replace(/\*([^*\n]+)\*/g, "<b>$1</b>")}</pre>
+    ${acc ? `<div class="rp-acc"><button class="btn chico pri" data-si="${p.id}">${esc(siDe(p))}</button>${p.tipo === "d_mala" ? `<button class="btn chico" data-si="${p.id}" data-solo="bajar">Solo bajar</button><button class="btn chico" data-si="${p.id}" data-solo="apagar">Solo apagar anuncios</button><button class="btn chico" data-verlimp="${p.id}">Ver limpieza</button>` : ""}<button class="btn chico" data-no="${p.id}">No</button></div>` : ""}</article>`;
+  return `<p class="rp-ayuda">Lo que propone el bot según los umbrales de Configuración (manual de la CBO de Santi). <b>Nada se aplica sin tu SÍ.</b> Al aplicar, se relee Meta, se verifica y la decisión queda anotada con su motivo para Franco. Cuando esté conectado WhatsApp, te llegan las mismas propuestas y podés contestar <b>SI n</b> / <b>NO n</b>.</p>
+    ${abiertas.length ? `<p class="rp-alerta">🧭 ${abiertas.length} acción${abiertas.length === 1 ? "" : "es"} para decidir.</p>` : `<p class="vacio">No hay acciones abiertas. Salen en los horarios de Configuración; los avisos de surfeo, en el momento.</p>`}
+    <div class="rp-lista">${abiertas.map((p) => tarjeta(p, true)).join("")}</div>
+    ${hechas.length ? `<h3 class="rp-h3">Decisiones (3 días)</h3><div class="rp-lista">${hechas.map((p) => `<article class="rp-card ${p.estado === "aplicada" ? "rp-card-v" : ""}"><div class="rp-cab">${ICONO_P[p.tipo] || "•"} <b>${esc(p.nombre || "")}</b>${chip(p.estado === "aplicada" ? "✓ aplicada" : "✗ no", p.estado === "aplicada" ? "rp-chip-v" : "rp-chip-g")}<time class="mut">${fecha(p.resuelta)}</time></div>
+      <p>${esc(p.quien || "")}${p.resultado?.pasos?.length ? ` · ${esc(p.resultado.pasos.join(" · "))}` : ""}</p>${p.decision_motivo ? `<p class="rp-motivo">«${esc(p.decision_motivo)}»</p>` : ""}${p.grupo_enviado ? `<p class="mut">Mandado al grupo con Franco ${fecha(p.grupo_enviado)}</p>` : ""}</article>`).join("")}</div>` : ""}
+    ${vencidas.length ? `<details class="rp-venc"><summary>${vencidas.length} vencidas sin respuesta</summary><div class="rp-lista">${vencidas.map((p) => tarjeta(p, false)).join("")}</div></details>` : ""}`;
 }
 function tabConfig(d) {
   const grupos = []; for (const x of d.esquema) { let g = grupos.find((y) => y.g === x.g); if (!g) grupos.push(g = { g: x.g, xs: [] }); g.xs.push(x); }
@@ -297,6 +329,10 @@ function enlazar() {
   const C = (id) => (d.campanas || []).find((c) => c.id === id);
   $$("[data-limp]", r).forEach((b) => b.onclick = () => abrirLimpieza(C(b.dataset.limp)));
   $$("[data-surf]", r).forEach((b) => b.onclick = () => surfearYAnotar(C(b.dataset.surf)));
+  const P = (id) => (d.propuestas || []).find((p) => String(p.id) === String(id));
+  $$("[data-si]", r).forEach((b) => b.onclick = () => decidir(P(b.dataset.si), "si", b.dataset.solo));
+  $$("[data-no]", r).forEach((b) => b.onclick = () => decidir(P(b.dataset.no), "no"));
+  $$("[data-verlimp]", r).forEach((b) => b.onclick = () => { const p = P(b.dataset.verlimp); abrirLimpieza({ id: p.campana_id, act: p.act, nombre: p.nombre, cuenta: p.ahora?.cuenta, cbo: p.ahora?.cbo, presupuesto: p.ahora?.presupuesto ?? p.de }); });
   const E = (id) => (d.escala || []).find((e) => e.id === id);
   $$("[data-esc]", r).forEach((b) => b.onclick = () => cambiarPres(E(b.dataset.esc), Number(b.dataset.pct)));
   $$("[data-apagar-c]", r).forEach((b) => b.onclick = () => apagarCampana(E(b.dataset.apagarC)));
