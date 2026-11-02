@@ -3336,7 +3336,7 @@ function cargarCazador() {
   if (cazCarga) return cazCarga;
   const css = new Promise((ok) => {
     if ($('link[href^="buscador.css"]')) return ok();
-    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "buscador.css?v=5";
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "buscador.css?v=6";
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
@@ -3375,7 +3375,7 @@ function cargarAtc() {
   if (atcCarga) return atcCarga;
   const css = new Promise((ok) => {
     if ($('link[href^="atc.css"]')) return ok();
-    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "atc.css?v=2";
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "atc.css?v=3";
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
@@ -3414,7 +3414,7 @@ function cargarReportes() {
   if (rpCarga) return rpCarga;
   const css = new Promise((ok) => {
     if ($('link[href^="reportes.css"]')) return ok();
-    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "reportes.css?v=2";
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "reportes.css?v=3";
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
@@ -3486,7 +3486,7 @@ function cargarCreativos() {
   if (crCarga) return crCarga;
   const css = new Promise((ok) => {
     if ($('link[href^="creativos.css"]')) return ok();
-    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "creativos.css?v=8";
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "creativos.css?v=9";
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
@@ -3562,7 +3562,7 @@ function cargarWorkspace() {
   if (wsCarga) return wsCarga;
   const css = new Promise((ok) => {
     if ($('link[href^="workspace.css"]')) return ok();
-    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "workspace.css?v=1";
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "workspace.css?v=2";
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {

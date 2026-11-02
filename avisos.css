@@ -3,7 +3,7 @@
 .av-btn .av-n { position: absolute; top: -7px; right: -7px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 99px; background: var(--peligro); color: #fff; font-size: 11px; font-weight: 700; line-height: 20px; text-align: center; border: 2px solid var(--papel); }
 .av-btn.hay svg { animation: av-tiembla 2.4s ease-in-out infinite; transform-origin: 50% 20%; }
 @keyframes av-tiembla { 0%, 86%, 100% { transform: rotate(0); } 89% { transform: rotate(14deg); } 92% { transform: rotate(-12deg); } 95% { transform: rotate(6deg); } }
-.av-panel { position: absolute; right: 0; top: calc(100% + 10px); width: min(380px, calc(100vw - 24px)); max-height: min(70vh, 560px); display: flex; flex-direction: column; background: var(--tarjeta); color: var(--tinta); border: 2px solid var(--tinta); border-radius: 12px; box-shadow: 4px 4px 0 var(--sombra); z-index: 60; overflow: hidden; }
+.av-panel { position: absolute; right: 0; top: calc(100% + 10px); width: min(380px, calc(100vw - 24px)); max-height: min(70vh, 560px); display: flex; flex-direction: column; background: var(--tarjeta); -webkit-backdrop-filter: var(--g-blur); backdrop-filter: var(--g-blur); color: var(--tinta); border: 1px solid var(--g-borde); border-radius: 12px; box-shadow: var(--g-sombra); z-index: 60; overflow: hidden; }
 .av-cab { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--linea); font-family: var(--f-titulo); }
 .av-link { background: none; border: 0; color: var(--acento); font: inherit; font-size: 13px; cursor: pointer; text-decoration: underline; }
 .av-items { overflow-y: auto; }
@@ -16,7 +16,7 @@
 .av-txt small { color: var(--mut); font-size: 12px; }
 .av-item.t-saldo .av-txt b, .av-item.t-error .av-txt b { color: var(--peligro); }
 .av-acc, .av-pop-acc { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-.av-b { background: var(--papel-2); color: var(--tinta); border: 1.5px solid var(--tinta); border-radius: 8px; padding: 6px 10px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.av-b { background: var(--papel-2); color: var(--tinta); border: 1px solid var(--g-borde); border-radius: 8px; padding: 6px 10px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .av-b.ok { background: var(--ok); color: #fff; border-color: var(--ok); }
 .av-b.tenue { border-color: var(--linea); color: var(--mut); background: transparent; }
 .av-b:disabled { opacity: .6; cursor: default; }

@@ -1,21 +1,21 @@
 /* ATC — atención al cliente (27/10). Usa las variables de styles.css: anda en claro y oscuro. */
 .atc { display: grid; gap: 16px; padding-bottom: 40px; }
 .atc-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
-.atc-aviso { margin: 0; padding: 10px 14px; border: 2px solid var(--tinta); border-radius: var(--r-card, 10px); background: var(--r-ama-bg); color: var(--r-ama-tx); font-weight: 600; }
+.atc-aviso { margin: 0; padding: 10px 14px; border: 1px solid var(--g-borde); border-radius: var(--r-card, 10px); background: var(--r-ama-bg); color: var(--r-ama-tx); font-weight: 600; }
 .atc-mut { color: var(--mut); font-size: 13.5px; }
 
 .atc-ofertas .segs { flex-wrap: nowrap; overflow-x: auto; padding: 2px 2px 6px; scrollbar-width: thin; }
 .atc-ofertas .seg { flex: 0 0 auto; }
 .atc-ofertas .seg span { min-height: 32px; font-size: 13.5px; padding: 4px 10px; }
 .atc-tabs { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 6px; scrollbar-width: thin; }
-.atc-tab { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 6px 16px; border: 2px solid var(--tinta); border-radius: var(--r-btn); background: var(--tarjeta); color: var(--tinta); box-shadow: 3px 3px 0 var(--sombra); font: 700 15.5px var(--f-titulo); cursor: pointer; }
+.atc-tab { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 6px 16px; border: 1px solid var(--g-borde); border-radius: var(--r-btn); background: var(--tarjeta); -webkit-backdrop-filter: var(--g-blur); backdrop-filter: var(--g-blur); color: var(--tinta); box-shadow: var(--g-sombra); font: 700 15.5px var(--f-titulo); cursor: pointer; }
 .atc-tab:hover { background: var(--papel-2); }
-.atc-tab[aria-selected="true"] { background: var(--tinta); color: var(--papel); transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--sombra); }
+.atc-tab[aria-selected="true"] { background: var(--tinta); color: var(--papel);  box-shadow: var(--g-sombra); }
 .atc-tab:focus-visible { outline: 3px solid var(--foco); outline-offset: 2px; }
 .atc-badge { min-width: 22px; padding: 1px 7px; border-radius: 999px; background: var(--peligro); color: #fff; font-size: 12.5px; line-height: 18px; text-align: center; }
 
 .atc-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
-.atc-tile { display: grid; gap: 2px; padding: 12px 14px; border: 2px solid var(--tinta); border-radius: var(--r-card, 10px); background: var(--tarjeta); box-shadow: 3px 3px 0 var(--sombra); }
+.atc-tile { display: grid; gap: 2px; padding: 12px 14px; border: 1px solid var(--g-borde); border-radius: var(--r-card, 10px); background: var(--tarjeta); -webkit-backdrop-filter: var(--g-blur); backdrop-filter: var(--g-blur); box-shadow: var(--g-sombra); }
 .atc-tile b { font: 700 26px var(--f-titulo); font-variant-numeric: tabular-nums; }
 .atc-tile b.chico { font-size: 16px; }
 .atc-tile span { color: var(--mut); font-size: 13.5px; }
@@ -24,13 +24,13 @@
 .atc-tile.alerta { background: var(--r-rojo-bg); color: var(--r-rojo-tx); }
 .atc-tile.bot span, .atc-tile.tomi span, .atc-tile.alerta span { color: inherit; opacity: .85; }
 
-.atc-rep { padding: 14px 16px; border: 2px solid var(--tinta); border-radius: var(--r-card, 10px); background: var(--papel-2); }
+.atc-rep { padding: 14px 16px; border: 1px solid var(--g-borde); border-radius: var(--r-card, 10px); background: var(--papel-2); }
 .atc-rep h3 { margin: 0 0 6px; font: 700 16px var(--f-titulo); }
 .atc-rep ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
 .atc-rep li { font-size: 14.5px; line-height: 1.4; }
 
 .atc-lista { display: grid; gap: 12px; }
-.atc-item { display: grid; gap: 8px; padding: 12px 14px; border: 2px solid var(--tinta); border-radius: var(--r-card, 10px); background: var(--tarjeta); box-shadow: 3px 3px 0 var(--sombra); min-width: 0; }
+.atc-item { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--g-borde); border-radius: var(--r-card, 10px); background: var(--tarjeta); -webkit-backdrop-filter: var(--g-blur); backdrop-filter: var(--g-blur); box-shadow: var(--g-sombra); min-width: 0; }
 .atc-cab { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .atc-cab time { margin-left: auto; }
 .atc-quien { padding: 2px 9px; border-radius: 999px; font-size: 12.5px; font-weight: 700; border: 1.5px solid currentColor; }
@@ -55,11 +55,11 @@
 .atc-mas { display: flex; justify-content: center; }
 
 .atc-modal-fondo { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 16px; background: rgba(0, 0, 0, .45); }
-.atc-modal { width: min(640px, 100%); max-height: min(86vh, 900px); display: grid; grid-template-rows: auto 1fr; border: 2px solid var(--tinta); border-radius: 12px; background: var(--papel); box-shadow: 5px 5px 0 var(--sombra); overflow: hidden; }
-.atc-modal header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border-bottom: 2px solid var(--tinta); }
+.atc-modal { width: min(640px, 100%); max-height: min(86vh, 900px); display: grid; grid-template-rows: auto 1fr; border: 1px solid var(--g-borde); border-radius: 12px; background: var(--papel); box-shadow: var(--g-sombra); overflow: hidden; }
+.atc-modal header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--g-borde); }
 .atc-modal-cuerpo { overflow-y: auto; padding: 14px; display: grid; gap: 10px; align-content: start; }
 .atc-chat { display: grid; gap: 8px; }
-.atc-burbuja { max-width: 85%; padding: 8px 12px; border: 2px solid var(--tinta); border-radius: 12px; background: var(--tarjeta); }
+.atc-burbuja { max-width: 85%; padding: 8px 12px; border: 1px solid var(--g-borde); border-radius: 12px; background: var(--tarjeta); -webkit-backdrop-filter: var(--g-blur); backdrop-filter: var(--g-blur); }
 .atc-burbuja.pagina { justify-self: end; background: var(--r-ver-bg); color: var(--r-ver-tx); }
 .atc-burbuja.pagina .atc-mut { color: inherit; opacity: .8; }
 .atc-burbuja p { margin: 3px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14.5px; }
