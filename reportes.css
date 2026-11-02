@@ -263,3 +263,6 @@
   .rp-selbar > b { flex: 1 1 100%; }
   .rp-selbar .btn { flex: 1 1 auto; }
 }
+.rp-ahora { font-size: 12px; color: var(--ambar); white-space: nowrap; } .rp-ahora b { font-size: 12.5px; letter-spacing: 0; color: var(--ambar); }
+.rp-desp { margin-top: 2px; font-size: 11px; } .rp-desp b { font-size: 12.5px; letter-spacing: 0; }
+.rp-reloj { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
