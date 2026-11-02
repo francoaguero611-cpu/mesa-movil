@@ -571,10 +571,13 @@ async function cargarUltimos(forzar = false) {
   pintarTabla();
 }
 function ultimaCelda(x, nivel) {
-  const d = ULT.data || {}; if (!ULT.data && !ULT.local[x.id] && !ULT.local["camp:" + x.id]) return ULT.st === "cargando" ? `<span class="mut">…</span>` : "—";
-  let e = masNuevo(d.ult?.[x.id], ULT.local[x.id]), dentro = false;
-  if (nivel === "campana") { const c = masNuevo(d.camp?.[x.id], ULT.local["camp:" + x.id]); if (c && (!e || Date.parse(c.t) > Date.parse(e.t))) { e = c; dentro = true; } }
-  if (!e) return `<span class="mut">—</span>`;
+  // (02/11, Lorenzo) solo cambios de PRESUPUESTO: cuándo y de cuánto a cuánto
+  const esPres = (e) => e && /budget|presupuesto/i.test((e.tipo || "") + " " + (e.que || ""));
+  const d = ULT.data || {}, loc = esPres(ULT.local[x.id]) ? ULT.local[x.id] : null;
+  let e = masNuevo(esPres(d.ult?.[x.id]) ? d.ult[x.id] : null, loc), dentro = false;
+  const p = nivel === "campana" ? DI.pres?.[String(x.id)] : null;
+  if (p) { const ep = { t: p.t, tipo: "budget", que: "Presupuesto", antes: p.de, despues: p.a, quien: p.quien, nivel: "campana" }; if (!e || Date.parse(ep.t) > Date.parse(e.t)) e = ep; }
+  if (!e) return ULT.st === "cargando" && !DI.ok ? `<span class="mut">…</span>` : `<span class="mut">—</span>`;
   const num = (v) => { const n = Number(v); return v != null && v !== "" && isFinite(n) ? NF2.format(n) : v; };
   let que;
   if (/budget|presupuesto/i.test(e.tipo + " " + e.que)) que = e.antes != null && e.despues != null ? `Presupuesto ${num(e.antes)} → ${num(e.despues)}` : "Presupuesto";
@@ -1102,12 +1105,12 @@ const porVisita = (x) => !x.visitas ? "—" : `${usdG(nulo(x.facturacion) ? null
 // [clave, título, formato(x) -> html, clase extra(x)]
 // (25/10, Lorenzo) sin ROI; orden fijo de métricas. Las que no pidió quedan ocultas de arranque (se prenden en «Columnas»).
 const COLS = [
-  ["ultima", "Última modificación", (x, nivel) => nivel ? ultimaCelda(x, nivel) : ""], // (24/10 b, Lorenzo)
   ["estado", "Estado", (x, nivel) => nivel ? estadoTxt(x) : ""],          // (24/10, Lorenzo)
+  ["ultima", "Última modificación", (x, nivel) => nivel ? ultimaCelda(x, nivel) : ""], // (02/11) solo presupuesto, justo antes de Presupuesto
   // (29/10, Lorenzo) columna «Acciones» sacada
   ["presupuesto", "Presupuesto", (x, nivel) => nivel === "campana" && x.tipo_presupuesto === "ABO" ? `<span class="chip-tp" title="Presupuesto por conjunto: abrí la campaña para verlo y cambiarlo">Presupuesto ABO</span>` : `${usdG(x.presupuesto)}${x.tipo_presupuesto ? ` <span class="chip-tp">${esc(x.tipo_presupuesto)}</span>` : ""}${editaPres(x, nivel) ? ` <button type="button" class="lapiz" data-pres="${esc(nivel + ":" + x.id)}" aria-label="Cambiar presupuesto de ${esc(x.nombre)}" title="Cambiar presupuesto"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z M14 6l4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg></button>` : ""}`], // (26/10, Lorenzo) antes de Ventas
   ["ventas", "Ventas", (x) => entN(x.ventas)],
-  ["roas", "ROAS", (x) => chipRoas(x.roas)],
+  ["roas", "ROAS", (x, nivel) => chipRoas(x.roas) + (nivel === "campana" ? flechaRoas(x) : "")],
   ["margen", "Margen %", (x) => pctN(x.margen), (x) => signo(x.margen ?? x.ganancia)],
   ["ganancia", "Ganancia / pérdida", (x) => usdG(x.ganancia), (x) => signo(x.ganancia)],
   ["ticket_promedio", "AOV", (x) => usdG(aovDe(x))],
@@ -1775,13 +1778,15 @@ function modificarPresupuesto() {
     $("[data-sig]", m.dlg).onclick = () => listo() && its.length && paso2();
   };
   const paso2 = () => {
-    m.set(`<h3>¿Seguro que querés ${verbo()}?</h3>${lista()}${avisoTecho(its, modo)}${modoTx}
+    const puedeTecho = its.some((i) => i.nivel === "campana") && (modo === "bajar" || (modo === "fijo" && its.every((i) => fijo < (i.ref.presupuesto ?? 0))));
+    m.set(`<h3>¿Seguro que querés ${verbo()}?</h3>${lista()}${avisoTecho(its, modo)}${puedeTecho ? casillaTecho("pres-techo") : ""}${modoTx}
       <div class="botones"><button class="btn" data-atras>Atrás</button><button class="btn pri" data-ok data-foco>Sí, ${modo === "fijo" ? `poner ${montoTx(fijo)}` : `${modo === "bajar" ? "bajar −" : "subir +"}${pct} %`}</button></div>`);
     $("[data-atras]", m.dlg).onclick = paso1;
     $("[data-ok]", m.dlg).onclick = async (e) => {
       enviando = true;
       const b = e.currentTarget; b.classList.add("cargando"); b.innerHTML = `<span class="gira">↻</span> Guardando…`;
-      await aplicarPresupuesto(modo === "fijo" ? { items: its.map((i) => ({ ...i, monto: fijo })), lote: true } : { pct: modo === "bajar" ? -pct : pct, items: its });
+      const techo = !!$("#pres-techo", m.dlg)?.checked;
+      await aplicarPresupuesto(modo === "fijo" ? { items: its.map((i) => ({ ...i, monto: fijo })), lote: true, techo } : { pct: modo === "bajar" ? -pct : pct, items: its, techo });
       enviando = false; m.cerrar();
     };
   };
@@ -1793,23 +1798,24 @@ function editarPresupuesto(it) {
   const m = abrirModal(`<h3>Presupuesto diario</h3><p class="mut">${NIVEL[it.nivel][0]} · ${esc(it.nombre)}</p>
     <label class="w-lbl" for="pres-ed">Nuevo presupuesto (hoy ${montoTx(r.presupuesto)})</label>
     <input class="campo num" id="pres-ed" inputmode="decimal" autocomplete="off" value="${esc(NF2.format(r.presupuesto ?? 0))}" data-foco>
-    <p class="mut" id="pres-queda"></p>${avisoTecho([it], "fijo")}
+    <p class="mut" id="pres-queda"></p>${avisoTecho([it], "fijo")}${it.nivel === "campana" ? `<div id="pres-ed-techo" hidden>${casillaTecho("pres-techo1")}</div>` : ""}
     ${DEMO ? `<p class="mut">Demo: se simula en el navegador, no toca Meta.</p>` : dryOn() ? `<p class="mut"><b>Modo prueba:</b> Meta no se toca.</p>` : ""}
     <div class="botones"><button class="btn" data-x>Cancelar</button><button class="btn pri" data-ok>Guardar</button></div>`, { bloqueado: () => enviando });
   const inp = $("#pres-ed", m.dlg), ok = $("[data-ok]", m.dlg), queda = $("#pres-queda", m.dlg);
   const valor = () => { const v = parseFloat(inp.value.replace(/\./g, "").replace(",", ".")); return v >= 1 ? a55(v) : null; };
-  const pinta = () => { const v = valor(); queda.innerHTML = v ? `Queda en <b>${montoTx(v)}</b> (siempre termina en ,55)` : `<span class="neg">Poné un monto válido (ej. 45,55)</span>`; ok.disabled = !v; ok.textContent = v ? `Guardar ${montoTx(v)}` : "Guardar"; };
+  const pinta = () => { const v = valor(); queda.innerHTML = v ? `Queda en <b>${montoTx(v)}</b> (siempre termina en ,55)` : `<span class="neg">Poné un monto válido (ej. 45,55)</span>`; ok.disabled = !v; ok.textContent = v ? `Guardar ${montoTx(v)}` : "Guardar";
+    const ct = $("#pres-ed-techo", m.dlg); if (ct) ct.hidden = !(v && v < (r.presupuesto ?? 0)); };
   inp.oninput = pinta; pinta(); inp.select();
   inp.onkeydown = (e) => { if (e.key === "Enter" && valor()) ok.click(); };
   $("[data-x]", m.dlg).onclick = m.cerrar;
   ok.onclick = async () => {
     const v = valor(); if (!v) return;
     enviando = true; ok.classList.add("cargando"); ok.innerHTML = `<span class="gira">↻</span> Guardando…`;
-    await aplicarPresupuesto({ items: [{ ...it, monto: v }] });
+    await aplicarPresupuesto({ items: [{ ...it, monto: v }], techo: !!$("#pres-techo1", m.dlg)?.checked && !$("#pres-ed-techo", m.dlg)?.hidden });
     enviando = false; m.cerrar();
   };
 }
-async function aplicarPresupuesto({ pct = null, items, lote = false }) {
+async function aplicarPresupuesto({ pct = null, items, lote = false, techo = false }) {
   try {
     const r = await api("presupuesto", { body: { ...(pct ? { pct } : {}), items: items.map(({ id, act, nivel, nombre, monto }) => ({ id, act, nivel, nombre, ...(monto ? { monto } : {}) })) }, escritura: true });
     const res = r.resultados || [], ok = res.filter((x) => x.ok), mal = res.filter((x) => !x.ok);
@@ -1825,6 +1831,8 @@ async function aplicarPresupuesto({ pct = null, items, lote = false }) {
         marcarUltimo(it, { tipo: "budget", que: "presupuesto", antes, despues });
       }
       if (ok.length) refrescarUltimosLuego();
+      if (techo && ok.length) await marcarTechos(ok);
+      if (ok.length) setTimeout(() => cargarTechos(true), 1500);
       const okTx = ok.length ? `✓ Presupuesto ${pct ? `${pct > 0 ? "+" : "−"}${Math.abs(pct)} %` : "cambiado"} en ${ok.length}: ${esc(ok.map((x) => `${x.nombre} ${det(x)}`).join(" · "))}.` : "";
       if (mal.length) avisoFallos({ okTx, mal, items, que: pct > 0 ? "No se surfearon" : "No se cambiaron" });
       else toast(okTx, "ok", 9000);
@@ -3437,11 +3445,11 @@ function cargarReportes() {
   if (rpCarga) return rpCarga;
   const css = new Promise((ok) => {
     if ($('link[href^="reportes.css"]')) return ok();
-    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "reportes.css?v=9";
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "reportes.css?v=10";
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "reportes.js?v=8";
+    const sc = document.createElement("script"); sc.src = "reportes.js?v=9";
     sc.onload = () => window.Reportes ? ok() : mal(new Error("Reportes no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar Reportes. ¿Hay conexión?")); };
     document.head.appendChild(sc);
@@ -3482,24 +3490,37 @@ async function montarReportes() {
   });
 }
 
-// ---------- techos marcados a mano (02/11): 🧱 al lado del nombre y aviso antes de subir ----------
 const TECHOS = new Map(); let techosT = 0;
+const DI = { pres: {}, ok: false }; // (02/11) último cambio de presupuesto de cada campaña y si el ROAS mejoró/empeoró desde ahí
 async function cargarTechos(forzar = false) {
-  if (DEMO || !clave() || (!forzar && Date.now() - techosT < 5 * 60e3)) return;
+  if (DEMO || !clave() || (!forzar && Date.now() - techosT < 3 * 60e3)) return;
   techosT = Date.now();
   try {
-    const r = await fetch("https://tppcpnfzcxxusdhrlmdx.supabase.co/functions/v1/reportes?accion=techos", { headers: { "x-app-clave": clave() }, cache: "no-store" });
+    const r = await fetch("https://tppcpnfzcxxusdhrlmdx.supabase.co/functions/v1/reportes?accion=dash_info", { headers: { "x-app-clave": clave() }, cache: "no-store" });
     if (!r.ok) return;
     const j = await r.json(); TECHOS.clear(); for (const t of j.techos || []) TECHOS.set(String(t.campana_id), t);
+    DI.pres = j.pres || {}; DI.ok = true;
     if (S.vista === "dash" && $("#carr")) pintarTabla();
-  } catch { /* sin techos no se frena nada */ }
+  } catch { /* sin estos datos no se frena nada */ }
 }
-const tagTecho = (x) => { const t = TECHOS.get(String(x.id)); return t ? `<span class="techo-tag" title="Techo marcado${t.quien ? " por " + esc(t.quien) : ""}: no surfear arriba de ${esc(montoTx(Number(t.monto)))}${t.motivo ? " · " + esc(t.motivo) : ""}">🧱 ${esc(montoTx(Number(t.monto)))}</span>` : ""; };
+// flechita al lado del ROAS: ↑ verde si mejoró desde el último cambio de presupuesto, ↓ roja si empeoró
+function flechaRoas(x) {
+  const p = DI.pres?.[String(x.id)]; if (!p || !["mejoro", "empeoro"].includes(p.tend)) return "";
+  const t = `Desde el último cambio de presupuesto (${haceTx(p.t)}: ${montoTx(p.de)} → ${montoTx(p.a)}): ROAS ${p.base != null ? NF2.format(p.base) : "—"} → ${p.despues != null ? NF2.format(p.despues) : "—"}`;
+  return p.tend === "mejoro" ? `<span class="flecha-roas sube" title="${esc(t)}">↑</span>` : `<span class="flecha-roas baja" title="${esc(t)}">↓</span>`;
+}
+const tagTecho = (x) => { const t = TECHOS.get(String(x.id)); return t ? `<span class="techo-tag" title="Techo marcado${t.quien ? " por " + esc(t.quien) : ""}: no subir arriba de ${esc(montoTx(Number(t.monto)))}${t.motivo ? " · " + esc(t.motivo) : ""}">Techo ${esc(montoTx(Number(t.monto)))}</span>` : ""; };
 function avisoTecho(its, modo) {
   if (modo === "bajar") return "";
   const xs = its.filter((i) => i.nivel === "campana" && TECHOS.has(String(i.id)));
   if (!xs.length) return "";
-  return `<p class="techo-aviso" role="alert">🧱 ${xs.map((i) => `<b>${esc(i.nombre)}</b> tiene techo en ${esc(montoTx(Number(TECHOS.get(String(i.id)).monto)))}`).join(" · ")}. Ya se probó subirla y no rindió: ¿seguro?</p>`;
+  return `<p class="techo-aviso" role="alert">${xs.map((i) => `<b>${esc(i.nombre)}</b> tiene techo en ${esc(montoTx(Number(TECHOS.get(String(i.id)).monto)))}`).join(" · ")}. Ya se probó subirla y no rindió: ¿seguro?</p>`;
+}
+const casillaTecho = (id) => `<label class="techo-casilla"><input type="checkbox" id="${id}"> <span>Marcar <b>techo</b> en el monto nuevo <small class="mut">(no se propone subirla por 7 días)</small></span></label>`;
+async function marcarTechos(oks) { // oks: resultados de app-movil «presupuesto» que salieron bien
+  for (const x of oks) { if (x.nivel && x.nivel !== "campana") continue;
+    try { await fetch("https://tppcpnfzcxxusdhrlmdx.supabase.co/functions/v1/reportes?accion=techo", { method: "POST", headers: { "x-app-clave": clave(), "content-type": "application/json" }, body: JSON.stringify({ id: x.id, nombre: x.nombre, monto: x.despues, motivo: `bajado ${montoTx(x.antes)} → ${montoTx(x.despues)}` }) }); } catch { /* sigue */ } }
+  cargarTechos(true);
 }
 
 // ---------- Creativos (12/10): creativos.js se carga la primera vez. Backend: app-movil/creativos.ts ----------

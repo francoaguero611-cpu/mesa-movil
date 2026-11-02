@@ -437,3 +437,11 @@ html .techo-aviso { border: 1px solid rgba(255,201,100,.4); border-radius: 16px;
   .umb-lista { grid-template-columns: 1fr !important; row-gap: 4px; }
   .umb-pista { --reserva: 110px; }
 }
+
+/* (02/11) Dashboard: flechita del ROAS desde el último cambio de presupuesto + casilla de techo al bajar */
+.flecha-roas { display: inline-grid; place-items: center; width: 20px; height: 20px; margin-left: 5px; border-radius: 50%; font-size: 13px; font-weight: 800; vertical-align: middle; cursor: help; }
+.flecha-roas.sube { color: #04241a; background: var(--pos); box-shadow: 0 0 10px rgba(111,242,200,.6); }
+.flecha-roas.baja { color: #2a0509; background: var(--rojo); box-shadow: 0 0 10px rgba(255,122,133,.6); }
+.techo-casilla { display: flex; gap: 10px; align-items: flex-start; margin: 12px 0 4px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--g-borde); background: rgba(0,8,20,.25); cursor: pointer; font-size: 14px; }
+.techo-casilla input { width: 18px; height: 18px; margin-top: 1px; accent-color: var(--celeste); }
+.ult-mod { display: grid; gap: 1px; } .ult-que { font-size: 12.5px; } .ult-cuando { font-size: 11px; color: var(--mut); }

@@ -1,447 +1,188 @@
-/* Reportes — sección del Dashboard desde el 02/11 (Lorenzo). Control de las consecuencias de lo que hacemos:
-   Surfeos (cada cambio de presupuesto con su antes / 3 h / 24 h / 48 h y botón de techo) · Campañas (las que vienen mal, hora contra
-   hora, con limpieza de anuncios) · Cuentas · Gastos (Meta contra Whop) · Mínimos · Escala (cuentas nuevas) · Bot (propuestas del
-   simulacro) · Configuración (todos los umbrales, editables).
-   Nada toca Meta sin un toque y una confirmación: las acciones pasan por app-movil con las funciones del ctx que da app.js.
-   app.js lo carga la primera vez que se entra y lo monta con window.Reportes.montar(raiz, ctx).
-   Backend: Edge Function «reportes» (copia en Segundo-cerebro-business/scripts/supabase/reportes/index.ts). */
+/* Reportes v2 (02/11 noche, Lorenzo): UNA página, compacta, todo a la vista.
+   Tarjetas: Saldo de Whop a cargar · Limpiador de anuncios (Optimizar) · Rechazos (winners primero) · Winners nuevos y
+   envejeciendo · Cuentas nuevas. Cada tarjeta muestra lo importante y «Ver todo» abre la lista completa.
+   Lo de surfeos salió de acá: ahora vive en el Dashboard (columna «Última modificación» + flechita al lado del ROAS).
+   Nada toca Meta sin un toque y una confirmación (apagar anuncios pasa por app-movil con ctx.estado).
+   Backend: Edge Function «reportes» (scripts/supabase/reportes/index.ts) + cuentas-umbral (saldo y umbrales). */
 "use strict";
 (() => {
 const API = "https://tppcpnfzcxxusdhrlmdx.supabase.co/functions/v1/reportes";
+const API_UMB = "https://tppcpnfzcxxusdhrlmdx.supabase.co/functions/v1/cuentas-umbral";
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-const ls = {
-  get(k, d = null) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
-  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
-};
+const ls = { get(k, d = null) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const clave = () => ls.get("dash_clave", "");
 const NF0 = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }), NF2 = new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const usd = (n) => n == null || !Number.isFinite(Number(n)) ? "—" : "US$ " + NF0.format(Number(n));
-const usd2 = (n) => n == null || !Number.isFinite(Number(n)) ? "—" : NF2.format(Number(n));
 const ro = (n) => n == null ? "—" : NF2.format(Number(n));
-const a55 = (n) => Math.round((Math.floor(n) + 0.55) * 100) / 100;
-const fecha = (f) => { try { return new Date(f).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }); } catch { return ""; } };
-const hace = (f) => { const m = Math.round((Date.now() - Date.parse(f)) / 60e3); return m < 60 ? `hace ${m} min` : m < 48 * 60 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} días`; };
-
-const TABS = [
-  ["bot", "Acciones"], ["surfeos", "Surfeos"], ["campanas", "Campañas"], ["cuentas", "Cuentas"], ["gastos", "Gastos"],
-  ["minimos", "Mínimos"], ["escala", "Escala"], ["config", "Configuración"],
-];
-const TOC = (() => { try { return JSON.parse(localStorage.getItem("rp_tocado") || "{}"); } catch { return {}; } })(); // campaña → cuándo la tocaste desde acá
-const tocar = (id, tx = "") => { TOC[String(id)] = { ms: Date.now(), tx }; try { localStorage.setItem("rp_tocado", JSON.stringify(TOC)); } catch {} };
-const R = { raiz: null, ctx: {}, sel: new Set(), tab: ls.get("rp_tab", "bot"), datos: {}, filtro: ls.get("rp_filtro", "todos"), cfg: null, cargando: false };
+const rc = (r) => r == null ? "" : r >= 2 ? "rp-v" : r >= 1.22 ? "rp-a" : "rp-r";
+const corto = (n) => String(n || "").replace(/ Cuenta publicitaria( USD)?/i, "");
+const fch = (d) => d ? `${d.slice(8, 10)}/${d.slice(5, 7)}` : "";
+const R = { raiz: null, ctx: {}, d: {}, per: ls.get("rp_limp_per", "3d"), umb: null };
 
 async function api(q, body = null) {
   const r = await fetch(`${API}?${q}`, { method: body ? "POST" : "GET", headers: { "x-app-clave": clave(), "x-app-usuario": R.ctx.usuario?.() || "", ...(body ? { "content-type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined, cache: "no-store" }).catch(() => null);
-  if (!r) throw new Error("Sin conexión con el servidor");
+  if (!r) throw new Error("Sin conexión");
   if (r.status === 401) { R.ctx.login?.("Volvé a entrar para ver Reportes."); throw new Error("Clave incorrecta"); }
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok || j.error) throw new Error(j.error || `Error ${r.status}`);
-  return j;
+  const j = await r.json().catch(() => ({})); if (!r.ok || j.error) throw new Error(j.error || `Error ${r.status}`); return j;
 }
 const toast = (m, t = "ok", ms) => R.ctx.toast?.(m, t, ms);
+const met = (m) => `<span class="rp-m"><b class="${rc(m?.roas)}">${ro(m?.roas)}</b><small>${m?.v ?? 0} v · ${usd(m?.g)}</small></span>`;
+const links = (link, post) => `<span class="rp-lks">${link ? `<a href="${esc(link)}" target="_blank" rel="noopener" class="rp-lk" title="Abrir en el Administrador de anuncios">Ads</a>` : ""}${post ? `<a href="${esc(post)}" target="_blank" rel="noopener" class="rp-lk" title="Ver la publicación">Post</a>` : ""}</span>`;
+const card = (id, titulo, cuerpo, extraCab = "", pie = "") => `<section class="rp-card2" data-card="${id}"><header><h3>${titulo}</h3>${extraCab}</header>${cuerpo}${pie ? `<footer>${pie}</footer>` : ""}</section>`;
+const cargando = (t) => `<p class="vacio chico"><span class="cargador"></span>${t}</p>`;
 
-// ---------- piezas ----------
-const roasCls = (r, eq = 1.22) => r == null ? "" : r >= 2 ? "rp-v" : r >= eq ? "rp-a" : "rp-r";
-const chip = (txt, cls = "") => `<span class="rp-chip ${cls}">${txt}</span>`;
-const ESTADO_SURF = {
-  seguimiento: ["⏳ En seguimiento", ""], bajo: ["🔴 Bajo rendimiento", "rp-chip-r"], rindio: ["🟢 Rindió", "rp-chip-v"], empate: ["🟡 Empate", "rp-chip-a"],
-  techo: ["🔴 Techo", "rp-chip-r"], techo_marcado: ["🧱 Techo marcado", "rp-chip-g"], mejoro: ["🟢 Mejoró después de bajarla", "rp-chip-v"], sigue_mal: ["🔴 Sigue mal", "rp-chip-r"],
-};
-const VER = { bajo: "🔴 bajo", ok: "✓ bien", rindio: "🟢 rindió", empate: "🟡 empate", techo: "🔴 techo", mejoro: "🟢 mejoró", sigue_mal: "🔴 sigue mal", pocos: "poco gasto todavía" };
-function segs(opts, val, attr) { return `<div class="rp-segs" role="group">${opts.map(([k, t]) => `<button type="button" class="rp-seg" ${attr}="${esc(k)}" aria-pressed="${k === val}">${t}</button>`).join("")}</div>`; }
-function confirmar(titulo, cuerpo, si, accion) {
-  let enviando = false;
-  const m = R.ctx.abrirModal(`<h3>${titulo}</h3>${cuerpo}${R.ctx.demo ? `<p class="mut">Demo: no toca Meta.</p>` : R.ctx.prueba ? `<p class="mut"><b>Modo prueba:</b> Meta no se toca.</p>` : ""}
-    <div class="botones"><button class="btn" data-x>Cancelar</button><button class="btn pri" data-ok data-foco>${si}</button></div>`, { bloqueado: () => enviando });
-  $("[data-x]", m.dlg).onclick = m.cerrar;
-  $("[data-ok]", m.dlg).onclick = async (e) => {
-    enviando = true; const b = e.currentTarget; b.classList.add("cargando"); b.innerHTML = `<span class="gira">↻</span> Haciendo…`;
-    try { await accion(); } catch (err) { toast(`No se pudo: ${esc(err.message)}`, "error", 8000); }
-    enviando = false; m.cerrar();
-  };
-  return m;
+// ---------- tarjetas ----------
+function cardSaldo() {
+  const u = R.umb, T = "Saldo de Whop";
+  if (!u) return card("saldo", T, cargando("Leyendo…"));
+  if (u.__error) return card("saldo", T, `<p class="mut">No se pudo leer: ${esc(u.__error)}</p>`);
+  const w = u.whop || {}, saldo = Number(w.saldo || 0), xs = (u.cuentas || []).filter((c) => String(c.moneda || "USD").toUpperCase() === "USD" && c.umbral > 0 && c.gasto_dia > 0);
+  // cobros que Meta va a hacer en las próximas h horas: cada cuenta cobra un umbral cada vez que lo gastado sin cobrar lo alcanza
+  const cobros = (h) => xs.reduce((t, c) => t + Math.floor((Number(c.saldo || 0) + c.gasto_dia * h / 24) / c.umbral) * c.umbral, 0);
+  const H = [6, 12, 24].map((h) => ({ h, c: cobros(h), falta: Math.max(0, cobros(h) - saldo) }));
+  const f24 = H[2].falta, viejo = w.leido_en && Date.now() - Date.parse(w.leido_en) > 10 * 60e3;
+  const prox = xs.filter((c) => c.cobra_en_h != null).sort((a, b) => a.cobra_en_h - b.cobra_en_h).slice(0, 4);
+  return card("saldo", T, `
+    <div class="rp-grande ${f24 > 0 ? "mal" : "bien"}"><small>${f24 > 0 ? "Cargá para las próximas 24 h" : "Alcanza para las próximas 24 h"}</small><b>${f24 > 0 ? usd(Math.ceil(f24 / 10) * 10) : "✓"}</b>
+      <span>Saldo ${usd(saldo)}${viejo ? ` · <span class="rp-r">dato de las ${new Date(w.leido_en).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}</span>` : ""}${(w.rechazos || []).length ? ` · <span class="rp-r">${w.rechazos.length} cobros rechazados hoy</span>` : ""}</span></div>
+    <div class="rp-mini3">${H.map((x) => `<span><small>Próximas ${x.h} h</small><b>${usd(x.c)}</b><i class="${x.falta > 0 ? "rp-r" : "rp-v"}">${x.falta > 0 ? `faltan ${usd(x.falta)}` : "cubre"}</i></span>`).join("")}</div>
+    <ul class="rp-filas">${prox.map((c) => `<li><span>${esc(corto(c.nombre))}</span><span class="mut">cobra en ~${c.cobra_en_h < 1 ? "<1" : Math.round(c.cobra_en_h)} h</span><b>${usd(c.umbral)}</b></li>`).join("")}</ul>
+    <p class="rp-nota-pie">Si el saldo no alcanza, la tarjeta rechaza y la cuenta se frena. Meta cobra sobre todo a la mañana: cargá antes de las 9 h.</p>`);
 }
-
-// ---------- acciones ----------
-async function volverConTecho(s) {
-  const de = Number(s.de), ahora = Number(s.ahora ?? s.a);
-  confirmar("¿Volver al presupuesto de antes y marcar techo?", `<p><b>${esc(s.nombre)}</b>${s.cuenta ? ` · ${esc(s.cuenta)}` : ""}</p>
-    <p>Presupuesto: ${usd2(ahora)} → <b>${usd2(de)}</b></p><p class="mut">Queda con 🧱 techo en ${usd2(de)}: el Dashboard te avisa si la querés subir de nuevo.</p>`,
-    `Sí, volver a ${usd2(de)} y marcar techo`, async () => {
-      if (Math.abs(ahora - de) > 0.01) {
-        const r = await R.ctx.presupuesto({ id: s.campana_id, act: s.act, nombre: s.nombre, monto: de });
-        if (!r.ok) throw new Error(r.error || "Meta no lo aplicó");
-        if (r.simulado) { toast("Modo prueba: Meta no se tocó y no se marcó el techo.", "ok", 7000); return; }
-      }
-      await api("accion=techo", { id: s.campana_id, act: s.act, nombre: s.nombre, monto: de, motivo: `surfeo ${usd2(s.de)} → ${usd2(s.a)} no rindió` }); tocar(s.campana_id, `📉 volvió ${usd2(ahora)} → ${usd2(de)} + 🧱`);
-      toast(`✓ ${esc(s.nombre)}: ${usd2(de)} y 🧱 techo marcado.`, "ok", 8000);
-      R.ctx.recargarTechos?.(); await cargar(true);
-    });
+function cardLimpiador() {
+  const d = R.d.limpiador, per = R.per, T = "Limpiador de anuncios";
+  const tog = `<span class="rp-per">${[["hoy", "Hoy"], ["3d", "3 días"], ["total", "Total"]].map(([k, t]) => `<button type="button" data-per="${k}" aria-pressed="${k === per}">${t}</button>`).join("")}</span>`;
+  if (!d) return card("limp", T, cargando("Revisando campañas…"), tog);
+  if (d.__error) return card("limp", T, `<p class="mut">${esc(d.__error)}</p>`, tog);
+  const cands = d.campanas.flatMap((c) => c.conjuntos.flatMap((s) => s.ads.filter((a) => a.candidato)));
+  const n = cands.length, gasto = cands.reduce((t, a) => t + a.g, 0);
+  return card("limp", T, `
+    <div class="rp-grande ${n ? "mal" : "bien"}"><small>${n ? "Anuncios para apagar" : "Nada para apagar"}</small><b>${n || "✓"}</b><span>${n ? `${usd(gasto)} gastados con ROAS &lt; ${ro(d.l_roas)} · en ${d.campanas.filter((c) => c.candidatos).length} campañas` : `Ninguna campaña con ROAS &lt; ${ro(d.l_roas)} tiene anuncios así`}</span></div>
+    <ul class="rp-filas">${d.campanas.slice(0, 4).map((c) => `<li><span>${esc(c.nombre)}<small class="mut"> · ${esc(c.cuenta || "")}</small></span>${met(c)}<b>${c.candidatos ? `${c.candidatos} ads` : "—"}</b></li>`).join("") || `<li class="mut">Ninguna campaña con ROAS &lt; ${ro(d.l_roas)} en este período.</li>`}</ul>
+    <p class="rp-nota-pie">Campaña con ROAS &lt; ${ro(d.l_roas)} → conjunto &lt; ${ro(d.l_roas)} → anuncio &lt; ${ro(d.l_roas)} con ${usd(d.l_gasto)} o más gastados.</p>`,
+    tog, d.campanas.length ? `<button class="btn chico pri" data-abrir="limp">Revisar y optimizar</button>` : "");
 }
-function marcarTecho(x) {
-  const m = R.ctx.abrirModal(`<h3>Marcar 🧱 techo</h3><p><b>${esc(x.nombre)}</b></p>
-    <label class="w-lbl" for="rp-techo-m">Techo (no subir arriba de)</label><input class="campo num" id="rp-techo-m" inputmode="decimal" value="${esc(usd2(x.monto))}" data-foco>
-    <label class="w-lbl" for="rp-techo-mo">Motivo (opcional)</label><input class="campo" id="rp-techo-mo" maxlength="200" placeholder="ej. con 900 cayó a ROAS 1,7">
-    <p class="mut">Solo lo marca: no cambia el presupuesto.</p>
-    <div class="botones"><button class="btn" data-x>Cancelar</button><button class="btn pri" data-ok>Marcar techo</button></div>`);
-  $("[data-x]", m.dlg).onclick = m.cerrar;
-  $("[data-ok]", m.dlg).onclick = async () => {
-    const v = parseFloat($("#rp-techo-m", m.dlg).value.replace(/\./g, "").replace(",", "."));
-    if (!(v > 0)) return toast("Poné un monto válido", "error");
-    try { await api("accion=techo", { id: x.id, act: x.act, nombre: x.nombre, monto: v, motivo: $("#rp-techo-mo", m.dlg).value }); tocar(x.id, `🧱 techo en ${usd2(v)}`); toast("🧱 Techo marcado.", "ok"); m.cerrar(); R.ctx.recargarTechos?.(); await cargar(true); }
-    catch (e) { toast(esc(e.message), "error"); }
-  };
+function cardRechazos() {
+  const d = R.d.rechazos, T = "Rechazos y anuncios con problemas";
+  if (!d) return card("rech", T, cargando("Buscando…"));
+  if (d.__error) return card("rech", T, `<p class="mut">${esc(d.__error)}</p>`);
+  const w = d.anuncios.filter((a) => a.winner);
+  return card("rech", T, `
+    <div class="rp-grande ${d.winners ? "mal" : "bien"}"><small>Winners rechazados</small><b>${d.winners}</b><span>${d.con_ventas} vendieron en 7 días · ${d.total} en total (${d.por_estado?.DISAPPROVED ?? 0} rechazados, ${d.por_estado?.WITH_ISSUES ?? 0} con problemas)</span></div>
+    <ul class="rp-filas">${w.slice(0, 4).map((a) => `<li><span>${esc(a.nombre)}<small class="mut"> · ${esc(a.cuenta)}</small></span>${met(a.m7)}${links(a.link, a.post)}</li>`).join("") || `<li class="mut">Ningún winner rechazado.</li>`}</ul>`,
+    "", `<button class="btn chico" data-abrir="rech">Ver todos</button>`);
 }
-async function quitarTecho(x) {
-  confirmar("¿Quitar el techo?", `<p><b>${esc(x.nombre)}</b> vuelve a poder proponerse para subir.</p>`, "Sí, quitar techo", async () => {
-    await api("accion=techo_quitar", { id: x.id }); tocar(x.id, "techo quitado"); toast("Techo quitado.", "ok"); R.ctx.recargarTechos?.(); await cargar(true);
-  });
+// el mismo creativo en varias cuentas o publicaciones va junto
+function porNombre(xs, k) {
+  const m = new Map();
+  for (const x of xs) { const e = m.get(x.nombre) ?? { nombre: x.nombre, items: [], tot: { g: 0, v: 0, val: 0 }, prev: { g: 0, v: 0, val: 0 }, rec: { g: 0, v: 0, val: 0 } };
+    e.items.push(x); for (const p of ["tot", "prev", "rec"]) { e[p].g += x[p].g; e[p].v += x[p].v; e[p].val += x[p].val; } m.set(x.nombre, e); }
+  for (const e of m.values()) for (const p of ["tot", "prev", "rec"]) e[p].roas = e[p].g ? e[p].val / e[p].g : null;
+  return [...m.values()].sort((a, b) => k === "env" ? b.prev.g - a.prev.g : (b.tot.val - b.tot.g) - (a.tot.val - a.tot.g));
 }
-function cambiarPres(x, pct, titulo) {
-  const nuevo = a55(Number(x.presupuesto) * (1 + pct / 100));
-  confirmar(titulo || `¿${pct > 0 ? "Subir" : "Bajar"} ${Math.abs(pct)} %?`, `<p><b>${esc(x.nombre)}</b>${x.cuenta ? ` · ${esc(x.cuenta)}` : ""}</p><p>Presupuesto: ${usd2(x.presupuesto)} → <b>${usd2(nuevo)}</b></p>${pct > 0 && x.techo ? `<p class="techo-aviso">🧱 Tiene techo en ${usd2(x.techo)}.</p>` : ""}`,
-    `Sí, ${pct > 0 ? "subir" : "bajar"} a ${usd2(nuevo)}`, async () => {
-      const r = await R.ctx.presupuesto({ id: x.id, act: x.act, nombre: x.nombre, monto: nuevo });
-      if (!r.ok) throw new Error(r.error || "Meta no lo aplicó");
-      tocar(x.id, `${pct > 0 ? "📈 subió" : "📉 bajó"} ${usd2(x.presupuesto)} → ${usd2(nuevo)}`);
-      toast(r.simulado ? "Modo prueba: Meta no se tocó." : `✓ ${esc(x.nombre)}: ${usd2(nuevo)}. Te voy diciendo cómo sigue en Surfeos.`, "ok", 8000);
-      await cargar(true);
-    });
+function cardWinners() {
+  const d = R.d.winners, T = "Winners";
+  if (!d) return card("win", T, cargando("Buscando…"));
+  if (d.__error) return card("win", T, `<p class="mut">${esc(d.__error)}</p>`);
+  const N = porNombre(d.nuevos, "nuevo"), E = porNombre(d.envejeciendo, "env");
+  const fila = (e, env) => `<li><span>${esc(e.nombre)}<small class="mut"> · ${e.items.length} ${e.items.length === 1 ? "publicación" : "publicaciones"}</small></span>${env ? `<span class="rp-m"><b class="${rc(e.prev.roas)}">${ro(e.prev.roas)}</b><small>antes</small></span><span class="rp-m"><b class="${rc(e.rec.roas)}">${ro(e.rec.roas)}</b><small>ayer + hoy</small></span>` : met(e.tot)}${links(e.items[0].ads[0]?.link, e.items[0].link_post)}</li>`;
+  return card("win", T, `
+    <div class="rp-dos"><div><h4>Nuevos <b>${N.length}</b></h4><ul class="rp-filas">${N.slice(0, 4).map((e) => fila(e, false)).join("") || `<li class="mut">Ninguno nuevo.</li>`}</ul></div>
+      <div><h4>Envejeciendo <b>${E.length}</b></h4><ul class="rp-filas">${E.slice(0, 4).map((e) => fila(e, true)).join("") || `<li class="mut">Ningún winner cayendo.</li>`}</ul></div></div>
+    <p class="rp-nota-pie">Nuevo: empezó hace poco, 5+ ventas y ROAS &gt; 2. Envejeciendo: fue winner los 4 días anteriores y ayer + hoy va con ROAS &lt; 1,3: pedí renos de ese.</p>`,
+    "", `<button class="btn chico" data-abrir="win">Ver todos</button>`);
 }
-function apagarCampana(x) {
-  confirmar("¿Apagar la campaña?", `<p><b>${esc(x.nombre)}</b>${x.cuenta ? ` · ${esc(x.cuenta)}` : ""}</p>`, "Sí, apagar", async () => {
-    const r = await R.ctx.estado([{ id: x.id, act: x.act, nivel: "campana", nombre: x.nombre }], "PAUSED");
-    if (!r[0]?.ok) throw new Error(r[0]?.error || "Meta no lo aplicó"); toast("✓ Apagada.", "ok"); await cargar(true);
-  });
-}
-function surfearYAnotar(x) {
-  const m = R.ctx.abrirModal(`<h3>Surfear y seguir</h3><p><b>${esc(x.nombre)}</b> · hoy ${usd2(x.presupuesto)}</p>
-    ${segs([["30", "+30 %"], ["15", "+15 %"], ["-30", "−30 %"]], "30", "data-pct")}
-    <label class="w-lbl" for="rp-mot">Motivo (va al historial y, cuando esté el bot, al grupo con Franco)</label><input class="campo" id="rp-mot" maxlength="200" placeholder="ej. ROAS 2,4 y 18 ventas hoy">
-    <p id="rp-queda" class="mut"></p>${x.techo ? `<p class="techo-aviso">🧱 Tiene techo en ${usd2(x.techo)}.</p>` : ""}
-    <div class="botones"><button class="btn" data-x>Cancelar</button><button class="btn pri" data-ok>Aplicar</button></div>`);
-  let pct = 30; const queda = () => { $("#rp-queda", m.dlg).innerHTML = `Queda en <b>${usd2(a55(x.presupuesto * (1 + pct / 100)))}</b>. Te aviso a las 3, 24 y 48 h cómo sigue.`; };
-  $$("[data-pct]", m.dlg).forEach((b) => b.onclick = () => { pct = Number(b.dataset.pct); $$("[data-pct]", m.dlg).forEach((y) => y.setAttribute("aria-pressed", y === b)); queda(); }); queda();
-  $("[data-x]", m.dlg).onclick = m.cerrar;
-  $("[data-ok]", m.dlg).onclick = async (e) => {
-    const b = e.currentTarget; b.classList.add("cargando");
-    try {
-      const nuevo = a55(x.presupuesto * (1 + pct / 100));
-      const r = await R.ctx.presupuesto({ id: x.id, act: x.act, nombre: x.nombre, monto: nuevo });
-      if (!r.ok) throw new Error(r.error || "Meta no lo aplicó");
-      if (!r.simulado) await api("accion=surfeo_guardar", { id: x.id, act: x.act, nombre: x.nombre, de: Number(x.presupuesto), a: nuevo, motivo: $("#rp-mot", m.dlg).value });
-      toast(r.simulado ? "Modo prueba: Meta no se tocó." : `✓ Surfeada y anotada. La sigo en Surfeos.`, "ok", 8000); m.cerrar(); R.tab = "surfeos"; await cargar(true);
-    } catch (err) { b.classList.remove("cargando"); toast(`No se pudo: ${esc(err.message)}`, "error", 8000); }
-  };
-}
-function motivo(s) {
-  const m = R.ctx.abrirModal(`<h3>Motivo del cambio</h3><p><b>${esc(s.nombre)}</b> · ${usd2(s.de)} → ${usd2(s.a)}</p>
-    <input class="campo" id="rp-mot2" maxlength="300" value="${esc(s.motivo || "")}" data-foco><div class="botones"><button class="btn" data-x>Cancelar</button><button class="btn pri" data-ok>Guardar</button></div>`);
-  $("[data-x]", m.dlg).onclick = m.cerrar;
-  $("[data-ok]", m.dlg).onclick = async () => { try { await api("accion=surfeo_guardar", { surfeo: s.id, motivo: $("#rp-mot2", m.dlg).value }); m.cerrar(); await cargar(true); } catch (e) { toast(esc(e.message), "error"); } };
-}
-async function abrirLimpieza(x) {
-  const m = R.ctx.abrirModal(`<h3>Limpieza · 3 días</h3><p><b>${esc(x.nombre)}</b>${x.cuenta ? ` · ${esc(x.cuenta)}` : ""}</p><p class="vacio"><span class="cargador"></span>Leyendo conjuntos y anuncios…</p>`, { ancho: true });
-  let d; try { d = await api(`accion=limpieza&id=${encodeURIComponent(x.id)}&act=${encodeURIComponent(x.act)}`); } catch (e) { m.set(`<h3>Limpieza</h3><div class="err-box">${esc(e.message)}</div><div class="botones"><button class="btn" data-x>Cerrar</button></div>`); $("[data-x]", m.dlg).onclick = m.cerrar; return; }
-  const cfg = R.cfg || {};
-  const filas = d.conjuntos.map((s) => `<tr class="${s.malo ? "rp-mala" : ""}"><td><b>${esc(s.nombre)}</b>${s.reno ? " " + chip("reno") : ""}${s.protegida ? " " + chip(`protegida (${s.edad_h} h)`, "rp-chip-g") : ""}${s.minimo ? " " + chip(`mín ${usd2(s.minimo)}`) : ""}</td>
-    <td class="num">${usd(s.g)}</td><td class="num">${s.v}</td><td class="num ${roasCls(s.roas)}">${ro(s.roas)}</td><td>${s.malo ? (s.apagar.length ? `${s.apagar.length} para apagar` : s.protegida ? "nueva: se espera" : "sin anuncios para apagar") : "bien"}</td></tr>`).join("");
-  const ap = d.apagar;
-  m.set(`<h3>Limpieza · ${esc(d.desde.slice(8))}/${esc(d.desde.slice(5, 7))} → hoy</h3><p><b>${esc(x.nombre)}</b> · 3 días: ${usd(d.total.g)} · ${d.total.v} ventas · ROAS <b class="${roasCls(d.total.roas)}">${ro(d.total.roas)}</b></p>
-    <div class="rp-tabla-caja"><table class="rp-tabla"><thead><tr><th>Conjunto</th><th>Gasto</th><th>Ventas</th><th>ROAS</th><th></th></tr></thead><tbody>${filas || `<tr><td colspan="5" class="mut">Sin datos.</td></tr>`}</tbody></table></div>
-    ${d.nota ? `<p class="techo-aviso">${esc(d.nota)}</p>` : ""}${ap.length ? `<h4>Anuncios para apagar (gasto &gt; ${usd(cfg.d_ad_gasto ?? 10)} y ROAS &lt; ${ro(cfg.d_ad_roas ?? 1.3)}, dentro de conjuntos malos)</h4>
-      <ul class="rp-lista-ap">${ap.map((a) => `<li><label><input type="checkbox" data-ap="${esc(a.id)}" checked> ${esc(a.nombre)} <span class="mut">· ${esc(a.conjunto)} · ${usd(a.g)} · ROAS ${ro(a.roas)}</span></label></li>`).join("")}</ul>` : `<p class="mut">No hay anuncios que cumplan la regla para apagar.</p>`}
-    <div class="botones"><button class="btn" data-x>Cerrar</button>${x.cbo ? `<button class="btn" data-bajar>Bajar −${cfg.d_pct ?? 30} %</button>` : ""}${ap.length ? `<button class="btn pri" data-apagar>Apagar los tildados</button>` : ""}</div>`);
-  $("[data-x]", m.dlg).onclick = m.cerrar;
-  const bj = $("[data-bajar]", m.dlg); if (bj) bj.onclick = () => { m.cerrar(); cambiarPres(x, -(cfg.d_pct ?? 30)); };
-  const bt = $("[data-apagar]", m.dlg);
-  if (bt) bt.onclick = async () => {
-    const ids = $$("[data-ap]:checked", m.dlg).map((i) => i.dataset.ap); if (!ids.length) return;
-    if (bt.dataset.seguro !== "1") { bt.dataset.seguro = "1"; bt.textContent = `¿Seguro? Apagar ${ids.length}`; return; }
-    bt.classList.add("cargando");
-    try {
-      const r = await R.ctx.estado(ap.filter((a) => ids.includes(a.id)).map((a) => ({ id: a.id, act: x.act, nivel: "anuncio", nombre: a.nombre })), "PAUSED");
-      const ok = r.filter((y) => y.ok).length; toast(`✓ Apagados ${ok} de ${ids.length}.`, ok === ids.length ? "ok" : "error", 8000); m.cerrar();
-    } catch (e) { toast(`No se pudo: ${esc(e.message)}`, "error", 8000); bt.classList.remove("cargando"); }
-  };
+function cardNuevas() {
+  const d = R.d.nuevas, T = "Cuentas nuevas";
+  if (!d) return card("nuevas", T, cargando("…"));
+  if (d.__error) return card("nuevas", T, `<p class="mut">${esc(d.__error)}</p>`);
+  const mal = d.cuentas.filter((c) => c.mal);
+  return card("nuevas", T, `
+    <div class="rp-grande ${mal.length ? "mal" : "bien"}"><small>${mal.length ? "Vienen mal" : "Vienen bien"}</small><b>${mal.length}/${d.cuentas.length}</b><span>cuentas que empezaron a gastar en los últimos ${d.dias} días</span></div>
+    <ul class="rp-filas">${d.cuentas.slice(0, 6).map((c) => `<li><span>${esc(corto(c.cuenta))}<small class="mut"> · desde ${fch(c.desde)} · ${c.campanas} camp.</small></span>${met(c.total)}<b class="${c.total.gan >= 0 ? "rp-v" : "rp-r"}">${usd(c.total.gan)}</b></li>`).join("") || `<li class="mut">No hay cuentas nuevas.</li>`}</ul>`);
 }
 
-// ---------- pestañas ----------
-function notaHTML(n, h, final) {
-  if (!n) return `<div class="rp-nota rp-nota-vacia"><b>${h} h</b><span class="mut">todavía no</span></div>`;
-  const a = n.antes, d = n.despues, y = n.ayer;
-  return `<div class="rp-nota ${n.ver === "bajo" || n.ver === "techo" || n.ver === "sigue_mal" ? "rp-nota-r" : n.ver === "rindio" || n.ver === "mejoro" ? "rp-nota-v" : ""}">
-    <b>${h} h ${final ? "" : `<span class="mut">(van ${d.h} h)</span>`}</b>
-    <span>ROAS <b class="${roasCls(a.roas)}">${ro(a.roas)}</b> → <b class="${roasCls(d.roas)}">${ro(d.roas)}</b></span>
-    <span>ganancia/h ${usd(a.gan_h)} → ${usd(d.gan_h)} <span class="mut">(${n.sube_gan >= 0 ? "+" : ""}${n.sube_gan} %)</span></span>
-    <span class="mut">ventas ${a.v} → ${d.v} · gasto ${usd(a.g)} → ${usd(d.g)}</span>
-    <span class="mut">ayer mismas horas: ROAS ${ro(y?.roas)} · ${y?.v ?? 0} ventas</span>
-    <span class="rp-ver">${final ? VER[n.ver] || n.ver : "en curso"}${n.cortado ? ` · otro cambio a las ${fecha(n.cortado)}` : ""}</span></div>`;
+// ---------- «Ver todo» y optimizar ----------
+function cerrable(m) { const x = $("[data-x]", m.dlg); if (x) x.onclick = m.cerrar; return m; }
+function verRechazos() {
+  const d = R.d.rechazos; if (!d) return;
+  cerrable(R.ctx.abrirModal(`<h3>Rechazos y anuncios con problemas</h3><p class="mut">Métricas de los últimos 7 días. Primero los winners y los que vendieron (${d.anuncios.length} de ${d.total}).</p>
+    <div class="rp-lista2">${d.anuncios.map((a) => `<div class="rp-it"><div><b>${esc(a.nombre)}</b>${a.winner ? ` <span class="rp-tag v">winner</span>` : ""} <span class="rp-tag ${a.estado === "DISAPPROVED" ? "r" : "a"}">${a.estado === "DISAPPROVED" ? "rechazado" : "con problemas"}</span>
+      <small class="mut">${esc(a.cuenta)} · ${esc(a.campana?.nombre || "")} › ${esc(a.conjunto?.nombre || "")}</small>${a.motivos?.length ? `<small class="rp-mot">${esc(a.motivos.join(" · "))}</small>` : ""}</div>${met(a.m7)}${links(a.link, a.post)}</div>`).join("")}</div>
+    <div class="botones"><button class="btn" data-x>Cerrar</button></div>`, { ancho: true }));
 }
-function tabSurfeos(d) {
-  // (02/11 noche, Lorenzo) por DÍAS, como el Dashboard: al surfear → cierre de ese día → día siguiente → 2.º día.
-  const T = { empeoro: ["↘ Empeoró", "rp-chip-r"], mejoro: ["↗ Mejoró", "rp-chip-v"], estable: ["→ Estable", "rp-chip-a"], pronto: ["⏳ Muy pronto", ""] };
-  const xs0 = d.surfeos || [], ten = (s) => s.notas?.tendencia || "pronto";
-  const n = (k) => xs0.filter((s) => ten(s) === k).length;
-  const F = [["todos", `Todos ${xs0.length}`], ["empeoro", `Empeoró ${n("empeoro")}`], ["mejoro", `Mejoró ${n("mejoro")}`], ["estable", `Estable ${n("estable")}`], ["pronto", `Muy pronto ${n("pronto")}`]];
-  if (!F.some(([k]) => k === R.filtro)) R.filtro = "todos";
-  const xs = xs0.filter((s) => R.filtro === "todos" || ten(s) === R.filtro);
-  const fch = (dia) => `${dia.slice(8)}/${dia.slice(5, 7)}`;
-  // última modificación de cada campaña: el cambio de presupuesto más nuevo, el techo o lo que tocaste desde acá
-  const ult = new Map(); // campaña → { ms, tx } (qué fue lo último que se le hizo)
-  const ver = (id, ms, tx) => { if (ms && ms > (ult.get(id)?.ms || 0)) ult.set(id, { ms, tx }); };
-  for (const s of xs0) { ver(String(s.campana_id), Date.parse(s.t), `${s.dir > 0 ? "📈 subió" : "📉 bajó"} ${usd2(s.de)} → ${usd2(s.a)}`); if (s.techo?.desde) ver(String(s.campana_id), Date.parse(s.techo.desde), `🧱 techo en ${usd2(s.techo.monto)}`); }
-  for (const [id, v] of Object.entries(TOC)) if (xs0.some((s) => String(s.campana_id) === id)) { const o = typeof v === "number" ? { ms: v, tx: "" } : v; if (o.ms > (ult.get(id)?.ms || 0) - 60e3 && o.tx) ult.set(id, o); else ver(id, o.ms, o.tx || ult.get(id)?.tx || ""); }
-  const ultCampana = new Map(); for (const s of xs0) { const k = String(s.campana_id); if (!ultCampana.has(k) || Date.parse(s.t) > Date.parse(ultCampana.get(k).t)) ultCampana.set(k, s); }
-  const reloj = (id) => { const u = ult.get(String(id)); if (!u) return ""; const m = Math.round((Date.now() - u.ms) / 60000);
-    const tx = m < 2 ? "recién" : m < 60 ? `hace ${m} min` : m < 48 * 60 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} días`;
-    return `<span class="rp-reloj${m < 30 ? " fresco" : m < 180 ? " tibio" : ""}" title="Última modificación de esta campaña">⏱ ${tx}${u.tx ? ` · ${u.tx}` : ""}</span>`; };
-  R.ultCampana = ultCampana;
-  return `<p class="rp-ayuda">Cada surfeo de un vistazo: <b>a qué hora</b>, de qué presupuesto a cuál, el <b>ROAS en ese momento</b> y cómo cerró ese día y los siguientes. «Después» = todo lo que hizo desde el surfeo hasta ahora junto: con eso se decide Mejoró / Estable / Empeoró (si sigue con ROAS 2 o más, no cuenta como empeoró). Una campaña surfeada dos veces tiene dos tarjetas.</p>
-    ${segs(F, R.filtro, "data-f")}
-    <div class="rp-lista rp-surfs">${xs.map((s) => {
-      const arriba = s.dir > 0, dias = s.notas?.dias || [], [tt, tc] = T[ten(s)] || T.pronto;
-      const puedeVolver = arriba && s.ahora != null && Number(s.ahora) > Number(s.de) + 0.01;
-      const base = dias[0]?.roas;
-      const pill = (x, i) => { if (!x) return ""; const dif = i && base != null && x.roas != null ? x.roas - base : 0, cls = !i || x.roas == null ? "" : dif >= 0.25 ? "sube" : dif <= -0.25 ? "baja" : "igual";
-        return `${i ? `<i class="rp-fl">›</i>` : ""}<span class="rp-paso ${cls}${x.final ? "" : " curso"}" title="${esc(x.et)} · ${fch(x.dia)}"><small>${i ? fch(x.dia) : "surf"}</small><b class="${roasCls(x.roas)}">${ro(x.roas)}</b></span>`; };
-      const hoyAR = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10), surf = dias[0], tAR = new Date(Date.parse(s.t) - 3 * 3600e3).toISOString();
-      const diaSurf = tAR.slice(0, 10), horaSurf = tAR.slice(11, 16);
-      const cuando = diaSurf === hoyAR ? "Hoy" : diaSurf === new Date(Date.now() - 27 * 3600e3).toISOString().slice(0, 10) ? "Ayer" : fch(diaSurf);
-      const tile = (x, i) => { if (!x) return ""; const dif = base != null && x.roas != null ? x.roas - base : 0, cls = x.roas == null ? "" : dif >= 0.25 ? "sube" : dif <= -0.25 ? "baja" : "igual";
-        const et = x.k === "cierre" ? (x.final ? `Cerró ${fch(x.dia)}` : `${fch(x.dia)} · ahora`) : x.final ? fch(x.dia) : `${fch(x.dia)} · ahora`;
-        return `<i class="rp-fl">›</i><span class="rp-t ${cls}${x.final ? "" : " curso"}"><small>${et}</small><b class="${roasCls(x.roas)}">${ro(x.roas)}</b></span>`; };
-      const resto = dias.slice(1), falta = Math.max(0, 3 - resto.length);
-      const msU = ult.get(String(s.campana_id))?.ms, recien = msU && Date.now() - msU < 15 * 60e3;
-      return `<details class="rp-surf2 rp-s3 ${ten(s) === "empeoro" ? "rp-surf-r" : ten(s) === "mejoro" ? "rp-surf-v" : ""}${recien ? " rp-recien" : ""}${R.sel.has(String(s.campana_id)) ? " rp-elegida" : ""}" data-surf-id="${s.id}"${R.abiertos?.has(String(s.id)) ? " open" : ""}>
-        <summary>
-          <span class="rp-s3-nom"><span class="rp-s3-tit"><label class="rp-check" title="Elegir para cambiar varias juntas"><input type="checkbox" data-selc="${esc(s.campana_id)}"${R.sel.has(String(s.campana_id)) ? " checked" : ""}><i></i></label><b>${esc(s.nombre || s.campana_id)}</b></span><span class="mut">${s.cuenta ? esc(s.cuenta) : ""}${s.quien ? ` · ${esc(s.quien)}` : ""}${s.ahora != null ? ` · hoy en ${usd2(s.ahora)}` : ""}</span><span class="rp-s2-chips">${chip(tt, tc)}${reloj(s.campana_id)}${s.techo ? chip(`🧱 ${usd2(s.techo.monto)}`, "rp-chip-g") : ""}</span></span>
-          <span class="rp-s3-fila">
-            <span class="rp-t rp-t-surf"><small>${arriba ? "📈 Surf" : "📉 Bajada"} · ${cuando}</small><b class="rp-hora">${horaSurf}</b><span class="rp-pres">${usd2(s.de)} → <b>${usd2(s.a)}</b></span>${s.ahora != null && Math.abs(Number(s.ahora) - Number(s.a)) > 0.01 ? `<span class="rp-ahora">hoy en <b>${usd2(s.ahora)}</b></span>` : ""}</span>
-            <span class="rp-t rp-t-base"><small>ROAS al surfear</small><b class="${roasCls(surf?.roas)}">${ro(surf?.roas)}</b>${s.notas?.despues_surf?.roas != null ? `<small class="rp-desp">después: <b class="${roasCls(s.notas.despues_surf.roas)}">${ro(s.notas.despues_surf.roas)}</b></small>` : ""}</span>
-            ${resto.map(tile).join("")}${Array.from({ length: falta }, () => `<i class="rp-fl">›</i><span class="rp-t vacio"><small>—</small><b>—</b></span>`).join("")}
-          </span>
-        </summary>
-        <div class="rp-s3-det">
-        <div class="rp-s2-tabla" role="table">
-          <div class="rp-s2-f rp-s2-th" role="row"><span>Día</span><span>Presupuesto</span><span>Gastado</span><span>Ventas</span><span>ROAS</span><span>Profit</span></div>
-          ${dias.map((x) => `<div class="rp-s2-f${x.k === "surf" ? " surf" : ""}${x.final ? "" : " curso"}" role="row"><span><b>${esc(x.et)}</b><small>${fch(x.dia)}${x.final ? "" : " · en curso"}</small></span><span data-l="Presupuesto">${x.p != null ? usd2(x.p) : "—"}</span><span data-l="Gastado">${usd(x.g)}</span><span data-l="Ventas">${x.v}</span><span data-l="ROAS"><b class="${roasCls(x.roas)}">${ro(x.roas)}</b></span><span data-l="Profit"><b class="${x.gan == null ? "" : x.gan >= 0 ? "rp-v" : "rp-r"}">${x.gan == null ? "—" : usd(x.gan)}</b></span></div>`).join("")}
-        </div>
-        ${s.motivo ? `<p class="rp-motivo">«${esc(s.motivo)}»</p>` : ""}
-        <div class="rp-acc rp-s2-acc">${puedeVolver ? `<button class="btn chico pri" data-volver="${s.id}">Volver a ${usd2(s.de)} + 🧱</button>` : ""}
-          ${s.techo ? `<button class="btn chico" data-quitar="${esc(s.campana_id)}">Quitar techo</button>` : `<button class="btn chico" data-techo="${s.id}">Marcar 🧱 techo</button>`}
-          <button class="btn chico" data-motivo="${s.id}">${s.motivo ? "Cambiar motivo" : "Anotar motivo"}</button></div>
-        </div>
-      </details>`;
-    }).join("") || `<p class="vacio">Nada en este filtro (últimos 7 días).</p>`}</div>`;
+function verWinners() {
+  const d = R.d.winners; if (!d) return;
+  const bloque = (xs, env) => porNombre(xs, env ? "env" : "nuevo").map((e) => `<div class="rp-it rp-it-col"><div><b>${esc(e.nombre)}</b> ${env ? `<span class="rp-m-inline">antes <b class="${rc(e.prev.roas)}">${ro(e.prev.roas)}</b> (${e.prev.v} v) → ayer + hoy <b class="${rc(e.rec.roas)}">${ro(e.rec.roas)}</b> (${e.rec.v} v, ${usd(e.rec.g)})</span>` : `<span class="rp-m-inline"><b class="${rc(e.tot.roas)}">${ro(e.tot.roas)}</b> · ${e.tot.v} ventas · ${usd(e.tot.g)} gastados · ganancia ${usd(e.tot.val * 0.9 - e.tot.g)}</span>`}</div>
+    ${e.items.map((it) => `<div class="rp-sub"><span class="mut">${it.ads.map((a) => `${esc(a.cuenta)} › ${esc(a.campana)}`).slice(0, 3).join(" · ")}${it.ads.length > 3 ? ` +${it.ads.length - 3}` : ""}</span>${met(env ? it.rec : it.tot)}${links(it.ads[0]?.link, it.link_post)}</div>`).join("")}</div>`).join("");
+  cerrable(R.ctx.abrirModal(`<h3>Winners</h3><h4 class="rp-h4">Nuevos</h4><div class="rp-lista2">${bloque(d.nuevos, false) || `<p class="mut">Ninguno.</p>`}</div>
+    <h4 class="rp-h4">Envejeciendo</h4><div class="rp-lista2">${bloque(d.envejeciendo, true) || `<p class="mut">Ninguno.</p>`}</div><div class="botones"><button class="btn" data-x>Cerrar</button></div>`, { ancho: true }));
 }
-function tabCampanas(d) {
-  const F = [["todos", "Todas"], ["mala_3d", "Malas 3 días"], ["mala_hora", "Malas a esta hora"], ["floja", "Flojas"]];
-  const xs = (d.campanas || []).filter((c) => R.filtro === "todos" || c.estado === R.filtro);
-  const n3 = (d.campanas || []).filter((c) => c.estado === "mala_3d").length, nh = (d.campanas || []).filter((c) => c.estado === "mala_hora").length;
-  const celda = (m, eq, l) => `<td class="num" data-l="${l}"><b class="${roasCls(m.roas, eq)}">${ro(m.roas)}</b><span class="mut">${m.v} v · ${usd(m.g)}</span></td>`;
-  const EST = { mala_3d: chip("🔴 mala 3 días", "rp-chip-r"), mala_hora: chip("🟠 mala ayer y hoy", "rp-chip-a"), floja: chip("🟡 floja", "rp-chip-a"), bien: "" };
-  return `<p class="rp-ayuda">ROAS de hoy hasta ahora contra ayer y anteayer <b>a esta misma hora</b>, y los 3 días enteros. «Limpieza» abre los conjuntos y anuncios de los 3 días y te propone apagar los que gastaron más de US$ 10 con ROAS bajo dentro de conjuntos malos.</p>
-    ${n3 || nh ? `<p class="rp-alerta">🔴 ${n3} malas hace 3 días · 🟠 ${nh} malas ayer y hoy a esta hora.</p>` : ""}
-    ${segs(F, R.filtro, "data-f")}
-    <div class="rp-tabla-caja"><table class="rp-tabla"><thead><tr><th>Campaña</th><th>Presup.</th><th>Hoy</th><th>Ayer a esta hora</th><th>Anteayer a esta hora</th><th>3 días</th><th></th></tr></thead><tbody>
-    ${xs.map((c) => `<tr class="${c.estado === "mala_3d" ? "rp-mala" : ""}"><td><b>${c.techo ? "🧱 " : ""}${esc(c.nombre)}</b><span class="mut">${esc(c.cuenta || "")}</span>${EST[c.estado] || ""}</td>
-      <td class="num" data-l="Presupuesto">${c.cbo ? usd2(c.presupuesto) : "ABO"}</td>${celda(c.hoy, d.cfg?.equilibrio, "Hoy")}${celda(c.ayer_hora, d.cfg?.equilibrio, "Ayer a esta hora")}${celda(c.ante_hora, d.cfg?.equilibrio, "Anteayer a esta hora")}
-      <td class="num" data-l="3 días"><b class="${roasCls(c.tres.roas, d.cfg?.equilibrio)}">${ro(c.tres.roas)}</b><span class="mut">${usd(c.tres.gan)} ganancia</span></td>
-      <td class="rp-acc-td"><button class="btn chico" data-limp="${esc(c.id)}">Limpieza</button>${c.cbo ? `<button class="btn chico" data-surf="${esc(c.id)}">Surfear</button>` : ""}</td></tr>`).join("") || `<tr><td colspan="7" class="mut">Nada en este filtro.</td></tr>`}
-    </tbody></table></div>`;
-}
-function tabCuentas(d) {
-  const ag = (d.cuentas || []).filter((k) => k.agotada).length;
-  return `<p class="rp-ayuda">Gasto, ROAS y ganancia por cuenta en los últimos días. «Agotada» = todas sus campañas debajo del equilibrio por ${d.dias} días: conviene escalar en otra cuenta.</p>
-    ${ag ? `<p class="rp-alerta">🪫 ${ag} cuenta${ag === 1 ? "" : "s"} agotada${ag === 1 ? "" : "s"}.</p>` : ""}
-    <div class="rp-tabla-caja"><table class="rp-tabla"><thead><tr><th>Cuenta</th>${(d.cuentas?.[0]?.dias || []).map((x) => `<th>${esc(x.dia.slice(8))}/${esc(x.dia.slice(5, 7))}</th>`).join("")}<th>Total</th></tr></thead><tbody>
-    ${(d.cuentas || []).map((k) => `<tr class="${k.agotada ? "rp-mala" : ""}"><td><b>${esc(k.cuenta)}</b><span class="mut">${k.n} campañas</span>${k.agotada ? chip("🪫 agotada", "rp-chip-r") : ""}</td>
-      ${k.dias.map((x) => `<td class="num" data-l="${esc(x.dia.slice(8))}/${esc(x.dia.slice(5, 7))}"><b class="${roasCls(x.roas)}">${ro(x.roas)}</b><span class="mut">${usd(x.g)} · ${usd(x.gan)}</span></td>`).join("")}
-      <td class="num" data-l="Total"><b class="${roasCls(k.roas)}">${ro(k.roas)}</b><span class="mut">${usd(k.g)} · ${usd(k.gan)}</span></td></tr>`).join("")}
-    </tbody></table></div>`;
-}
-function tabGastos(d) {
-  const w = d.whop, viejo = w && Date.now() - Date.parse(w.leido) > 3 * 3600e3;
-  return `<p class="rp-ayuda">${esc(d.nota)}</p>
-    <div class="rp-tabla-caja"><table class="rp-tabla"><thead><tr><th>Día</th><th>Gastado en Meta</th><th>Facturado</th><th>ROAS</th><th>Ganancia</th></tr></thead><tbody>
-    ${(d.dias || []).map((x) => `<tr><td><b>${esc(x.dia.slice(8))}/${esc(x.dia.slice(5, 7))}</b><span class="mut">${x.campanas} campañas</span></td><td class="num" data-l="Gastado">${usd(x.g)}</td><td class="num" data-l="Facturado">${usd(x.val)}</td><td class="num ${roasCls(x.roas)}" data-l="ROAS">${ro(x.roas)}</td><td class="num" data-l="Ganancia">${usd(x.gan)}</td></tr>`).join("")}
-    </tbody></table></div>
-    <h3 class="rp-h3">Whop</h3>
-    ${!w ? `<p class="mut">Sin datos de Whop.</p>` : `${viejo ? `<p class="rp-alerta">⚠️ El saldo de Whop es de ${hace(w.leido)} (${fecha(w.leido)}): la ventana de Whop de la Mac no está abierta, así que no se actualiza.</p>` : ""}
-      <div class="rp-tiles"><div class="rp-tile"><b>${usd(w.saldo)}</b><span>Saldo disponible</span></div><div class="rp-tile"><b>${usd(w.cobros_hoy_usd)}</b><span>Cobros de hoy (últimos de cada tarjeta)</span></div>${w.retenido_chicas != null ? `<div class="rp-tile"><b>${usd(w.retenido_chicas)}</b><span>Retenido (~US$ 2, vuelve)</span></div>` : ""}</div>`}`;
-}
-function tabMinimos(d) {
-  const al = (d.minimos || []).filter((x) => x.alerta).length;
-  return `<p class="rp-ayuda">Cuánto del presupuesto de cada CBO está atado a gastos mínimos de conjuntos (renos nuevas). Arriba de ${d.pct_max} % los winners se quedan sin aire.</p>
-    ${al ? `<p class="rp-alerta">⚖️ ${al} CBO con más de ${d.pct_max} % en mínimos.</p>` : ""}
-    <div class="rp-lista">${(d.minimos || []).map((x) => `<article class="rp-card ${x.alerta ? "rp-card-r" : ""}">
-      <div class="rp-cab"><b>${esc(x.nombre)}</b><span class="mut">${esc(x.cuenta || "")}</span>${x.alerta ? chip("⚖️ ahogando", "rp-chip-r") : ""}</div>
-      <div class="rp-barra" role="img" aria-label="${x.pct} % en mínimos"><span style="width:${Math.min(100, x.pct)}%"></span></div>
-      <p class="mut">${x.pct} % del presupuesto en mínimos: ${usd2(x.suma)} de ${usd2(x.presupuesto)} · ${x.sets.length} de ${x.activos} conjuntos prendidos con mínimo</p>
-      <ul class="rp-lista-ap">${x.sets.map((s) => `<li><label><input type="checkbox" data-min="${esc(s.id)}" data-camp="${esc(x.id)}"> ${esc(s.nombre)} <span class="mut">· mín ${usd2(s.minimo)}${s.creado ? ` · desde ${fecha(s.creado)}` : ""}</span></label></li>`).join("")}</ul>
-      <div class="rp-acc"><button class="btn chico" data-sacarmin="${esc(x.id)}">Sacar mínimo a los tildados</button></div></article>`).join("") || `<p class="vacio">Ninguna CBO prendida tiene conjuntos con mínimo.</p>`}</div>`;
-}
-function tabEscala(d) {
-  return `<p class="rp-ayuda">Campañas nuevas que no son testeo (escala horizontal y cuentas nuevas), a las 24, 48 y 72 h de arrancar.</p>
-    <div class="rp-lista">${(d.escala || []).map((e) => `<article class="rp-card ${e.accion === "apagar" || e.accion === "bajar" ? "rp-card-r" : e.accion === "subir" ? "rp-card-v" : ""}">
-      <div class="rp-cab"><b>${esc(e.nombre)}</b><span class="mut">${esc(e.cuenta || "")}</span>${chip(`${e.edad_h} h`)}${chip(e.hito)}</div>
-      <p>ROAS <b class="${roasCls(e.m.roas)}">${ro(e.m.roas)}</b> · ${e.m.v} ventas · gasto ${usd(e.m.g)} · ganancia ${usd(e.m.gan)} · presupuesto ${usd2(e.presupuesto)}</p>
-      <p class="rp-motivo">${esc(e.motivo)}</p>
-      <div class="rp-acc">${e.accion === "subir" ? `<button class="btn chico pri" data-esc="${esc(e.id)}" data-pct="30">+30 %</button>` : ""}${e.accion === "bajar" ? `<button class="btn chico pri" data-esc="${esc(e.id)}" data-pct="-30">−30 %</button>` : ""}${e.accion === "apagar" ? `<button class="btn chico pri" data-apagar-c="${esc(e.id)}">Apagar</button>` : ""}</div></article>`).join("") || `<p class="vacio">No hay campañas nuevas de escala en los últimos 4 días.</p>`}</div>`;
-}
-const ICONO_P = { a_subir: "🟢", b_bajo: "🔴", b_nota: "📊", c_bajar: "🟠", c_apagar: "⛔", d_mala: "🟠", e_recuperar: "🔁", f_minimos: "⚖️", g_subir: "🆕", g_bajar: "🆕", g_apagar: "🆕", h_cuenta: "🪫", t_tiron: "👂", auto_minimos: "⚙️" };
-// Botón principal de cada tipo de propuesta (lo que hace el SÍ)
-function siDe(p) {
-  const a = p.a != null ? usd2(p.a) : "";
-  return ({ a_subir: `Sí, subir a ${a}`, e_recuperar: `Sí, subir a ${a}`, g_subir: `Sí, subir a ${a}`, t_tiron: `Sí, bajar a ${a}`, c_bajar: `Sí, bajar a ${a}`, g_bajar: `Sí, bajar a ${a}`,
-    d_mala: `Sí, bajar a ${a} y limpiar`, b_bajo: `Sí, volver a ${a} + 🧱`, c_apagar: "Sí, apagar", g_apagar: "Sí, apagar", f_minimos: "Sí, sacar mínimos de 3+ días", h_cuenta: "Entendido" })[p.tipo]
-    ?? (p.tipo === "b_nota" ? (p.a != null ? `Sí, volver a ${a} + 🧱` : "Entendido") : "Sí");
-}
-function decidir(p, decision, solo) {
-  const titulo = decision === "no" ? "¿Descartar la propuesta?" : `¿${solo === "bajar" ? `Solo bajar a ${usd2(p.a)}` : solo === "apagar" ? "Solo apagar los anuncios malos" : siDe(p).replace(/^Sí, /, "")}?`;
-  const movida = p.ahora && p.de != null && Math.abs(p.ahora.presupuesto - Number(p.de)) > Math.max(1, p.de * 0.01);
-  const m = R.ctx.abrirModal(`<h3>${esc(titulo)}</h3><p><b>${esc(p.nombre || "")}</b>${p.ahora?.cuenta ? ` · ${esc(p.ahora.cuenta)}` : ""}</p><p class="mut">${esc(p.motivo || "")}</p>
-    ${movida && decision === "si" ? `<p class="techo-aviso">Ojo: la propuesta era desde ${usd2(p.de)} y el Dashboard la muestra en ${usd2(p.ahora.presupuesto)}. Antes de aplicar se relee Meta: si alguien la movió, no se aplica.</p>` : ""}
-    <label class="w-lbl" for="rp-dm">Motivo (va al historial y al grupo con Franco)</label><input class="campo" id="rp-dm" maxlength="300" placeholder="${decision === "no" ? "ej. espero a la noche" : "ej. de acuerdo"}" data-foco>
-    <div class="botones"><button class="btn" data-x>Cancelar</button><button class="btn ${decision === "no" ? "" : "pri"}" data-ok>${decision === "no" ? "Sí, descartar" : "Sí, aplicar"}</button></div>`);
-  let enviando = false;
-  $("[data-x]", m.dlg).onclick = m.cerrar;
-  $("[data-ok]", m.dlg).onclick = async (e) => {
-    if (enviando) return; enviando = true; const b = e.currentTarget; b.classList.add("cargando"); b.innerHTML = `<span class="gira">↻</span> ${decision === "no" ? "Guardando…" : "Aplicando en Meta…"}`;
-    try {
-      const r = await api("accion=decidir", { id: p.id, decision, solo, motivo: $("#rp-dm", m.dlg).value });
-      toast(decision === "no" ? "Descartada." : `✓ ${esc(r.pasos.join(" · "))}`, "ok", 9000); m.cerrar();
-      if (decision === "si") R.ctx.recargarTechos?.(); await cargar(true);
-    } catch (err) { enviando = false; b.classList.remove("cargando"); b.textContent = "Reintentar"; toast(`No se aplicó: ${esc(err.message)}`, "error", 10000); }
+function verLimpiador() {
+  const d = R.d.limpiador; if (!d) return;
+  const sel = new Set(d.campanas.flatMap((c) => c.conjuntos.flatMap((s) => s.ads.filter((a) => a.candidato).map((a) => a.id))));
+  const fila = (x, nivel, chk) => `<div class="rp-lf n${nivel}${nivel === 1 && !x.malo ? " bien" : ""}">${chk ?? "<span></span>"}<span class="rp-lf-nom">${esc(x.nombre)}${x.activo === false ? ` <small class="mut">(apagado)</small>` : ""}${nivel === 0 ? `<small class="mut"> · ${esc(x.cuenta || "")}</small>` : ""}</span><span data-l="Gastado">${usd(x.g)}</span><span data-l="Ventas">${x.v}</span><span data-l="ROAS" class="${rc(x.roas)}">${ro(x.roas)}</span><span data-l="Profit" class="${x.gan >= 0 ? "rp-v" : "rp-r"}">${usd(x.gan)}</span>${x.link ? links(x.link) : "<span></span>"}</div>`;
+  const m = R.ctx.abrirModal(`<h3>Limpiador · ${d.periodo === "hoy" ? "hoy" : d.periodo === "3d" ? "últimos 3 días" : "total"}</h3>
+    <p class="mut">Tildados: anuncios prendidos con ROAS &lt; ${ro(d.l_roas)} y ${usd(d.l_gasto)} o más gastados, dentro de conjuntos con ROAS &lt; ${ro(d.l_roas)}. Destildá los que quieras dejar. El período se cambia en la tarjeta (Hoy · 3 días · Total).</p>
+    <div class="rp-lf rp-lf-th"><span></span><span>Campaña › conjunto › anuncio</span><span>Gastado</span><span>Ventas</span><span>ROAS</span><span>Profit</span><span></span></div>
+    <div class="rp-lista2 rp-lf-lista">${d.campanas.map((c) => fila(c, 0) + c.conjuntos.map((s) => fila(s, 1) + s.ads.map((a) => fila(a, 2, a.activo ? `<label class="rp-check"><input type="checkbox" data-ad="${esc(a.id)}" data-act="${esc(c.act)}" data-nom="${esc(a.nombre)}"${sel.has(a.id) ? " checked" : ""}><i></i></label>` : "<span></span>")).join("")).join("")).join("")}</div>
+    <div class="botones"><button class="btn" data-x>Cerrar</button><button class="btn pri" data-opt>Optimizar: apagar ${sel.size}</button></div>`, { ancho: true });
+  cerrable(m);
+  const b = $("[data-opt]", m.dlg);
+  $$("[data-ad]", m.dlg).forEach((c) => c.onchange = () => { c.checked ? sel.add(c.dataset.ad) : sel.delete(c.dataset.ad); b.textContent = `Optimizar: apagar ${sel.size}`; delete b.dataset.seguro; });
+  b.onclick = async () => {
+    if (!sel.size) return;
+    if (b.dataset.seguro !== "1") { b.dataset.seguro = "1"; b.textContent = `¿Seguro? Apagar ${sel.size} anuncios`; return; }
+    b.classList.add("cargando"); b.textContent = "Apagando…";
+    const items = $$("[data-ad]", m.dlg).filter((c) => sel.has(c.dataset.ad)).map((c) => ({ id: c.dataset.ad, act: c.dataset.act, nivel: "anuncio", nombre: c.dataset.nom }));
+    try { const r = await R.ctx.estado(items, "PAUSED"); const ok = r.filter((x) => x.ok).length;
+      toast(`✓ Apagados ${ok} de ${items.length} anuncios.`, ok === items.length ? "ok" : "error", 9000); m.cerrar(); cargar("limpiador", true); }
+    catch (e) { toast(`No se pudo: ${esc(e.message)}`, "error", 9000); b.classList.remove("cargando"); b.textContent = "Reintentar"; }
   };
 }
-function tabBot(d) {
-  const ps = d.propuestas || [], abiertas = ps.filter((p) => p.estado === "abierta" && !p.vencida), vencidas = ps.filter((p) => p.vencida), hechas = ps.filter((p) => ["aplicada", "no"].includes(p.estado));
-  const tarjeta = (p, acc) => `<article class="rp-card ${acc ? "" : "rp-card-apagada"}"><div class="rp-cab">${ICONO_P[p.tipo] || "•"} <b>${esc(p.nombre || "")}</b>${p.ahora?.cuenta ? `<span class="mut">${esc(p.ahora.cuenta)}</span>` : ""}<time class="mut">${fecha(p.creada)}${acc && p.vence ? ` · vence ${fecha(p.vence).split(" ").pop()}` : ""}</time></div>
-    <pre class="rp-wa">${esc(p.texto).replace(/\*([^*\n]+)\*/g, "<b>$1</b>")}</pre>
-    ${acc ? `<div class="rp-acc"><button class="btn chico pri" data-si="${p.id}">${esc(siDe(p))}</button>${p.tipo === "d_mala" ? `<button class="btn chico" data-si="${p.id}" data-solo="bajar">Solo bajar</button><button class="btn chico" data-si="${p.id}" data-solo="apagar">Solo apagar anuncios</button><button class="btn chico" data-verlimp="${p.id}">Ver limpieza</button>` : ""}<button class="btn chico" data-no="${p.id}">No</button></div>` : ""}</article>`;
-  return `<p class="rp-ayuda">Lo que propone el bot según los umbrales de Configuración (manual de la CBO de Santi). <b>Nada se aplica sin tu SÍ.</b> Al aplicar, se relee Meta, se verifica y la decisión queda anotada con su motivo para Franco. Cuando esté conectado WhatsApp, te llegan las mismas propuestas y podés contestar <b>SI n</b> / <b>NO n</b>.</p>
-    ${abiertas.length ? `<p class="rp-alerta">🧭 ${abiertas.length} acción${abiertas.length === 1 ? "" : "es"} para decidir.</p>` : `<p class="vacio">No hay acciones abiertas. Salen en los horarios de Configuración; los avisos de surfeo, en el momento.</p>`}
-    <div class="rp-lista">${abiertas.map((p) => tarjeta(p, true)).join("")}</div>
-    ${hechas.length ? `<h3 class="rp-h3">Decisiones (3 días)</h3><div class="rp-lista">${hechas.map((p) => `<article class="rp-card ${p.estado === "aplicada" ? "rp-card-v" : ""}"><div class="rp-cab">${ICONO_P[p.tipo] || "•"} <b>${esc(p.nombre || "")}</b>${chip(p.estado === "aplicada" ? "✓ aplicada" : "✗ no", p.estado === "aplicada" ? "rp-chip-v" : "rp-chip-g")}<time class="mut">${fecha(p.resuelta)}</time></div>
-      <p>${esc(p.quien || "")}${p.resultado?.pasos?.length ? ` · ${esc(p.resultado.pasos.join(" · "))}` : ""}</p>${p.decision_motivo ? `<p class="rp-motivo">«${esc(p.decision_motivo)}»</p>` : ""}${p.tipo === "auto_minimos" ? `<p class="mut">${esc(p.motivo || "")}</p><pre class="rp-auto">${esc(p.texto || "")}</pre>` : ""}${p.grupo_enviado ? `<p class="mut">Mandado al grupo con Franco ${fecha(p.grupo_enviado)}</p>` : ""}</article>`).join("")}</div>` : ""}
-    ${vencidas.length ? `<details class="rp-venc"><summary>${vencidas.length} vencidas sin respuesta</summary><div class="rp-lista">${vencidas.map((p) => tarjeta(p, false)).join("")}</div></details>` : ""}`;
-}
-function tabConfig(d) {
-  const grupos = []; for (const x of d.esquema) { let g = grupos.find((y) => y.g === x.g); if (!g) grupos.push(g = { g: x.g, xs: [] }); g.xs.push(x); }
+async function verConfig() {
+  let d; try { d = await api("accion=config"); } catch (e) { return toast(esc(e.message), "error"); }
+  const usar = /^(Limpiador|Winners|Cuentas nuevas|F · Mínimos)$/;
+  const grupos = []; for (const x of d.esquema) { if (!usar.test(x.g) && !(x.g === "General" && x.k === "roas_equilibrio")) continue; let g = grupos.find((y) => y.g === x.g); if (!g) grupos.push(g = { g: x.g, xs: [] }); g.xs.push(x); }
   const campo = (x) => x.t === "bool" ? `<label class="rp-sw"><input type="checkbox" data-k="${esc(x.k)}" ${x.valor ? "checked" : ""}> <span>${esc(x.n)}</span></label>`
-    : `<label class="rp-campo"><span>${esc(x.n)}${x.t === "pct" ? "" : ""}</span><input class="campo num" data-k="${esc(x.k)}" value="${esc(x.t === "texto" ? x.valor : NF2.format(x.valor).replace(/,00$/, ""))}" inputmode="${x.t === "texto" ? "text" : "decimal"}">
-       <small class="mut">${x.a ? esc(x.a) + " · " : ""}fábrica: ${esc(String(x.def))}</small></label>`;
-  return `<p class="rp-ayuda">Todos los umbrales del bot y de los reportes. Al guardar, se usan desde la próxima pasada (máx. 30 min).${d.actualizado ? ` Último cambio: ${fecha(d.actualizado)}${d.quien ? ` (${esc(d.quien)})` : ""}.` : ""}</p>
-    <form id="rp-form" class="rp-config">${grupos.map((g) => `<fieldset class="rp-grupo"><legend>${esc(g.g)}</legend>${g.xs.map(campo).join("")}</fieldset>`).join("")}
-    <div class="rp-acc rp-fijo"><button type="submit" class="btn pri">Guardar umbrales</button><button type="button" class="btn" data-fabrica>Volver a los de fábrica</button></div></form>`;
+    : `<label class="rp-campo"><span>${esc(x.n)}</span><input class="campo num" data-k="${esc(x.k)}" value="${esc(x.t === "texto" ? x.valor : NF2.format(x.valor).replace(/,00$/, ""))}" inputmode="decimal"><small class="mut">${x.a ? esc(x.a) + " · " : ""}fábrica: ${esc(String(x.def))}</small></label>`;
+  const m = cerrable(R.ctx.abrirModal(`<h3>Umbrales</h3><div class="rp-config">${grupos.map((g) => `<fieldset class="rp-grupo"><legend>${esc(g.g === "General" ? "General" : g.g)}</legend>${g.xs.map(campo).join("")}</fieldset>`).join("")}</div>
+    <div class="botones"><button class="btn" data-x>Cancelar</button><button class="btn pri" data-ok>Guardar</button></div>`, { ancho: true }));
+  $("[data-ok]", m.dlg).onclick = async () => {
+    const valores = {}; $$("[data-k]", m.dlg).forEach((i) => valores[i.dataset.k] = i.type === "checkbox" ? i.checked : i.value.trim().replace(/\./g, "").replace(",", "."));
+    try { await api("accion=config", { valores }); toast("✓ Umbrales guardados.", "ok"); m.cerrar(); cargarTodo(true); } catch (e) { toast(esc(e.message), "error", 8000); }
+  };
 }
 
-// ---------- pintar y eventos ----------
-// (02/11) varias campañas a la vez: volver al presupuesto de antes o bajar X %, y marcar 🧱 techo en el monto que queda
-function barraSel() {
-  let b = document.getElementById("rp-selbar");
-  if (R.tab !== "surfeos" || !R.sel.size) { b?.remove(); return; }
-  if (!b) { b = document.createElement("div"); b.id = "rp-selbar"; b.className = "rp-selbar"; document.body.appendChild(b); }
-  b.innerHTML = `<b>${R.sel.size} campaña${R.sel.size === 1 ? "" : "s"}</b>
-    <button class="btn chico pri" data-lote="volver">Volver al de antes + 🧱</button>
-    <button class="btn chico" data-lote="-30">−30 % + 🧱</button><button class="btn chico" data-lote="-20">−20 % + 🧱</button><button class="btn chico" data-lote="-10">−10 % + 🧱</button>
-    <button class="btn chico" data-lote="techo">Solo 🧱 techo</button><button class="btn chico" data-lote="limpiar">Limpiar</button>`;
-  $$("[data-lote]", b).forEach((x) => x.onclick = () => x.dataset.lote === "limpiar" ? (R.sel.clear(), pintar()) : lote(x.dataset.lote));
-}
-function lote(modo) {
-  const xs = [...R.sel].map((id) => R.ultCampana?.get(id)).filter(Boolean);
-  const plan = xs.map((s) => { const ahora = Number(s.ahora ?? s.a);
-    const nuevo = modo === "volver" ? (s.dir > 0 ? Number(s.de) : ahora) : modo === "techo" ? ahora : a55(ahora * (1 + Number(modo) / 100));
-    return { s, ahora, nuevo, cambia: Math.abs(nuevo - ahora) > 0.01 }; });
-  const tit = modo === "volver" ? "Volver al presupuesto de antes del surfeo y marcar techo" : modo === "techo" ? "Marcar 🧱 techo en el presupuesto de hoy" : `Bajar ${Math.abs(Number(modo))} % y marcar techo`;
-  confirmar(`¿${tit}?`, `<ul class="rp-lote">${plan.map((p) => `<li><b>${esc(p.s.nombre)}</b> <span class="mut">${esc(p.s.cuenta || "")}</span><br>${p.cambia ? `${usd2(p.ahora)} → <b>${usd2(p.nuevo)}</b>` : `queda en ${usd2(p.ahora)}`} · 🧱 ${usd2(p.nuevo)}</li>`).join("")}</ul>`,
-    `Sí, aplicar a ${plan.length}`, async () => {
-      let ok = 0; const mal = [];
-      for (const p of plan) {
-        try {
-          if (p.cambia) { const r = await R.ctx.presupuesto({ id: p.s.campana_id, act: p.s.act, nombre: p.s.nombre, monto: p.nuevo }); if (!r.ok) throw new Error(r.error || "Meta no lo aplicó"); if (r.simulado) continue; }
-          await api("accion=techo", { id: p.s.campana_id, act: p.s.act, nombre: p.s.nombre, monto: p.nuevo, motivo: tit }); tocar(p.s.campana_id, p.cambia ? `📉 bajó ${usd2(p.ahora)} → ${usd2(p.nuevo)} + 🧱` : `🧱 techo en ${usd2(p.nuevo)}`); ok++;
-        } catch (e) { mal.push(`${p.s.nombre}: ${e.message}`); }
-      }
-      toast(`✓ ${ok} de ${plan.length} listas.${mal.length ? " Fallaron: " + esc(mal.join(" · ")) : ""}`, mal.length ? "error" : "ok", 10000);
-      R.sel.clear(); R.ctx.recargarTechos?.(); await cargar(true);
-    });
-}
+// ---------- pintar y cargar ----------
 function pintar() {
-  const r = R.raiz; if (!r) return;
-  const d = R.datos[R.tab];
-  const cuerpo = !d ? `<p class="vacio"><span class="cargador"></span>Cargando…</p>` : d.__error ? `<div class="err-box" role="alert"><b>No se pudo cargar.</b> ${esc(d.__error)} <button class="btn chico" data-recargar>Reintentar</button></div>`
-    : ({ surfeos: tabSurfeos, campanas: tabCampanas, cuentas: tabCuentas, gastos: tabGastos, minimos: tabMinimos, escala: tabEscala, bot: tabBot, config: tabConfig })[R.tab](d);
-  r.innerHTML = `<div class="rp">
-    <div class="rp-top"><div class="rp-tabs" role="tablist">${TABS.map(([k, t]) => `<button type="button" class="rp-tab" role="tab" data-tab="${k}" aria-selected="${k === R.tab}">${t}</button>`).join("")}</div>
-      <button type="button" class="btn chico" data-recargar title="Volver a leer">↻ Actualizar</button></div>
-    <div class="rp-cuerpo">${cuerpo}</div></div>`;
-  enlazar(); barraSel();
+  if (!R.raiz) return;
+  R.raiz.innerHTML = `<div class="rp2">
+    <div class="rp2-top"><p class="mut">Lo que hay que mirar hoy, en una pantalla. «Ver todo» abre el detalle.</p>
+      <span class="rp2-bot"><button class="btn chico" data-cfg>Umbrales</button><button class="btn chico" data-rec>↻ Actualizar</button></span></div>
+    <div class="rp2-grid">${cardSaldo()}${cardLimpiador()}${cardRechazos()}${cardWinners()}${cardNuevas()}</div></div>`;
+  const r = R.raiz;
+  $("[data-rec]", r).onclick = () => cargarTodo(true);
+  $("[data-cfg]", r).onclick = verConfig;
+  $$("[data-per]", r).forEach((b) => b.onclick = () => { R.per = b.dataset.per; ls.set("rp_limp_per", R.per); R.d.limpiador = null; pintar(); cargar("limpiador"); });
+  $$("[data-abrir]", r).forEach((b) => b.onclick = () => ({ limp: verLimpiador, rech: verRechazos, win: verWinners })[b.dataset.abrir]?.());
 }
-function enlazar() {
-  const r = R.raiz, d = R.datos[R.tab] || {};
-  $$("[data-tab]", r).forEach((b) => b.onclick = () => { R.sel.clear(); R.tab = b.dataset.tab; R.filtro = "todos"; ls.set("rp_tab", R.tab); cargar(); });
-  $$("[data-recargar]", r).forEach((b) => b.onclick = () => cargar(true));
-  $$("[data-f]", r).forEach((b) => b.onclick = () => { R.filtro = b.dataset.f; ls.set("rp_filtro", R.filtro); pintar(); });
-  const S = (id) => (d.surfeos || []).find((s) => String(s.id) === String(id));
-  R.abiertos ??= new Set();
-  $$("[data-selc]", r).forEach((c) => { c.closest("label").onclick = (e) => e.stopPropagation(); c.onchange = () => { const id = c.dataset.selc; c.checked ? R.sel.add(id) : R.sel.delete(id); c.closest("details")?.classList.toggle("rp-elegida", c.checked); barraSel(); }; });
-  $$("[data-surf-id]", r).forEach((x) => x.ontoggle = () => { x.open ? R.abiertos.add(x.dataset.surfId) : R.abiertos.delete(x.dataset.surfId); });
-  $$("[data-volver]", r).forEach((b) => b.onclick = () => volverConTecho(S(b.dataset.volver)));
-  $$("[data-techo]", r).forEach((b) => b.onclick = () => { const s = S(b.dataset.techo); marcarTecho({ id: s.campana_id, act: s.act, nombre: s.nombre, monto: s.dir > 0 ? s.de : s.ahora ?? s.a }); });
-  $$("[data-quitar]", r).forEach((b) => b.onclick = () => { const s = (d.surfeos || []).find((x) => x.campana_id === b.dataset.quitar); quitarTecho({ id: b.dataset.quitar, nombre: s?.nombre }); });
-  $$("[data-motivo]", r).forEach((b) => b.onclick = () => motivo(S(b.dataset.motivo)));
-  const C = (id) => (d.campanas || []).find((c) => c.id === id);
-  $$("[data-limp]", r).forEach((b) => b.onclick = () => abrirLimpieza(C(b.dataset.limp)));
-  $$("[data-surf]", r).forEach((b) => b.onclick = () => surfearYAnotar(C(b.dataset.surf)));
-  const P = (id) => (d.propuestas || []).find((p) => String(p.id) === String(id));
-  $$("[data-si]", r).forEach((b) => b.onclick = () => decidir(P(b.dataset.si), "si", b.dataset.solo));
-  $$("[data-no]", r).forEach((b) => b.onclick = () => decidir(P(b.dataset.no), "no"));
-  $$("[data-verlimp]", r).forEach((b) => b.onclick = () => { const p = P(b.dataset.verlimp); abrirLimpieza({ id: p.campana_id, act: p.act, nombre: p.nombre, cuenta: p.ahora?.cuenta, cbo: p.ahora?.cbo, presupuesto: p.ahora?.presupuesto ?? p.de }); });
-  const E = (id) => (d.escala || []).find((e) => e.id === id);
-  $$("[data-esc]", r).forEach((b) => b.onclick = () => cambiarPres(E(b.dataset.esc), Number(b.dataset.pct)));
-  $$("[data-apagar-c]", r).forEach((b) => b.onclick = () => apagarCampana(E(b.dataset.apagarC)));
-  $$("[data-sacarmin]", r).forEach((b) => b.onclick = () => {
-    const x = (d.minimos || []).find((m) => m.id === b.dataset.sacarmin), ids = $$(`[data-min][data-camp="${x.id}"]:checked`, r).map((i) => i.dataset.min);
-    if (!ids.length) return toast("Tildá los conjuntos a los que les querés sacar el mínimo.", "error");
-    const sets = x.sets.filter((s) => ids.includes(String(s.id)));
-    confirmar("¿Sacar el gasto mínimo?", `<p><b>${esc(x.nombre)}</b></p><ul>${sets.map((s) => `<li>${esc(s.nombre)} · mín ${usd2(s.minimo)}</li>`).join("")}</ul>`, `Sí, sacar ${sets.length}`, async () => {
-      const res = await R.ctx.quitarMinimo(sets.map((s) => ({ id: s.id, act: x.act, nombre: s.nombre })));
-      const ok = Array.isArray(res) ? res.filter((y) => y.ok).length : 0; toast(`✓ Mínimo sacado a ${ok} de ${sets.length}.`, ok === sets.length ? "ok" : "error", 8000); await cargar(true);
-    });
-  });
-  const f = $("#rp-form", r);
-  if (f) {
-    f.onsubmit = async (e) => {
-      e.preventDefault(); const valores = {};
-      $$("[data-k]", f).forEach((i) => valores[i.dataset.k] = i.type === "checkbox" ? i.checked : i.value.trim().replace(/\./g, "").replace(",", "."));
-      for (const x of d.esquema) if (x.t === "texto") valores[x.k] = $(`[data-k="${x.k}"]`, f).value;
-      try { await api("accion=config", { valores }); toast("✓ Umbrales guardados.", "ok"); await cargar(true); } catch (err) { toast(esc(err.message), "error", 8000); }
-    };
-    $("[data-fabrica]", f).onclick = () => confirmar("¿Volver a los umbrales de fábrica?", `<p>Se pisan todos los valores con los de la propuesta del 02/11.</p>`, "Sí, volver", async () => {
-      const valores = Object.fromEntries(d.esquema.map((x) => [x.k, x.def])); await api("accion=config", { valores }); toast("✓ Umbrales de fábrica.", "ok"); await cargar(true);
-    });
-  }
+async function cargar(k, forzar = false) {
+  const q = k === "limpiador" ? `accion=resumen&tab=limpiador&periodo=${R.per}` : `accion=resumen&tab=${k}`;
+  try { R.d[k] = await api(q + (forzar ? "&forzar=1" : "")); } catch (e) { R.d[k] = { __error: e.message }; }
+  const y = window.scrollY; pintar(); window.scrollTo({ top: y });
 }
-async function cargar(forzar = false) {
-  if (!forzar && R.datos[R.tab] && !R.datos[R.tab].__error) return pintar();
-  const tab = R.tab, quieto = forzar && R.datos[tab] && !R.datos[tab].__error, y = window.scrollY; // (02/11) recargar sin saltar arriba
-  if (!quieto) { R.datos[tab] = null; pintar(); } else R.raiz?.classList.add("rp-actualizando");
-  try {
-    if (!R.cfg) api("accion=config").then((c) => { R.cfg = Object.fromEntries(c.esquema.map((x) => [x.k, x.valor])); }).catch(() => {});
-    R.datos[tab] = tab === "config" ? await api("accion=config") : await api(`accion=resumen&tab=${tab}`);
-    if (tab === "config") R.cfg = Object.fromEntries(R.datos[tab].esquema.map((x) => [x.k, x.valor]));
-  } catch (e) { if (!quieto) R.datos[tab] = { __error: e.message }; else toast(`No se pudo actualizar: ${esc(e.message)}`, "error"); }
-  R.raiz?.classList.remove("rp-actualizando");
-  if (R.tab === tab) { pintar(); if (quieto) window.scrollTo({ top: y }); }
+async function cargarUmb() {
+  try { const r = await fetch(`${API_UMB}?accion=ver`, { headers: { "x-app-clave": clave() }, cache: "no-store" }); const j = await r.json(); if (!r.ok || j.error) throw new Error(j.error || `Error ${r.status}`); R.umb = j; }
+  catch (e) { R.umb = { __error: e.message }; }
+  const y = window.scrollY; pintar(); window.scrollTo({ top: y });
 }
-window.Reportes = {
-  montar(raiz, ctx) { R.raiz = raiz; R.ctx = ctx || {}; R.datos = {}; R.sel.clear();
-    clearInterval(R.vigila); R.vigila = setInterval(() => { if (!R.raiz?.isConnected) { document.getElementById("rp-selbar")?.remove(); clearInterval(R.vigila); } }, 800); // saliste de Reportes: se va la barra
-    if (!TABS.some(([k]) => k === R.tab)) R.tab = "surfeos"; cargar(true); },
-};
+function cargarTodo(forzar = false) {
+  if (!forzar) { R.d = {}; R.umb = null; }
+  pintar();
+  cargarUmb(); for (const k of ["limpiador", "rechazos", "winners", "nuevas"]) cargar(k, forzar);
+}
+window.Reportes = { montar(raiz, ctx) { R.raiz = raiz; R.ctx = ctx || {}; document.getElementById("rp-selbar")?.remove(); cargarTodo(false); } };
 })();
