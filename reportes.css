@@ -1,0 +1,86 @@
+/* Reportes (02/11). Usa las variables de styles.css: anda en claro y oscuro. */
+.rp { display: grid; gap: 14px; padding-bottom: 48px; }
+.rp-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.rp-tabs { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 6px; scrollbar-width: thin; min-width: 0; flex: 1 1 auto; }
+.rp-tab { flex: 0 0 auto; min-height: 40px; padding: 6px 14px; border: 2px solid var(--tinta); border-radius: var(--r-btn); background: var(--tarjeta); color: var(--tinta); box-shadow: 3px 3px 0 var(--sombra); font: 700 15px var(--f-titulo); cursor: pointer; }
+.rp-tab:hover { background: var(--papel-2); }
+.rp-tab[aria-selected="true"] { background: var(--tinta); color: var(--papel); transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--sombra); }
+.rp-tab:focus-visible, .rp-seg:focus-visible { outline: 3px solid var(--foco); outline-offset: 2px; }
+.rp-cuerpo { display: grid; gap: 12px; min-width: 0; }
+.rp-ayuda { margin: 0; color: var(--mut); font-size: 14px; line-height: 1.45; max-width: 80ch; }
+.rp-alerta { margin: 0; padding: 10px 14px; border: 2px solid var(--tinta); border-radius: var(--r-card); background: var(--r-rojo-bg); color: var(--r-rojo-tx); font-weight: 600; }
+.rp-alerta-g { background: var(--r-ama-bg); color: var(--r-ama-tx); font-weight: 500; }
+.rp-h3 { margin: 8px 0 0; font: 700 17px var(--f-titulo); }
+
+.rp-segs { display: flex; flex-wrap: wrap; gap: 6px; }
+.rp-seg { min-height: 34px; padding: 4px 12px; border: 1.5px solid var(--tinta); border-radius: 999px; background: var(--tarjeta); color: var(--tinta); font: 600 13.5px var(--f-texto); cursor: pointer; }
+.rp-seg[aria-pressed="true"] { background: var(--tinta); color: var(--papel); }
+
+.rp-lista { display: grid; gap: 12px; }
+.rp-card { display: grid; gap: 8px; padding: 12px 14px; border: 2px solid var(--tinta); border-radius: var(--r-card); background: var(--tarjeta); box-shadow: 3px 3px 0 var(--sombra); min-width: 0; }
+.rp-card-r { border-left: 8px solid var(--peligro); }
+.rp-card-v { border-left: 8px solid var(--ok); }
+.rp-cab { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
+.rp-cab b { overflow-wrap: anywhere; }
+.rp-cab time { margin-left: auto; font-size: 13px; }
+.rp-cambio { font-size: 15px; font-variant-numeric: tabular-nums; }
+.rp-motivo { margin: 0; font-style: italic; color: var(--tinta-2); }
+.rp-chip { display: inline-block; padding: 1px 8px; border-radius: 999px; border: 1.5px solid currentColor; font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+.rp-chip-r { background: var(--r-rojo-bg); color: var(--r-rojo-tx); }
+.rp-chip-v { background: var(--r-ver-bg); color: var(--r-ver-tx); }
+.rp-chip-a { background: var(--r-ama-bg); color: var(--r-ama-tx); }
+.rp-chip-g { background: var(--r-gris-bg); color: var(--r-gris-tx); }
+
+.rp-notas { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+.rp-nota { display: grid; gap: 2px; padding: 8px 10px; border: 1.5px solid var(--linea); border-radius: 8px; background: var(--papel-2); font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.rp-nota > b { font: 700 14px var(--f-titulo); }
+.rp-nota-r { border-color: var(--peligro); background: var(--r-rojo-bg); color: var(--r-rojo-tx); }
+.rp-nota-v { border-color: var(--ok); background: var(--r-ver-bg); color: var(--r-ver-tx); }
+.rp-nota-r .mut, .rp-nota-v .mut { color: inherit; opacity: .8; }
+.rp-nota-vacia { opacity: .6; }
+.rp-ver { font-weight: 700; margin-top: 2px; }
+.rp-acc { display: flex; flex-wrap: wrap; gap: 8px; }
+.rp-v { color: var(--ok); } .rp-a { color: var(--r-ama-tx); } .rp-r { color: var(--peligro); }
+
+.rp-tabla-caja { overflow-x: auto; border: 2px solid var(--tinta); border-radius: var(--r-card); background: var(--tarjeta); }
+.rp-tabla { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.rp-tabla th { position: sticky; top: 0; background: var(--papel-2); text-align: left; padding: 8px 10px; font: 700 12.5px var(--f-titulo); white-space: nowrap; border-bottom: 2px solid var(--tinta); }
+.rp-tabla td { padding: 8px 10px; border-bottom: 1px solid var(--linea); vertical-align: top; }
+.rp-tabla td:first-child { min-width: 220px; }
+.rp-tabla td > .mut, .rp-tabla td > span.mut { display: block; font-size: 12px; }
+.rp-tabla td .rp-chip { margin-top: 4px; }
+.rp-tabla .num { text-align: right; white-space: nowrap; }
+.rp-tabla tr.rp-mala td { background: color-mix(in srgb, var(--r-rojo-bg) 55%, transparent); }
+.rp-acc-td { white-space: nowrap; } .rp-acc-td .btn + .btn { margin-left: 6px; }
+
+.rp-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.rp-tile { display: grid; gap: 2px; padding: 12px 14px; border: 2px solid var(--tinta); border-radius: var(--r-card); background: var(--tarjeta); box-shadow: 3px 3px 0 var(--sombra); }
+.rp-tile b { font: 700 24px var(--f-titulo); font-variant-numeric: tabular-nums; }
+.rp-tile span { color: var(--mut); font-size: 13px; }
+
+.rp-barra { height: 12px; border: 1.5px solid var(--tinta); border-radius: 999px; overflow: hidden; background: var(--papel-2); }
+.rp-barra span { display: block; height: 100%; background: var(--acento); }
+.rp-card-r .rp-barra span { background: var(--peligro); }
+.rp-lista-ap { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 13.5px; }
+.rp-lista-ap label { display: flex; gap: 6px; align-items: baseline; cursor: pointer; overflow-wrap: anywhere; }
+
+.rp-wa { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--r-ver-bg); color: var(--r-ver-tx); font: 14px/1.45 var(--f-texto); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.rp-config { display: grid; gap: 14px; }
+.rp-grupo { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px 16px; margin: 0; padding: 12px 14px 14px; border: 2px solid var(--tinta); border-radius: var(--r-card); background: var(--tarjeta); }
+.rp-grupo legend { padding: 0 6px; font: 700 15px var(--f-titulo); }
+.rp-campo { display: grid; gap: 4px; font-size: 13.5px; }
+.rp-campo .campo { max-width: 140px; }
+.rp-campo small { font-size: 12px; }
+.rp-sw { display: flex; gap: 8px; align-items: center; font-size: 14px; cursor: pointer; }
+.rp-fijo { position: sticky; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); padding: 10px; border: 2px solid var(--tinta); border-radius: var(--r-card); background: var(--papel); box-shadow: 3px 3px 0 var(--sombra); justify-self: start; }
+
+/* tabla principal del Dashboard y modales de presupuesto */
+.techo-tag { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 6px; border: 1.5px solid var(--r-gris-tx); background: var(--r-gris-bg); color: var(--r-gris-tx); font-size: 12px; font-weight: 700; white-space: nowrap; vertical-align: 1px; }
+.techo-aviso { margin: 8px 0; padding: 8px 12px; border: 2px solid var(--tinta); border-radius: 8px; background: var(--r-ama-bg); color: var(--r-ama-tx); font-weight: 600; }
+
+@media (max-width: 560px) {
+  .rp-tab { min-height: 36px; padding: 4px 10px; font-size: 14px; }
+  .rp-cab time { margin-left: 0; width: 100%; }
+  .rp-tabla td:first-child { min-width: 170px; }
+}

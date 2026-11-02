@@ -482,6 +482,7 @@ async function cargarDetalle(c, forzar = false) {
 // ---------- montaje ----------
 function montar() {
   pararRanking(); S.vista = "dash"; ls.set("dash_seccion", "dash");
+  cargarTechos();
   if (location.hash && seccionDe(location.hash.slice(1))) { try { history.replaceState(null, "", location.pathname + location.search); } catch {} }
   pintarNav();
   $("#main").innerHTML = `
@@ -1157,7 +1158,7 @@ function fila({ nivel, n, x, act, sub, abrible, abierto, extraEstado }) {
   return `<tr class="fila nivel-${n}${abierto ? " abierta" : ""}${sel ? " sel" : ""}" data-k="${esc(k)}" data-act="${esc(act)}" tabindex="0" aria-selected="${sel}">
     <td class="nom">${dotEstado(x.estado).replace('class="dot ', 'class="dot dot-esq ')}<div class="nomwrap">
       ${abrible ? `<button type="button" class="tg" data-tg="${esc((nivel === "campana" ? "c:" : "s:") + x.id)}" aria-expanded="${abierto}" aria-label="${abierto ? "Ocultar" : "Ver"} ${etiquetaTg} de ${esc(x.nombre)}"><span aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9.5 5.5 C 12 8, 14 10.5, 15.5 12.2 C 13.6 14, 11.6 16.4, 9.2 18.6" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>` : `<span class="tg-hueco" aria-hidden="true"></span>`}
-      <div class="txt"><span class="niv-tag niv-${nivel}">${NIVEL[nivel][0]}</span><div class="n">${esc(x.nombre)}</div>${sub ? `<div class="sub">${sub}</div>` : ""}</div>
+      <div class="txt"><span class="niv-tag niv-${nivel}">${NIVEL[nivel][0]}</span><div class="n">${nivel === "campana" ? tagTecho(x) : ""}${esc(x.nombre)}</div>${sub ? `<div class="sub">${sub}</div>` : ""}</div>
     </div></td>${celdas(x, nivel)}</tr>${filaNube(x)}`;
 }
 function subCampana(c) {
@@ -1765,7 +1766,7 @@ function modificarPresupuesto() {
     $("[data-sig]", m.dlg).onclick = () => listo() && its.length && paso2();
   };
   const paso2 = () => {
-    m.set(`<h3>¿Seguro que querés ${verbo()}?</h3>${lista()}${modoTx}
+    m.set(`<h3>¿Seguro que querés ${verbo()}?</h3>${lista()}${avisoTecho(its, modo)}${modoTx}
       <div class="botones"><button class="btn" data-atras>Atrás</button><button class="btn pri" data-ok data-foco>Sí, ${modo === "fijo" ? `poner ${montoTx(fijo)}` : `${modo === "bajar" ? "bajar −" : "subir +"}${pct} %`}</button></div>`);
     $("[data-atras]", m.dlg).onclick = paso1;
     $("[data-ok]", m.dlg).onclick = async (e) => {
@@ -1783,7 +1784,7 @@ function editarPresupuesto(it) {
   const m = abrirModal(`<h3>Presupuesto diario</h3><p class="mut">${NIVEL[it.nivel][0]} · ${esc(it.nombre)}</p>
     <label class="w-lbl" for="pres-ed">Nuevo presupuesto (hoy ${montoTx(r.presupuesto)})</label>
     <input class="campo num" id="pres-ed" inputmode="decimal" autocomplete="off" value="${esc(NF2.format(r.presupuesto ?? 0))}" data-foco>
-    <p class="mut" id="pres-queda"></p>
+    <p class="mut" id="pres-queda"></p>${avisoTecho([it], "fijo")}
     ${DEMO ? `<p class="mut">Demo: se simula en el navegador, no toca Meta.</p>` : dryOn() ? `<p class="mut"><b>Modo prueba:</b> Meta no se toca.</p>` : ""}
     <div class="botones"><button class="btn" data-x>Cancelar</button><button class="btn pri" data-ok>Guardar</button></div>`, { bloqueado: () => enviando });
   const inp = $("#pres-ed", m.dlg), ok = $("[data-ok]", m.dlg), queda = $("#pres-queda", m.dlg);
@@ -3271,6 +3272,8 @@ const SECCIONES = [
     montar: (o) => montarCreativos(o), ya: (o) => window.Creativos?.abrir(o.ruta || {}) }, // tocarla estando adentro = volver a todas las carpetas
   { id: "atc", nombre: "ATC", raiz: "#atc", icono: "M4.5 5.2 C 9.5 5, 14.5 5.1, 19.6 5 C 20.3 5, 20.6 5.4, 20.6 6 L20.5 14.2 C 20.5 14.9, 20.1 15.3, 19.4 15.3 L11 15.4 L6.6 19 L6.8 15.4 L4.6 15.4 C 3.9 15.4, 3.5 15, 3.5 14.3 L3.6 6.1 C 3.6 5.5, 3.9 5.2, 4.5 5.2 Z M7.8 9.4 H16.2 M7.8 12 H13",
     montar: () => montarAtc() }, // (27/10) atención al cliente: comentarios, privados, mails y reclamos
+  { id: "reportes", nombre: "Reportes", raiz: "#rp", icono: "M5 4.5 C 9.5 4.3, 14 4.6, 18.8 4.4 L18.6 19.6 C 14 19.8, 9.5 19.5, 5.2 19.7 Z M8.3 15.5 L11 12.3 L13.2 14.2 L16 10 M8.4 8.2 H12.6",
+    montar: () => montarReportes() }, // (02/11) control de lo que hacemos: surfeos, campañas, cuentas, gastos, mínimos, escala, bot y umbrales
 ];
 const seccionDe = (id) => SECCIONES.find((x) => x.id === (id === "taller" ? "workspace" : id)) || null; // #taller = nombre viejo
 
@@ -3401,6 +3404,79 @@ async function montarAtc() {
   }
   if (S.vista !== "atc" || !$("#atc")) return;
   window.Atc.montar($("#atc"), { login: (msg) => login(msg), toast });
+}
+
+// ---------- Reportes (02/11, Lorenzo): reportes.js se carga la primera vez. Backend: Edge Function «reportes» ----------
+// Las acciones que tocan Meta (presupuesto, apagar, sacar mínimo) pasan por app-movil, como el resto del Dashboard, siempre con confirmación.
+let rpCarga = null;
+function cargarReportes() {
+  if (window.Reportes) return Promise.resolve();
+  if (rpCarga) return rpCarga;
+  const css = new Promise((ok) => {
+    if ($('link[href^="reportes.css"]')) return ok();
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "reportes.css?v=1";
+    l.onload = l.onerror = () => ok(); document.head.appendChild(l);
+  });
+  const js = new Promise((ok, mal) => {
+    const sc = document.createElement("script"); sc.src = "reportes.js?v=1";
+    sc.onload = () => window.Reportes ? ok() : mal(new Error("Reportes no arrancó"));
+    sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar Reportes. ¿Hay conexión?")); };
+    document.head.appendChild(sc);
+  });
+  rpCarga = Promise.all([css, js]).catch((e) => { rpCarga = null; throw e; });
+  return rpCarga;
+}
+// Cambia el presupuesto de UNA campaña y devuelve si Meta lo aplicó (Reportes lo usa para marcar el techo solo si salió bien).
+async function presupuestoReportes(it) {
+  const r = await api("presupuesto", { body: { items: [{ id: it.id, act: it.act, nivel: "campana", nombre: it.nombre, monto: it.monto }] }, escritura: true });
+  const x = (r.resultados || [])[0] || {}, simulado = !!(r.dry || (x.cambios || []).some((c) => c.simulado));
+  if (x.ok && !simulado) { actualizarPresLocal(x); marcarUltimo({ id: it.id, nivel: "campana", nombre: it.nombre }, { tipo: "budget", que: "presupuesto", antes: x.antes, despues: x.despues }); refrescarUltimosLuego(); }
+  return { ok: !!x.ok, simulado, error: x.ok ? null : errorClaro(x.error), antes: x.antes, despues: x.despues };
+}
+async function montarReportes() {
+  cerrarMenu(); pararRanking();
+  S.vista = "reportes"; ls.set("dash_seccion", "reportes");
+  try { history.replaceState(null, "", location.pathname + location.search + "#reportes"); } catch {}
+  pintarNav();
+  $("#main").innerHTML = `<section class="rp-sec" id="rp" aria-labelledby="rp-t"><h2 class="sr" id="rp-t">Reportes</h2><p class="vacio"><span class="cargador"></span>Abriendo Reportes…</p></section>`;
+  pintarBarra();
+  window.scrollTo(0, 0);
+  try { await cargarReportes(); }
+  catch (e) {
+    if (S.vista !== "reportes" || !$("#rp")) return;
+    $("#rp").innerHTML = `<div class="err-box" role="alert"><b>No se pudo abrir Reportes.</b> ${esc(e.message)}<div><button type="button" class="btn chico" id="rp-reintentar">Reintentar</button></div></div>`;
+    $("#rp-reintentar").onclick = () => montarReportes();
+    return;
+  }
+  if (S.vista !== "reportes" || !$("#rp")) return;
+  window.Reportes.montar($("#rp"), {
+    login: (msg) => login(msg), toast, abrirModal, demo: DEMO, prueba: dryOn(),
+    usuario: () => usuarioActual()?.id || "",
+    presupuesto: presupuestoReportes,
+    estado: async (items, estado) => { const r = await api("estado", { body: { estado, items }, escritura: true }); return r.resultados || []; },
+    quitarMinimo: async (items) => { const r = await api("quitar_minimo", { body: { items }, escritura: true }); return r.resultados || r; },
+    recargarTechos: () => cargarTechos(true),
+  });
+}
+
+// ---------- techos marcados a mano (02/11): 🧱 al lado del nombre y aviso antes de subir ----------
+const TECHOS = new Map(); let techosT = 0;
+async function cargarTechos(forzar = false) {
+  if (DEMO || !clave() || (!forzar && Date.now() - techosT < 5 * 60e3)) return;
+  techosT = Date.now();
+  try {
+    const r = await fetch("https://tppcpnfzcxxusdhrlmdx.supabase.co/functions/v1/reportes?accion=techos", { headers: { "x-app-clave": clave() }, cache: "no-store" });
+    if (!r.ok) return;
+    const j = await r.json(); TECHOS.clear(); for (const t of j.techos || []) TECHOS.set(String(t.campana_id), t);
+    if (S.vista === "dash" && $("#carr")) pintarTabla();
+  } catch { /* sin techos no se frena nada */ }
+}
+const tagTecho = (x) => { const t = TECHOS.get(String(x.id)); return t ? `<span class="techo-tag" title="Techo marcado${t.quien ? " por " + esc(t.quien) : ""}: no surfear arriba de ${esc(montoTx(Number(t.monto)))}${t.motivo ? " · " + esc(t.motivo) : ""}">🧱 ${esc(montoTx(Number(t.monto)))}</span>` : ""; };
+function avisoTecho(its, modo) {
+  if (modo === "bajar") return "";
+  const xs = its.filter((i) => i.nivel === "campana" && TECHOS.has(String(i.id)));
+  if (!xs.length) return "";
+  return `<p class="techo-aviso" role="alert">🧱 ${xs.map((i) => `<b>${esc(i.nombre)}</b> tiene techo en ${esc(montoTx(Number(TECHOS.get(String(i.id)).monto)))}`).join(" · ")}. Ya se probó subirla y no rindió: ¿seguro?</p>`;
 }
 
 // ---------- Creativos (12/10): creativos.js se carga la primera vez. Backend: app-movil/creativos.ts ----------

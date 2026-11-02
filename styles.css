@@ -1402,3 +1402,7 @@ input.campo.f-buscar { font-size: 16px; padding: 9px 12px; max-width: 460px; }
 .g-tabla th.r { text-align: right; }
 .g-tabla td.r .mut { white-space: nowrap; }
 @media (max-width: 560px) { .c-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .g-tabla th { padding: 4px 10px; } }
+
+/* (02/11) Techo marcado a mano desde Reportes: 🧱 al lado del nombre y aviso antes de subir */
+.techo-tag { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 6px; border: 1.5px solid var(--r-gris-tx); background: var(--r-gris-bg); color: var(--r-gris-tx); font-size: 12px; font-weight: 700; white-space: nowrap; vertical-align: 1px; }
+.techo-aviso { margin: 8px 0; padding: 8px 12px; border: 2px solid var(--tinta); border-radius: 8px; background: var(--r-ama-bg); color: var(--r-ama-tx); font-weight: 600; }
