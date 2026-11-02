@@ -186,7 +186,7 @@ function tabSurfeos(d) {
   if (!F.some(([k]) => k === R.filtro)) R.filtro = "todos";
   const xs = xs0.filter((s) => R.filtro === "todos" || ten(s) === R.filtro);
   const fch = (dia) => `${dia.slice(8)}/${dia.slice(5, 7)}`;
-  return `<p class="rp-ayuda">Cada cambio de presupuesto, día por día como en el Dashboard: <b>cómo venía al surfear</b>, cómo cerró ese día y cómo le fue los días siguientes. «Mejoró / empeoró» compara el ROAS del momento del surfeo con el último día completo (umbral en Configuración).</p>
+  return `<p class="rp-ayuda">Cada surfeo de un vistazo: <b>a qué hora</b>, de qué presupuesto a cuál, el <b>ROAS en ese momento</b> y cómo cerró ese día y los siguientes. Tocá una para ver gasto y ventas día por día.</p>
     ${segs(F, R.filtro, "data-f")}
     <div class="rp-lista rp-surfs">${xs.map((s) => {
       const arriba = s.dir > 0, dias = s.notas?.dias || [], [tt, tc] = T[ten(s)] || T.pronto;
@@ -194,21 +194,33 @@ function tabSurfeos(d) {
       const base = dias[0]?.roas;
       const pill = (x, i) => { if (!x) return ""; const dif = i && base != null && x.roas != null ? x.roas - base : 0, cls = !i || x.roas == null ? "" : dif >= 0.25 ? "sube" : dif <= -0.25 ? "baja" : "igual";
         return `${i ? `<i class="rp-fl">›</i>` : ""}<span class="rp-paso ${cls}${x.final ? "" : " curso"}" title="${esc(x.et)} · ${fch(x.dia)}"><small>${i ? fch(x.dia) : "surf"}</small><b class="${roasCls(x.roas)}">${ro(x.roas)}</b></span>`; };
-      return `<article class="rp-surf2 ${ten(s) === "empeoro" ? "rp-surf-r" : ten(s) === "mejoro" ? "rp-surf-v" : ""}">
-        <div class="rp-s2-cab">
-          <div class="rp-s2-nom"><b>${esc(s.nombre || s.campana_id)}</b>
-            <span class="mut">${arriba ? "📈" : "📉"} ${usd2(s.de)} → <b>${usd2(s.a)}</b> · ${fecha(s.t)}${s.cuenta ? ` · ${esc(s.cuenta)}` : ""}${s.quien ? ` · ${esc(s.quien)}` : ""}</span>
-            <span class="rp-s2-chips">${chip(tt, tc)}${s.techo ? chip(`🧱 ${usd2(s.techo.monto)}`, "rp-chip-g") : ""}${s.motivo ? `<span class="mut rp-s2-mot">«${esc(s.motivo)}»</span>` : ""}</span></div>
-          <div class="rp-s2-tira" aria-label="ROAS por día">${dias.map(pill).join("")}</div>
-        </div>
+      const hoyAR = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10), surf = dias[0], tAR = new Date(Date.parse(s.t) - 3 * 3600e3).toISOString();
+      const diaSurf = tAR.slice(0, 10), horaSurf = tAR.slice(11, 16);
+      const cuando = diaSurf === hoyAR ? "Hoy" : diaSurf === new Date(Date.now() - 27 * 3600e3).toISOString().slice(0, 10) ? "Ayer" : fch(diaSurf);
+      const tile = (x, i) => { if (!x) return ""; const dif = base != null && x.roas != null ? x.roas - base : 0, cls = x.roas == null ? "" : dif >= 0.25 ? "sube" : dif <= -0.25 ? "baja" : "igual";
+        const et = x.k === "cierre" ? (x.final ? `Cerró ${fch(x.dia)}` : `${fch(x.dia)} · ahora`) : x.final ? fch(x.dia) : `${fch(x.dia)} · ahora`;
+        return `<i class="rp-fl">›</i><span class="rp-t ${cls}${x.final ? "" : " curso"}"><small>${et}</small><b class="${roasCls(x.roas)}">${ro(x.roas)}</b></span>`; };
+      const resto = dias.slice(1), falta = Math.max(0, 3 - resto.length);
+      return `<details class="rp-surf2 rp-s3 ${ten(s) === "empeoro" ? "rp-surf-r" : ten(s) === "mejoro" ? "rp-surf-v" : ""}" data-surf-id="${s.id}"${R.abiertos?.has(String(s.id)) ? " open" : ""}>
+        <summary>
+          <span class="rp-s3-nom"><b>${esc(s.nombre || s.campana_id)}</b><span class="mut">${s.cuenta ? esc(s.cuenta) : ""}${s.quien ? ` · ${esc(s.quien)}` : ""}</span><span class="rp-s2-chips">${chip(tt, tc)}${s.techo ? chip(`🧱 ${usd2(s.techo.monto)}`, "rp-chip-g") : ""}</span></span>
+          <span class="rp-s3-fila">
+            <span class="rp-t rp-t-surf"><small>${arriba ? "📈 Surf" : "📉 Bajada"} · ${cuando}</small><b class="rp-hora">${horaSurf}</b><span class="rp-pres">${usd2(s.de)} → <b>${usd2(s.a)}</b></span></span>
+            <span class="rp-t rp-t-base"><small>ROAS al surfear</small><b class="${roasCls(surf?.roas)}">${ro(surf?.roas)}</b></span>
+            ${resto.map(tile).join("")}${Array.from({ length: falta }, () => `<i class="rp-fl">›</i><span class="rp-t vacio"><small>—</small><b>—</b></span>`).join("")}
+          </span>
+        </summary>
+        <div class="rp-s3-det">
         <div class="rp-s2-tabla" role="table">
           <div class="rp-s2-f rp-s2-th" role="row"><span>Día</span><span>Presupuesto</span><span>Gastado</span><span>Ventas</span><span>ROAS</span></div>
           ${dias.map((x) => `<div class="rp-s2-f${x.k === "surf" ? " surf" : ""}${x.final ? "" : " curso"}" role="row"><span><b>${esc(x.et)}</b><small>${fch(x.dia)}${x.final ? "" : " · en curso"}</small></span><span data-l="Presupuesto">${x.p != null ? usd2(x.p) : "—"}</span><span data-l="Gastado">${usd(x.g)}</span><span data-l="Ventas">${x.v}</span><span data-l="ROAS"><b class="${roasCls(x.roas)}">${ro(x.roas)}</b></span></div>`).join("")}
         </div>
+        ${s.motivo ? `<p class="rp-motivo">«${esc(s.motivo)}»</p>` : ""}
         <div class="rp-acc rp-s2-acc">${puedeVolver ? `<button class="btn chico pri" data-volver="${s.id}">Volver a ${usd2(s.de)} + 🧱</button>` : ""}
           ${s.techo ? `<button class="btn chico" data-quitar="${esc(s.campana_id)}">Quitar techo</button>` : `<button class="btn chico" data-techo="${s.id}">Marcar 🧱 techo</button>`}
           <button class="btn chico" data-motivo="${s.id}">${s.motivo ? "Cambiar motivo" : "Anotar motivo"}</button></div>
-      </article>`;
+        </div>
+      </details>`;
     }).join("") || `<p class="vacio">Nada en este filtro (últimos 7 días).</p>`}</div>`;
 }
 function tabCampanas(d) {

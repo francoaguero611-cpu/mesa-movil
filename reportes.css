@@ -196,3 +196,39 @@
   .rp-s2-f > span[data-l]::before { content: attr(data-l); display: block; font-size: 10.5px; color: var(--mut); }
   .rp-s2-acc { justify-content: stretch; }
 }
+
+/* (02/11 noche b) Surfeo cerrado = resumen grande: SURF día·hora · presupuesto · ROAS al surfear › cierre › día siguiente › 2.º día */
+.rp-s3 { padding: 0; }
+.rp-s3 > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: minmax(200px, 1fr) auto; align-items: center; gap: 10px 18px; padding: 14px 16px; }
+.rp-s3 > summary::-webkit-details-marker { display: none; }
+.rp-s3-nom { display: grid; gap: 3px; min-width: 0; }
+.rp-s3-nom > b { font-size: 15.5px; overflow-wrap: anywhere; }
+.rp-s3-nom > .mut { font-size: 12px; }
+.rp-s3-fila { display: flex; align-items: stretch; gap: 6px; }
+.rp-t { display: flex; flex-direction: column; justify-content: center; align-items: center; min-width: 84px; padding: 6px 12px; border-radius: 16px; background: rgba(0,8,20,.25); border: 1px solid var(--g-borde); font-variant-numeric: tabular-nums; }
+.rp-t small { font-size: 11px; color: var(--mut); white-space: nowrap; }
+.rp-t b { font-size: 22px; font-weight: 600; letter-spacing: -.5px; line-height: 1.15; }
+.rp-t.sube { background: rgba(111,242,200,.09); border-color: rgba(111,242,200,.35); }
+.rp-t.baja { background: rgba(255,122,133,.09); border-color: rgba(255,122,133,.35); }
+.rp-t.curso { border-style: dashed; }
+.rp-t.vacio { opacity: .35; }
+.rp-t-surf { min-width: 150px; align-items: flex-start; background: rgba(124,200,255,.10); border-color: rgba(124,200,255,.4); }
+.rp-t-surf small { color: var(--celeste); font-weight: 600; }
+.rp-t-surf .rp-hora { font-size: 26px; color: var(--tinta); }
+.rp-pres { font-size: 13px; color: var(--tinta-2); white-space: nowrap; } .rp-pres b { font-size: 13px; letter-spacing: 0; color: var(--tinta); }
+.rp-t-base { background: rgba(170,210,255,.07); }
+.rp-s3 .rp-fl { align-self: center; }
+.rp-s3-det { display: grid; gap: 10px; padding: 0 16px 16px; animation: rpAbre .35s cubic-bezier(.22, 1, .36, 1); }
+.rp-s3[open] > summary { border-bottom: 1px solid var(--linea); margin-bottom: 12px; }
+@media (max-width: 1100px) { .rp-s3 > summary { grid-template-columns: 1fr; } }
+@media (max-width: 720px) {
+  .rp-s3 > summary { padding: 12px; }
+  .rp-s3-fila { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .rp-s3-fila .rp-fl { display: none; }
+  .rp-t { min-width: 0; padding: 6px 4px; }
+  .rp-t b { font-size: 18px; }
+  .rp-t-surf { grid-column: 1 / 3; align-items: flex-start; padding: 6px 10px; }
+  .rp-t-surf .rp-hora { font-size: 22px; }
+  .rp-t-base { grid-column: 3 / 5; }
+  .rp-s3-det { padding: 0 12px 12px; }
+}
