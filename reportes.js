@@ -219,15 +219,15 @@ function tabCampanas(d) {
   const F = [["todos", "Todas"], ["mala_3d", "Malas 3 días"], ["mala_hora", "Malas a esta hora"], ["floja", "Flojas"]];
   const xs = (d.campanas || []).filter((c) => R.filtro === "todos" || c.estado === R.filtro);
   const n3 = (d.campanas || []).filter((c) => c.estado === "mala_3d").length, nh = (d.campanas || []).filter((c) => c.estado === "mala_hora").length;
-  const celda = (m, eq) => `<td class="num"><b class="${roasCls(m.roas, eq)}">${ro(m.roas)}</b><span class="mut">${m.v} v · ${usd(m.g)}</span></td>`;
+  const celda = (m, eq, l) => `<td class="num" data-l="${l}"><b class="${roasCls(m.roas, eq)}">${ro(m.roas)}</b><span class="mut">${m.v} v · ${usd(m.g)}</span></td>`;
   const EST = { mala_3d: chip("🔴 mala 3 días", "rp-chip-r"), mala_hora: chip("🟠 mala ayer y hoy", "rp-chip-a"), floja: chip("🟡 floja", "rp-chip-a"), bien: "" };
   return `<p class="rp-ayuda">ROAS de hoy hasta ahora contra ayer y anteayer <b>a esta misma hora</b>, y los 3 días enteros. «Limpieza» abre los conjuntos y anuncios de los 3 días y te propone apagar los que gastaron más de US$ 10 con ROAS bajo dentro de conjuntos malos.</p>
     ${n3 || nh ? `<p class="rp-alerta">🔴 ${n3} malas hace 3 días · 🟠 ${nh} malas ayer y hoy a esta hora.</p>` : ""}
     ${segs(F, R.filtro, "data-f")}
     <div class="rp-tabla-caja"><table class="rp-tabla"><thead><tr><th>Campaña</th><th>Presup.</th><th>Hoy</th><th>Ayer a esta hora</th><th>Anteayer a esta hora</th><th>3 días</th><th></th></tr></thead><tbody>
     ${xs.map((c) => `<tr class="${c.estado === "mala_3d" ? "rp-mala" : ""}"><td><b>${c.techo ? "🧱 " : ""}${esc(c.nombre)}</b><span class="mut">${esc(c.cuenta || "")}</span>${EST[c.estado] || ""}</td>
-      <td class="num">${c.cbo ? usd2(c.presupuesto) : "ABO"}</td>${celda(c.hoy, d.cfg?.equilibrio)}${celda(c.ayer_hora, d.cfg?.equilibrio)}${celda(c.ante_hora, d.cfg?.equilibrio)}
-      <td class="num"><b class="${roasCls(c.tres.roas, d.cfg?.equilibrio)}">${ro(c.tres.roas)}</b><span class="mut">${usd(c.tres.gan)} ganancia</span></td>
+      <td class="num" data-l="Presupuesto">${c.cbo ? usd2(c.presupuesto) : "ABO"}</td>${celda(c.hoy, d.cfg?.equilibrio, "Hoy")}${celda(c.ayer_hora, d.cfg?.equilibrio, "Ayer a esta hora")}${celda(c.ante_hora, d.cfg?.equilibrio, "Anteayer a esta hora")}
+      <td class="num" data-l="3 días"><b class="${roasCls(c.tres.roas, d.cfg?.equilibrio)}">${ro(c.tres.roas)}</b><span class="mut">${usd(c.tres.gan)} ganancia</span></td>
       <td class="rp-acc-td"><button class="btn chico" data-limp="${esc(c.id)}">Limpieza</button>${c.cbo ? `<button class="btn chico" data-surf="${esc(c.id)}">Surfear</button>` : ""}</td></tr>`).join("") || `<tr><td colspan="7" class="mut">Nada en este filtro.</td></tr>`}
     </tbody></table></div>`;
 }
@@ -237,15 +237,15 @@ function tabCuentas(d) {
     ${ag ? `<p class="rp-alerta">🪫 ${ag} cuenta${ag === 1 ? "" : "s"} agotada${ag === 1 ? "" : "s"}.</p>` : ""}
     <div class="rp-tabla-caja"><table class="rp-tabla"><thead><tr><th>Cuenta</th>${(d.cuentas?.[0]?.dias || []).map((x) => `<th>${esc(x.dia.slice(8))}/${esc(x.dia.slice(5, 7))}</th>`).join("")}<th>Total</th></tr></thead><tbody>
     ${(d.cuentas || []).map((k) => `<tr class="${k.agotada ? "rp-mala" : ""}"><td><b>${esc(k.cuenta)}</b><span class="mut">${k.n} campañas</span>${k.agotada ? chip("🪫 agotada", "rp-chip-r") : ""}</td>
-      ${k.dias.map((x) => `<td class="num"><b class="${roasCls(x.roas)}">${ro(x.roas)}</b><span class="mut">${usd(x.g)} · ${usd(x.gan)}</span></td>`).join("")}
-      <td class="num"><b class="${roasCls(k.roas)}">${ro(k.roas)}</b><span class="mut">${usd(k.g)} · ${usd(k.gan)}</span></td></tr>`).join("")}
+      ${k.dias.map((x) => `<td class="num" data-l="${esc(x.dia.slice(8))}/${esc(x.dia.slice(5, 7))}"><b class="${roasCls(x.roas)}">${ro(x.roas)}</b><span class="mut">${usd(x.g)} · ${usd(x.gan)}</span></td>`).join("")}
+      <td class="num" data-l="Total"><b class="${roasCls(k.roas)}">${ro(k.roas)}</b><span class="mut">${usd(k.g)} · ${usd(k.gan)}</span></td></tr>`).join("")}
     </tbody></table></div>`;
 }
 function tabGastos(d) {
   const w = d.whop, viejo = w && Date.now() - Date.parse(w.leido) > 3 * 3600e3;
   return `<p class="rp-ayuda">${esc(d.nota)}</p>
     <div class="rp-tabla-caja"><table class="rp-tabla"><thead><tr><th>Día</th><th>Gastado en Meta</th><th>Facturado</th><th>ROAS</th><th>Ganancia</th></tr></thead><tbody>
-    ${(d.dias || []).map((x) => `<tr><td><b>${esc(x.dia.slice(8))}/${esc(x.dia.slice(5, 7))}</b><span class="mut">${x.campanas} campañas</span></td><td class="num">${usd(x.g)}</td><td class="num">${usd(x.val)}</td><td class="num ${roasCls(x.roas)}">${ro(x.roas)}</td><td class="num">${usd(x.gan)}</td></tr>`).join("")}
+    ${(d.dias || []).map((x) => `<tr><td><b>${esc(x.dia.slice(8))}/${esc(x.dia.slice(5, 7))}</b><span class="mut">${x.campanas} campañas</span></td><td class="num" data-l="Gastado">${usd(x.g)}</td><td class="num" data-l="Facturado">${usd(x.val)}</td><td class="num ${roasCls(x.roas)}" data-l="ROAS">${ro(x.roas)}</td><td class="num" data-l="Ganancia">${usd(x.gan)}</td></tr>`).join("")}
     </tbody></table></div>
     <h3 class="rp-h3">Whop</h3>
     ${!w ? `<p class="mut">Sin datos de Whop.</p>` : `${viejo ? `<p class="rp-alerta">⚠️ El saldo de Whop es de ${hace(w.leido)} (${fecha(w.leido)}): la ventana de Whop de la Mac no está abierta, así que no se actualiza.</p>` : ""}
@@ -270,7 +270,7 @@ function tabEscala(d) {
       <p class="rp-motivo">${esc(e.motivo)}</p>
       <div class="rp-acc">${e.accion === "subir" ? `<button class="btn chico pri" data-esc="${esc(e.id)}" data-pct="30">+30 %</button>` : ""}${e.accion === "bajar" ? `<button class="btn chico pri" data-esc="${esc(e.id)}" data-pct="-30">−30 %</button>` : ""}${e.accion === "apagar" ? `<button class="btn chico pri" data-apagar-c="${esc(e.id)}">Apagar</button>` : ""}</div></article>`).join("") || `<p class="vacio">No hay campañas nuevas de escala en los últimos 4 días.</p>`}</div>`;
 }
-const ICONO_P = { a_subir: "🟢", b_bajo: "🔴", b_nota: "📊", c_bajar: "🟠", c_apagar: "⛔", d_mala: "🟠", e_recuperar: "🔁", f_minimos: "⚖️", g_subir: "🆕", g_bajar: "🆕", g_apagar: "🆕", h_cuenta: "🪫", t_tiron: "👂" };
+const ICONO_P = { a_subir: "🟢", b_bajo: "🔴", b_nota: "📊", c_bajar: "🟠", c_apagar: "⛔", d_mala: "🟠", e_recuperar: "🔁", f_minimos: "⚖️", g_subir: "🆕", g_bajar: "🆕", g_apagar: "🆕", h_cuenta: "🪫", t_tiron: "👂", auto_minimos: "⚙️" };
 // Botón principal de cada tipo de propuesta (lo que hace el SÍ)
 function siDe(p) {
   const a = p.a != null ? usd2(p.a) : "";
@@ -305,7 +305,7 @@ function tabBot(d) {
     ${abiertas.length ? `<p class="rp-alerta">🧭 ${abiertas.length} acción${abiertas.length === 1 ? "" : "es"} para decidir.</p>` : `<p class="vacio">No hay acciones abiertas. Salen en los horarios de Configuración; los avisos de surfeo, en el momento.</p>`}
     <div class="rp-lista">${abiertas.map((p) => tarjeta(p, true)).join("")}</div>
     ${hechas.length ? `<h3 class="rp-h3">Decisiones (3 días)</h3><div class="rp-lista">${hechas.map((p) => `<article class="rp-card ${p.estado === "aplicada" ? "rp-card-v" : ""}"><div class="rp-cab">${ICONO_P[p.tipo] || "•"} <b>${esc(p.nombre || "")}</b>${chip(p.estado === "aplicada" ? "✓ aplicada" : "✗ no", p.estado === "aplicada" ? "rp-chip-v" : "rp-chip-g")}<time class="mut">${fecha(p.resuelta)}</time></div>
-      <p>${esc(p.quien || "")}${p.resultado?.pasos?.length ? ` · ${esc(p.resultado.pasos.join(" · "))}` : ""}</p>${p.decision_motivo ? `<p class="rp-motivo">«${esc(p.decision_motivo)}»</p>` : ""}${p.grupo_enviado ? `<p class="mut">Mandado al grupo con Franco ${fecha(p.grupo_enviado)}</p>` : ""}</article>`).join("")}</div>` : ""}
+      <p>${esc(p.quien || "")}${p.resultado?.pasos?.length ? ` · ${esc(p.resultado.pasos.join(" · "))}` : ""}</p>${p.decision_motivo ? `<p class="rp-motivo">«${esc(p.decision_motivo)}»</p>` : ""}${p.tipo === "auto_minimos" ? `<p class="mut">${esc(p.motivo || "")}</p><pre class="rp-auto">${esc(p.texto || "")}</pre>` : ""}${p.grupo_enviado ? `<p class="mut">Mandado al grupo con Franco ${fecha(p.grupo_enviado)}</p>` : ""}</article>`).join("")}</div>` : ""}
     ${vencidas.length ? `<details class="rp-venc"><summary>${vencidas.length} vencidas sin respuesta</summary><div class="rp-lista">${vencidas.map((p) => tarjeta(p, false)).join("")}</div></details>` : ""}`;
 }
 function tabConfig(d) {
