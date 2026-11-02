@@ -11,7 +11,7 @@ const reducido = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 // ---------- 1) fondo ----------
 function fondo() {
   if (document.querySelector(".aurora")) return;
-  const a = document.createElement("div"); a.className = "aurora"; a.setAttribute("aria-hidden", "true"); a.innerHTML = "<i></i><i></i><i></i><i></i>";
+  const a = document.createElement("div"); a.className = "aurora"; a.setAttribute("aria-hidden", "true"); // luces fijas (glass.css)
   const g = document.createElement("div"); g.className = "grano"; g.setAttribute("aria-hidden", "true");
   document.body.prepend(g); document.body.prepend(a);
 }
@@ -64,11 +64,33 @@ function mover(e) {
   });
 }
 
+// ---------- 4) barra lateral (compu): botón para dejarla abierta con los nombres ----------
+const RAIL_SVG = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M9.5 5.5 C 12 8, 14 10.5, 15.5 12.2 C 13.6 14, 11.6 16.4, 9.2 18.6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+function rail() {
+  const n = document.getElementById("secciones"); if (!n || n.querySelector(".rail-toggle")) return;
+  let abierta = false; try { abierta = localStorage.getItem("dash_rail") === "1"; } catch {}
+  document.documentElement.classList.toggle("rail-abierta", abierta);
+  const b = document.createElement("button"); b.type = "button"; b.className = "rail-toggle"; b.innerHTML = RAIL_SVG;
+  const pinta = () => { const a = document.documentElement.classList.contains("rail-abierta"); b.setAttribute("aria-label", a ? "Achicar la barra de secciones" : "Abrir la barra de secciones con los nombres"); b.setAttribute("aria-expanded", a); };
+  b.onclick = () => { const a = !document.documentElement.classList.contains("rail-abierta"); document.documentElement.classList.toggle("rail-abierta", a); try { localStorage.setItem("dash_rail", a ? "1" : "0"); } catch {} pinta(); };
+  pinta(); n.prepend(b);
+}
+
+// ---------- 5) cambio de sección: fundido corto del contenido (solo al cambiar de sección, no al filtrar) ----------
+let seccionAnt = null;
+function fundido() {
+  const act = document.querySelector('.seccion[aria-pressed="true"]')?.dataset.sec; if (!act) return;
+  if (seccionAnt && act !== seccionAnt && !reducido()) { const m = document.getElementById("main"); if (m) { m.classList.remove("cambio"); void m.offsetWidth; m.classList.add("cambio"); m.addEventListener("animationend", () => m.classList.remove("cambio"), { once: true }); } }
+  seccionAnt = act;
+}
+
 function arrancar() {
   fondo();
   todos();
-  new MutationObserver(todos).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-pressed", "aria-selected", "hidden", "class"] });
+  new MutationObserver(() => { rail(); fundido(); todos(); }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-pressed", "aria-selected"] });
   addEventListener("resize", todos, { passive: true });
+  // la barra lateral cambia de ancho al abrirse: el indicador la acompaña
+  if ("ResizeObserver" in window) { const ro = new ResizeObserver(todos); const mirar = () => { const p = document.querySelector(".sec-pista"); if (p && !p._ro) { p._ro = 1; ro.observe(p); } }; mirar(); new MutationObserver(mirar).observe(document.body, { childList: true, subtree: true }); }
   document.addEventListener("load", todos, true);
   if (matchMedia("(hover: hover) and (pointer: fine)").matches) document.addEventListener("pointermove", mover, { passive: true });
   if (document.fonts?.ready) document.fonts.ready.then(todos);
