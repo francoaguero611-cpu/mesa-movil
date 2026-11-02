@@ -3437,11 +3437,11 @@ function cargarReportes() {
   if (rpCarga) return rpCarga;
   const css = new Promise((ok) => {
     if ($('link[href^="reportes.css"]')) return ok();
-    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "reportes.css?v=7";
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "reportes.css?v=8";
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "reportes.js?v=6";
+    const sc = document.createElement("script"); sc.src = "reportes.js?v=7";
     sc.onload = () => window.Reportes ? ok() : mal(new Error("Reportes no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar Reportes. ¿Hay conexión?")); };
     document.head.appendChild(sc);

@@ -28,7 +28,9 @@ const TABS = [
   ["bot", "Acciones"], ["surfeos", "Surfeos"], ["campanas", "Campañas"], ["cuentas", "Cuentas"], ["gastos", "Gastos"],
   ["minimos", "Mínimos"], ["escala", "Escala"], ["config", "Configuración"],
 ];
-const R = { raiz: null, ctx: {}, tab: ls.get("rp_tab", "bot"), datos: {}, filtro: ls.get("rp_filtro", "todos"), cfg: null, cargando: false };
+const TOC = (() => { try { return JSON.parse(localStorage.getItem("rp_tocado") || "{}"); } catch { return {}; } })(); // campaña → cuándo la tocaste desde acá
+const tocar = (id) => { TOC[String(id)] = Date.now(); try { localStorage.setItem("rp_tocado", JSON.stringify(TOC)); } catch {} };
+const R = { raiz: null, ctx: {}, sel: new Set(), tab: ls.get("rp_tab", "bot"), datos: {}, filtro: ls.get("rp_filtro", "todos"), cfg: null, cargando: false };
 
 async function api(q, body = null) {
   const r = await fetch(`${API}?${q}`, { method: body ? "POST" : "GET", headers: { "x-app-clave": clave(), "x-app-usuario": R.ctx.usuario?.() || "", ...(body ? { "content-type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined, cache: "no-store" }).catch(() => null);
@@ -73,7 +75,7 @@ async function volverConTecho(s) {
         if (!r.ok) throw new Error(r.error || "Meta no lo aplicó");
         if (r.simulado) { toast("Modo prueba: Meta no se tocó y no se marcó el techo.", "ok", 7000); return; }
       }
-      await api("accion=techo", { id: s.campana_id, act: s.act, nombre: s.nombre, monto: de, motivo: `surfeo ${usd2(s.de)} → ${usd2(s.a)} no rindió` });
+      await api("accion=techo", { id: s.campana_id, act: s.act, nombre: s.nombre, monto: de, motivo: `surfeo ${usd2(s.de)} → ${usd2(s.a)} no rindió` }); tocar(s.campana_id);
       toast(`✓ ${esc(s.nombre)}: ${usd2(de)} y 🧱 techo marcado.`, "ok", 8000);
       R.ctx.recargarTechos?.(); await cargar(true);
     });
@@ -88,13 +90,13 @@ function marcarTecho(x) {
   $("[data-ok]", m.dlg).onclick = async () => {
     const v = parseFloat($("#rp-techo-m", m.dlg).value.replace(/\./g, "").replace(",", "."));
     if (!(v > 0)) return toast("Poné un monto válido", "error");
-    try { await api("accion=techo", { id: x.id, act: x.act, nombre: x.nombre, monto: v, motivo: $("#rp-techo-mo", m.dlg).value }); toast("🧱 Techo marcado.", "ok"); m.cerrar(); R.ctx.recargarTechos?.(); await cargar(true); }
+    try { await api("accion=techo", { id: x.id, act: x.act, nombre: x.nombre, monto: v, motivo: $("#rp-techo-mo", m.dlg).value }); tocar(x.id); toast("🧱 Techo marcado.", "ok"); m.cerrar(); R.ctx.recargarTechos?.(); await cargar(true); }
     catch (e) { toast(esc(e.message), "error"); }
   };
 }
 async function quitarTecho(x) {
   confirmar("¿Quitar el techo?", `<p><b>${esc(x.nombre)}</b> vuelve a poder proponerse para subir.</p>`, "Sí, quitar techo", async () => {
-    await api("accion=techo_quitar", { id: x.id }); toast("Techo quitado.", "ok"); R.ctx.recargarTechos?.(); await cargar(true);
+    await api("accion=techo_quitar", { id: x.id }); tocar(x.id); toast("Techo quitado.", "ok"); R.ctx.recargarTechos?.(); await cargar(true);
   });
 }
 function cambiarPres(x, pct, titulo) {
@@ -103,6 +105,7 @@ function cambiarPres(x, pct, titulo) {
     `Sí, ${pct > 0 ? "subir" : "bajar"} a ${usd2(nuevo)}`, async () => {
       const r = await R.ctx.presupuesto({ id: x.id, act: x.act, nombre: x.nombre, monto: nuevo });
       if (!r.ok) throw new Error(r.error || "Meta no lo aplicó");
+      tocar(x.id);
       toast(r.simulado ? "Modo prueba: Meta no se tocó." : `✓ ${esc(x.nombre)}: ${usd2(nuevo)}. Te voy diciendo cómo sigue en Surfeos.`, "ok", 8000);
       await cargar(true);
     });
@@ -186,6 +189,16 @@ function tabSurfeos(d) {
   if (!F.some(([k]) => k === R.filtro)) R.filtro = "todos";
   const xs = xs0.filter((s) => R.filtro === "todos" || ten(s) === R.filtro);
   const fch = (dia) => `${dia.slice(8)}/${dia.slice(5, 7)}`;
+  // última modificación de cada campaña: el cambio de presupuesto más nuevo, el techo o lo que tocaste desde acá
+  const ult = new Map();
+  const ver = (id, ms) => { if (ms && ms > (ult.get(id) || 0)) ult.set(id, ms); };
+  for (const s of xs0) { ver(String(s.campana_id), Date.parse(s.t)); if (s.techo?.desde) ver(String(s.campana_id), Date.parse(s.techo.desde)); }
+  for (const [id, ms] of Object.entries(TOC)) if (ult.has(id) || xs0.some((s) => String(s.campana_id) === id)) ver(id, ms);
+  const ultCampana = new Map(); for (const s of xs0) { const k = String(s.campana_id); if (!ultCampana.has(k) || Date.parse(s.t) > Date.parse(ultCampana.get(k).t)) ultCampana.set(k, s); }
+  const reloj = (id) => { const ms = ult.get(String(id)); if (!ms) return ""; const m = Math.round((Date.now() - ms) / 60000);
+    const tx = m < 2 ? "recién" : m < 60 ? `hace ${m} min` : m < 48 * 60 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} días`;
+    return `<span class="rp-reloj${m < 30 ? " fresco" : m < 180 ? " tibio" : ""}" title="Última modificación de esta campaña">⏱ ${tx}</span>`; };
+  R.ultCampana = ultCampana;
   return `<p class="rp-ayuda">Cada surfeo de un vistazo: <b>a qué hora</b>, de qué presupuesto a cuál, el <b>ROAS en ese momento</b> y cómo cerró ese día y los siguientes. Tocá una para ver gasto y ventas día por día.</p>
     ${segs(F, R.filtro, "data-f")}
     <div class="rp-lista rp-surfs">${xs.map((s) => {
@@ -201,9 +214,10 @@ function tabSurfeos(d) {
         const et = x.k === "cierre" ? (x.final ? `Cerró ${fch(x.dia)}` : `${fch(x.dia)} · ahora`) : x.final ? fch(x.dia) : `${fch(x.dia)} · ahora`;
         return `<i class="rp-fl">›</i><span class="rp-t ${cls}${x.final ? "" : " curso"}"><small>${et}</small><b class="${roasCls(x.roas)}">${ro(x.roas)}</b></span>`; };
       const resto = dias.slice(1), falta = Math.max(0, 3 - resto.length);
-      return `<details class="rp-surf2 rp-s3 ${ten(s) === "empeoro" ? "rp-surf-r" : ten(s) === "mejoro" ? "rp-surf-v" : ""}" data-surf-id="${s.id}"${R.abiertos?.has(String(s.id)) ? " open" : ""}>
+      const msU = ult.get(String(s.campana_id)), recien = msU && Date.now() - msU < 15 * 60e3;
+      return `<details class="rp-surf2 rp-s3 ${ten(s) === "empeoro" ? "rp-surf-r" : ten(s) === "mejoro" ? "rp-surf-v" : ""}${recien ? " rp-recien" : ""}${R.sel.has(String(s.campana_id)) ? " rp-elegida" : ""}" data-surf-id="${s.id}"${R.abiertos?.has(String(s.id)) ? " open" : ""}>
         <summary>
-          <span class="rp-s3-nom"><b>${esc(s.nombre || s.campana_id)}</b><span class="mut">${s.cuenta ? esc(s.cuenta) : ""}${s.quien ? ` · ${esc(s.quien)}` : ""}</span><span class="rp-s2-chips">${chip(tt, tc)}${s.techo ? chip(`🧱 ${usd2(s.techo.monto)}`, "rp-chip-g") : ""}</span></span>
+          <span class="rp-s3-nom"><span class="rp-s3-tit"><label class="rp-check" title="Elegir para cambiar varias juntas"><input type="checkbox" data-selc="${esc(s.campana_id)}"${R.sel.has(String(s.campana_id)) ? " checked" : ""}><i></i></label><b>${esc(s.nombre || s.campana_id)}</b></span><span class="mut">${s.cuenta ? esc(s.cuenta) : ""}${s.quien ? ` · ${esc(s.quien)}` : ""}${s.ahora != null ? ` · hoy en ${usd2(s.ahora)}` : ""}</span><span class="rp-s2-chips">${chip(tt, tc)}${reloj(s.campana_id)}${s.techo ? chip(`🧱 ${usd2(s.techo.monto)}`, "rp-chip-g") : ""}</span></span>
           <span class="rp-s3-fila">
             <span class="rp-t rp-t-surf"><small>${arriba ? "📈 Surf" : "📉 Bajada"} · ${cuando}</small><b class="rp-hora">${horaSurf}</b><span class="rp-pres">${usd2(s.de)} → <b>${usd2(s.a)}</b></span></span>
             <span class="rp-t rp-t-base"><small>ROAS al surfear</small><b class="${roasCls(surf?.roas)}">${ro(surf?.roas)}</b></span>
@@ -212,8 +226,8 @@ function tabSurfeos(d) {
         </summary>
         <div class="rp-s3-det">
         <div class="rp-s2-tabla" role="table">
-          <div class="rp-s2-f rp-s2-th" role="row"><span>Día</span><span>Presupuesto</span><span>Gastado</span><span>Ventas</span><span>ROAS</span></div>
-          ${dias.map((x) => `<div class="rp-s2-f${x.k === "surf" ? " surf" : ""}${x.final ? "" : " curso"}" role="row"><span><b>${esc(x.et)}</b><small>${fch(x.dia)}${x.final ? "" : " · en curso"}</small></span><span data-l="Presupuesto">${x.p != null ? usd2(x.p) : "—"}</span><span data-l="Gastado">${usd(x.g)}</span><span data-l="Ventas">${x.v}</span><span data-l="ROAS"><b class="${roasCls(x.roas)}">${ro(x.roas)}</b></span></div>`).join("")}
+          <div class="rp-s2-f rp-s2-th" role="row"><span>Día</span><span>Presupuesto</span><span>Gastado</span><span>Ventas</span><span>ROAS</span><span>Profit</span></div>
+          ${dias.map((x) => `<div class="rp-s2-f${x.k === "surf" ? " surf" : ""}${x.final ? "" : " curso"}" role="row"><span><b>${esc(x.et)}</b><small>${fch(x.dia)}${x.final ? "" : " · en curso"}</small></span><span data-l="Presupuesto">${x.p != null ? usd2(x.p) : "—"}</span><span data-l="Gastado">${usd(x.g)}</span><span data-l="Ventas">${x.v}</span><span data-l="ROAS"><b class="${roasCls(x.roas)}">${ro(x.roas)}</b></span><span data-l="Profit"><b class="${x.gan == null ? "" : x.gan >= 0 ? "rp-v" : "rp-r"}">${x.gan == null ? "—" : usd(x.gan)}</b></span></div>`).join("")}
         </div>
         ${s.motivo ? `<p class="rp-motivo">«${esc(s.motivo)}»</p>` : ""}
         <div class="rp-acc rp-s2-acc">${puedeVolver ? `<button class="btn chico pri" data-volver="${s.id}">Volver a ${usd2(s.de)} + 🧱</button>` : ""}
@@ -327,6 +341,36 @@ function tabConfig(d) {
 }
 
 // ---------- pintar y eventos ----------
+// (02/11) varias campañas a la vez: volver al presupuesto de antes o bajar X %, y marcar 🧱 techo en el monto que queda
+function barraSel() {
+  let b = document.getElementById("rp-selbar");
+  if (R.tab !== "surfeos" || !R.sel.size) { b?.remove(); return; }
+  if (!b) { b = document.createElement("div"); b.id = "rp-selbar"; b.className = "rp-selbar"; document.body.appendChild(b); }
+  b.innerHTML = `<b>${R.sel.size} campaña${R.sel.size === 1 ? "" : "s"}</b>
+    <button class="btn chico pri" data-lote="volver">Volver al de antes + 🧱</button>
+    <button class="btn chico" data-lote="-30">−30 % + 🧱</button><button class="btn chico" data-lote="-20">−20 % + 🧱</button><button class="btn chico" data-lote="-10">−10 % + 🧱</button>
+    <button class="btn chico" data-lote="techo">Solo 🧱 techo</button><button class="btn chico" data-lote="limpiar">Limpiar</button>`;
+  $$("[data-lote]", b).forEach((x) => x.onclick = () => x.dataset.lote === "limpiar" ? (R.sel.clear(), pintar()) : lote(x.dataset.lote));
+}
+function lote(modo) {
+  const xs = [...R.sel].map((id) => R.ultCampana?.get(id)).filter(Boolean);
+  const plan = xs.map((s) => { const ahora = Number(s.ahora ?? s.a);
+    const nuevo = modo === "volver" ? (s.dir > 0 ? Number(s.de) : ahora) : modo === "techo" ? ahora : a55(ahora * (1 + Number(modo) / 100));
+    return { s, ahora, nuevo, cambia: Math.abs(nuevo - ahora) > 0.01 }; });
+  const tit = modo === "volver" ? "Volver al presupuesto de antes del surfeo y marcar techo" : modo === "techo" ? "Marcar 🧱 techo en el presupuesto de hoy" : `Bajar ${Math.abs(Number(modo))} % y marcar techo`;
+  confirmar(`¿${tit}?`, `<ul class="rp-lote">${plan.map((p) => `<li><b>${esc(p.s.nombre)}</b> <span class="mut">${esc(p.s.cuenta || "")}</span><br>${p.cambia ? `${usd2(p.ahora)} → <b>${usd2(p.nuevo)}</b>` : `queda en ${usd2(p.ahora)}`} · 🧱 ${usd2(p.nuevo)}</li>`).join("")}</ul>`,
+    `Sí, aplicar a ${plan.length}`, async () => {
+      let ok = 0; const mal = [];
+      for (const p of plan) {
+        try {
+          if (p.cambia) { const r = await R.ctx.presupuesto({ id: p.s.campana_id, act: p.s.act, nombre: p.s.nombre, monto: p.nuevo }); if (!r.ok) throw new Error(r.error || "Meta no lo aplicó"); if (r.simulado) continue; }
+          await api("accion=techo", { id: p.s.campana_id, act: p.s.act, nombre: p.s.nombre, monto: p.nuevo, motivo: tit }); tocar(p.s.campana_id); ok++;
+        } catch (e) { mal.push(`${p.s.nombre}: ${e.message}`); }
+      }
+      toast(`✓ ${ok} de ${plan.length} listas.${mal.length ? " Fallaron: " + esc(mal.join(" · ")) : ""}`, mal.length ? "error" : "ok", 10000);
+      R.sel.clear(); R.ctx.recargarTechos?.(); await cargar(true);
+    });
+}
 function pintar() {
   const r = R.raiz; if (!r) return;
   const d = R.datos[R.tab];
@@ -336,15 +380,16 @@ function pintar() {
     <div class="rp-top"><div class="rp-tabs" role="tablist">${TABS.map(([k, t]) => `<button type="button" class="rp-tab" role="tab" data-tab="${k}" aria-selected="${k === R.tab}">${t}</button>`).join("")}</div>
       <button type="button" class="btn chico" data-recargar title="Volver a leer">↻ Actualizar</button></div>
     <div class="rp-cuerpo">${cuerpo}</div></div>`;
-  enlazar();
+  enlazar(); barraSel();
 }
 function enlazar() {
   const r = R.raiz, d = R.datos[R.tab] || {};
-  $$("[data-tab]", r).forEach((b) => b.onclick = () => { R.tab = b.dataset.tab; R.filtro = "todos"; ls.set("rp_tab", R.tab); cargar(); });
+  $$("[data-tab]", r).forEach((b) => b.onclick = () => { R.sel.clear(); R.tab = b.dataset.tab; R.filtro = "todos"; ls.set("rp_tab", R.tab); cargar(); });
   $$("[data-recargar]", r).forEach((b) => b.onclick = () => cargar(true));
   $$("[data-f]", r).forEach((b) => b.onclick = () => { R.filtro = b.dataset.f; ls.set("rp_filtro", R.filtro); pintar(); });
   const S = (id) => (d.surfeos || []).find((s) => String(s.id) === String(id));
   R.abiertos ??= new Set();
+  $$("[data-selc]", r).forEach((c) => { c.closest("label").onclick = (e) => e.stopPropagation(); c.onchange = () => { const id = c.dataset.selc; c.checked ? R.sel.add(id) : R.sel.delete(id); c.closest("details")?.classList.toggle("rp-elegida", c.checked); barraSel(); }; });
   $$("[data-surf-id]", r).forEach((x) => x.ontoggle = () => { x.open ? R.abiertos.add(x.dataset.surfId) : R.abiertos.delete(x.dataset.surfId); });
   $$("[data-volver]", r).forEach((b) => b.onclick = () => volverConTecho(S(b.dataset.volver)));
   $$("[data-techo]", r).forEach((b) => b.onclick = () => { const s = S(b.dataset.techo); marcarTecho({ id: s.campana_id, act: s.act, nombre: s.nombre, monto: s.dir > 0 ? s.de : s.ahora ?? s.a }); });
@@ -384,15 +429,19 @@ function enlazar() {
 }
 async function cargar(forzar = false) {
   if (!forzar && R.datos[R.tab] && !R.datos[R.tab].__error) return pintar();
-  const tab = R.tab; R.datos[tab] = null; pintar();
+  const tab = R.tab, quieto = forzar && R.datos[tab] && !R.datos[tab].__error, y = window.scrollY; // (02/11) recargar sin saltar arriba
+  if (!quieto) { R.datos[tab] = null; pintar(); } else R.raiz?.classList.add("rp-actualizando");
   try {
     if (!R.cfg) api("accion=config").then((c) => { R.cfg = Object.fromEntries(c.esquema.map((x) => [x.k, x.valor])); }).catch(() => {});
     R.datos[tab] = tab === "config" ? await api("accion=config") : await api(`accion=resumen&tab=${tab}`);
     if (tab === "config") R.cfg = Object.fromEntries(R.datos[tab].esquema.map((x) => [x.k, x.valor]));
-  } catch (e) { R.datos[tab] = { __error: e.message }; }
-  if (R.tab === tab) pintar();
+  } catch (e) { if (!quieto) R.datos[tab] = { __error: e.message }; else toast(`No se pudo actualizar: ${esc(e.message)}`, "error"); }
+  R.raiz?.classList.remove("rp-actualizando");
+  if (R.tab === tab) { pintar(); if (quieto) window.scrollTo({ top: y }); }
 }
 window.Reportes = {
-  montar(raiz, ctx) { R.raiz = raiz; R.ctx = ctx || {}; R.datos = {}; if (!TABS.some(([k]) => k === R.tab)) R.tab = "surfeos"; cargar(true); },
+  montar(raiz, ctx) { R.raiz = raiz; R.ctx = ctx || {}; R.datos = {}; R.sel.clear();
+    clearInterval(R.vigila); R.vigila = setInterval(() => { if (!R.raiz?.isConnected) { document.getElementById("rp-selbar")?.remove(); clearInterval(R.vigila); } }, 800); // saliste de Reportes: se va la barra
+    if (!TABS.some(([k]) => k === R.tab)) R.tab = "surfeos"; cargar(true); },
 };
 })();
