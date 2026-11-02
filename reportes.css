@@ -86,3 +86,36 @@
 }
 .rp-card-apagada { opacity: .6; }
 .rp-venc summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
+
+/* (02/11) Surfeos compactos: una línea por campaña con la tira de ROAS antes → 3 h → 12 h → 24 h; al tocarla se abre el detalle */
+.rp-surfs { gap: 8px; }
+.rp-surf-cab, .rp-surf > summary { display: grid; grid-template-columns: minmax(220px, 1fr) repeat(4, 82px) minmax(120px, auto); align-items: center; gap: 6px; }
+.rp-surf-cab { padding: 0 18px; font-size: 12px; color: var(--mut); }
+.rp-surf-cab span:not(:first-child) { text-align: center; }
+.rp-surf { border-radius: 20px; border: 1px solid var(--g-borde); background: var(--g-vidrio); box-shadow: var(--g-sombra); transition: border-color .25s; }
+.rp-surf:hover { border-color: var(--g-borde-luz); }
+.rp-surf-r { box-shadow: var(--g-sombra), inset 3px 0 0 var(--rojo); }
+.rp-surf-v { box-shadow: var(--g-sombra), inset 3px 0 0 var(--pos); }
+.rp-surf > summary { list-style: none; cursor: pointer; padding: 12px 16px 12px 18px; }
+.rp-surf > summary::-webkit-details-marker { display: none; }
+.rp-surf-nom { display: grid; gap: 2px; min-width: 0; }
+.rp-surf-nom b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rp-surf-nom .mut { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rp-paso { position: relative; display: flex; align-items: center; justify-content: center; gap: 4px; height: 38px; border-radius: 999px; background: rgba(0,8,20,.25); border: 1px solid var(--g-borde); font-variant-numeric: tabular-nums; }
+.rp-paso b { font-size: 16px; font-weight: 600; }
+.rp-paso i { font-style: normal; font-size: 13px; opacity: .8; }
+.rp-paso small { position: absolute; bottom: -7px; font-size: 9.5px; padding: 0 5px; border-radius: 99px; background: rgba(255,201,100,.18); color: var(--ambar); }
+.rp-paso.base { background: rgba(170,210,255,.08); }
+.rp-paso.sube { background: rgba(111,242,200,.10); border-color: rgba(111,242,200,.35); } .rp-paso.sube i { color: var(--pos); }
+.rp-paso.baja { background: rgba(255,122,133,.10); border-color: rgba(255,122,133,.35); } .rp-paso.baja i { color: var(--rojo); }
+.rp-paso.curso { border-style: dashed; }
+.rp-paso.vacio { opacity: .4; }
+.rp-surf-est { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.rp-surf-det { display: grid; gap: 10px; padding: 4px 18px 16px; border-top: 1px solid var(--linea); animation: rpAbre .35s cubic-bezier(.22, 1, .36, 1); }
+@keyframes rpAbre { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@media (max-width: 820px) {
+  .rp-surf-cab { display: none; }
+  .rp-surf > summary { grid-template-columns: repeat(4, 1fr); }
+  .rp-surf-nom, .rp-surf-est { grid-column: 1 / -1; }
+  .rp-surf-est { justify-content: flex-start; }
+}

@@ -178,27 +178,41 @@ function notaHTML(n, h, final) {
     <span class="rp-ver">${final ? VER[n.ver] || n.ver : "en curso"}${n.cortado ? ` · otro cambio a las ${fecha(n.cortado)}` : ""}</span></div>`;
 }
 function tabSurfeos(d) {
-  const hs = d.cfg?.h ?? [3, 24, 48];
+  const hs = d.cfg?.h ?? [3, 12, 24];
   const F = [["todos", "Todos"], ["revisar", "Para revisar"], ["seguimiento", "En seguimiento"], ["rindio", "Rindieron"], ["bajadas", "Bajadas"]];
   const filtrar = (s) => R.filtro === "todos" || (R.filtro === "revisar" ? ["bajo", "techo", "sigue_mal"].includes(s.estado) : R.filtro === "bajadas" ? s.dir < 0 : R.filtro === "rindio" ? ["rindio", "mejoro"].includes(s.estado) : s.estado === "seguimiento");
   const xs = (d.surfeos || []).filter(filtrar);
   const nRev = (d.surfeos || []).filter((s) => ["bajo", "techo", "sigue_mal"].includes(s.estado)).length;
-  return `<p class="rp-ayuda">Cada cambio de presupuesto de campaña (desde Meta o el Dashboard, quien sea) se anota solo a los ~10 min. Se compara la misma cantidad de horas antes y después del cambio, y las mismas horas de ayer. Decide la <b>ganancia por hora</b>, no solo el ROAS.</p>
+  return `<p class="rp-ayuda">ROAS del día hasta el surfeo → ROAS de las primeras horas después. ↗ mejoró · → parecido · ↘ empeoró. Tocá una campaña para ver ventas, gasto, ganancia por hora y las acciones.</p>
     ${nRev ? `<p class="rp-alerta">🔴 ${nRev} para revisar: bajaron después del cambio.</p>` : ""}
     ${segs(F, R.filtro, "data-f")}
-    <div class="rp-lista">${xs.map((s) => {
+    <div class="rp-surf-cab" aria-hidden="true"><span>Campaña</span><span>Antes</span><span>${hs[0]} h</span><span>${hs[1]} h</span><span>${hs[2]} h</span></div>
+    <div class="rp-lista rp-surfs">${xs.map((s) => {
       const [et, ec] = ESTADO_SURF[s.estado] || [s.estado, ""], arriba = s.dir > 0;
       const notas = hs.map((h) => { const n = s.notas?.[`${h}h`]; return notaHTML(n, h, n?.final); }).join("");
       const puedeVolver = arriba && s.ahora != null && Number(s.ahora) > Number(s.de) + 0.01;
-      return `<article class="rp-card">
-        <div class="rp-cab"><b>${esc(s.nombre || s.campana_id)}</b>${s.cuenta ? `<span class="mut">${esc(s.cuenta)}</span>` : ""}${chip(et, ec)}${s.techo ? chip(`🧱 ${usd2(s.techo.monto)}`, "rp-chip-g") : ""}<time class="mut">${fecha(s.t)}</time></div>
-        <div class="rp-cambio">${arriba ? "📈" : "📉"} ${usd2(s.de)} → <b>${usd2(s.a)}</b> <span class="mut">(${arriba ? "+" : ""}${Math.round((s.a / s.de - 1) * 100)} %) · ${esc(s.quien || s.origen)}${s.ahora != null && Math.abs(s.ahora - s.a) > 0.01 ? ` · hoy en ${usd2(s.ahora)}` : ""}</span></div>
-        ${s.motivo ? `<p class="rp-motivo">«${esc(s.motivo)}»</p>` : ""}
-        <div class="rp-notas">${notas}</div>
-        <div class="rp-acc">${puedeVolver ? `<button class="btn chico pri" data-volver="${s.id}">Volver a ${usd2(s.de)} + 🧱 techo</button>` : ""}
-          ${s.techo ? `<button class="btn chico" data-quitar="${esc(s.campana_id)}">Quitar techo</button>` : `<button class="btn chico" data-techo="${s.id}">Marcar 🧱 techo</button>`}
-          <button class="btn chico" data-motivo="${s.id}">${s.motivo ? "Cambiar motivo" : "Anotar motivo"}</button></div>
-      </article>`;
+      const antes = s.notas?.antes_dia?.roas ?? s.notas?.[`${hs[0]}h`]?.antes?.roas ?? null;
+      // un paso de la tira: ROAS de ese horizonte, con flecha y color según cómo viene contra el de antes
+      const paso = (h) => { const n = s.notas?.[`${h}h`], r = n?.despues?.roas;
+        if (!n || (!n.final && (n.despues?.h ?? 0) < 0.5)) return `<span class="rp-paso vacio"><i>→</i><b>—</b></span>`;
+        const dif = antes != null && r != null ? r - antes : 0, cls = r == null ? "" : dif >= 0.15 ? "sube" : dif <= -0.3 ? "baja" : "igual";
+        return `<span class="rp-paso ${cls}${n.final ? "" : " curso"}" title="${n.final ? "" : `en curso: van ${n.despues.h} h · `}${n.despues.v} ventas · gasto ${usd(n.despues.g)} · ganancia/h ${usd(n.despues.gan_h)}"><i>${cls === "sube" ? "↗" : cls === "baja" ? "↘" : "→"}</i><b class="${roasCls(r)}">${ro(r)}</b>${n.final ? "" : `<small>${Math.round(n.despues.h)} h</small>`}</span>`; };
+      const abierto = R.abiertos?.has(String(s.id));
+      return `<details class="rp-surf ${["bajo", "techo", "sigue_mal"].includes(s.estado) ? "rp-surf-r" : ["rindio", "mejoro"].includes(s.estado) ? "rp-surf-v" : ""}" data-surf-id="${s.id}"${abierto ? " open" : ""}>
+        <summary>
+          <span class="rp-surf-nom"><b>${esc(s.nombre || s.campana_id)}</b><span class="mut">${arriba ? "📈" : "📉"} ${usd2(s.de)} → ${usd2(s.a)} · ${fecha(s.t)}${s.cuenta ? ` · ${esc(s.cuenta)}` : ""}</span></span>
+          <span class="rp-paso base"><b class="${roasCls(antes)}">${ro(antes)}</b></span>${hs.map(paso).join("")}
+          <span class="rp-surf-est">${chip(et, ec)}${s.techo ? chip(`🧱 ${usd2(s.techo.monto)}`, "rp-chip-g") : ""}</span>
+        </summary>
+        <div class="rp-surf-det">
+          <div class="rp-cambio">${arriba ? "📈" : "📉"} ${usd2(s.de)} → <b>${usd2(s.a)}</b> <span class="mut">(${arriba ? "+" : ""}${Math.round((s.a / s.de - 1) * 100)} %) · ${esc(s.quien || s.origen)}${s.ahora != null && Math.abs(s.ahora - s.a) > 0.01 ? ` · hoy en ${usd2(s.ahora)}` : ""}</span></div>
+          ${s.motivo ? `<p class="rp-motivo">«${esc(s.motivo)}»</p>` : ""}
+          <div class="rp-notas">${notas}</div>
+          <div class="rp-acc">${puedeVolver ? `<button class="btn chico pri" data-volver="${s.id}">Volver a ${usd2(s.de)} + 🧱 techo</button>` : ""}
+            ${s.techo ? `<button class="btn chico" data-quitar="${esc(s.campana_id)}">Quitar techo</button>` : `<button class="btn chico" data-techo="${s.id}">Marcar 🧱 techo</button>`}
+            <button class="btn chico" data-motivo="${s.id}">${s.motivo ? "Cambiar motivo" : "Anotar motivo"}</button></div>
+        </div>
+      </details>`;
     }).join("") || `<p class="vacio">Nada en este filtro (últimos 7 días).</p>`}</div>`;
 }
 function tabCampanas(d) {
@@ -322,6 +336,8 @@ function enlazar() {
   $$("[data-recargar]", r).forEach((b) => b.onclick = () => cargar(true));
   $$("[data-f]", r).forEach((b) => b.onclick = () => { R.filtro = b.dataset.f; ls.set("rp_filtro", R.filtro); pintar(); });
   const S = (id) => (d.surfeos || []).find((s) => String(s.id) === String(id));
+  R.abiertos ??= new Set();
+  $$("[data-surf-id]", r).forEach((x) => x.ontoggle = () => { x.open ? R.abiertos.add(x.dataset.surfId) : R.abiertos.delete(x.dataset.surfId); });
   $$("[data-volver]", r).forEach((b) => b.onclick = () => volverConTecho(S(b.dataset.volver)));
   $$("[data-techo]", r).forEach((b) => b.onclick = () => { const s = S(b.dataset.techo); marcarTecho({ id: s.campana_id, act: s.act, nombre: s.nombre, monto: s.dir > 0 ? s.de : s.ahora ?? s.a }); });
   $$("[data-quitar]", r).forEach((b) => b.onclick = () => { const s = (d.surfeos || []).find((x) => x.campana_id === b.dataset.quitar); quitarTecho({ id: b.dataset.quitar, nombre: s?.nombre }); });

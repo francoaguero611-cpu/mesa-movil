@@ -486,11 +486,11 @@ function montar() {
   if (location.hash && seccionDe(location.hash.slice(1))) { try { history.replaceState(null, "", location.pathname + location.search); } catch {} }
   pintarNav();
   $("#main").innerHTML = `
-    <div class="whop-barra" id="whop-barra" role="status" aria-live="polite"></div>
     <div class="sel-grupo-caja boceto"><label class="sr" for="sel-grupo">Oferta y mercado</label><select id="sel-grupo" class="sel-grupo"></select><span class="sel-flecha" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M5.5 9.5 C 8 12, 10.5 14, 12.2 15.5 C 14 13.6, 16.4 11.6, 18.6 9.2" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
     <div class="controles">
       <div class="periodos" role="group" aria-label="Período">${botonesPer("data-per", S.periodo)}</div>
       <div class="hora" id="hora"></div>
+      <div class="whop-mini" id="whop-barra" role="status" aria-live="polite"></div>
     </div>
     <div id="avisos"></div>
     <section class="carr" id="carr" aria-roledescription="carrusel" aria-label="Métricas por grupo">
@@ -508,8 +508,7 @@ function montar() {
       <div class="filtro-camp"><label class="sr" for="f-buscar">Buscar por nombre</label><input type="search" id="f-buscar" class="campo f-buscar" placeholder="Buscar campaña, conjunto o anuncio…" autocomplete="off" value="${esc(S.buscar)}"><label class="sr" for="f-cuenta">Cuenta publicitaria</label><select id="f-cuenta" class="campo f-cuenta"></select></div>
       <div class="tabla-con-reloj"><div class="tabla-caja boceto"><div class="tabla-scroll" id="tabla-scroll"></div></div><div class="riel-reloj" id="riel-reloj" aria-label="Historial de cambios por campaña"></div></div>
     </section>
-    <section class="seccion-prob" id="sec-prob" aria-labelledby="t-prob"></section>
-    <section class="seccion-umb" id="sec-umb" aria-labelledby="t-umb"></section>`;
+    <section class="seccion-prob" id="sec-prob" aria-labelledby="t-prob"></section>`;
   $$("[data-per]").forEach((b) => b.onclick = () => cambiarPeriodo(b.dataset.per));
   $("#sel-grupo").onchange = (e) => irA(+e.target.value);
   $("#b-prev").onclick = () => paso(-1);
@@ -680,7 +679,7 @@ async function cargarUmbrales(forzar = false) {
   pintarUmbrales(); pintarWhop(); avisarPagosNuevos();
   clearInterval(UB.timer); // la barra de Whop se refresca sola cada minuto mientras el Dashboard está abierto
   UB.timer = setInterval(async () => {
-    if (S.vista !== "dash" || !$("#whop-barra")) { clearInterval(UB.timer); UB.timer = null; return; }
+    if (!$("#whop-barra")) { clearInterval(UB.timer); UB.timer = null; return; } // (02/11) vive en el Dashboard (chiquito) y en Umbrales
     if (document.hidden) return;
     // (30/10) cada 5 min relee la sección entera para ver pagos rechazados nuevos (sin pisar un umbral que se está editando)
     if (!UB.edit && Date.now() - (UB.ultVer || 0) > 5 * 60e3) { try { UB.data = await apiUmb("ver"); UB.ultVer = Date.now(); UB.whop = UB.data.whop; pintarUmbrales(); pintarWhop(); avisarPagosNuevos(); return; } catch { /* sigue con Whop */ } }
@@ -698,6 +697,13 @@ const tiempoUmb = (h) => h == null ? "" : h < 1 ? "< 1 h" : h < 24 ? `~${Math.ro
 function pintarWhop() {
   const el = $("#whop-barra"); if (!el) return;
   const w = UB.whop, d = UB.data;
+  if (el.classList.contains("whop-mini")) { // (02/11) en el Dashboard: chiquito al costado; tocarlo abre Umbrales
+    if (!w) { el.innerHTML = ""; return; }
+    const viejoM = Date.now() - Date.parse(w.leido_en) > 10 * 60e3, mal = (d && d.necesita - w.saldo > 0) || (w.rechazos || []).length > 0;
+    el.innerHTML = `<button type="button" class="wm${mal ? " mal" : ""}${viejoM ? " viejo" : ""}" title="${viejoM ? "Dato viejo: " + esc(haceUmb(w.leido_en)) : "Ver umbrales y pagos"}"><i class="wm-dot" aria-hidden="true"></i>Saldo Whop <b class="num">${usd(w.saldo)}</b></button>`;
+    $("button", el).onclick = () => irASeccion("umbrales");
+    return;
+  }
   if (!w) { el.innerHTML = UB.st === "error" ? "" : `<span class="wb-et">Saldo en Whop</span><span class="mut">leyendo…</span>`; return; }
   const viejo = Date.now() - Date.parse(w.leido_en) > 10 * 60e3;
   const falta = d ? d.necesita - w.saldo : 0;
@@ -849,11 +855,14 @@ function pintarUmbrales() {
   const cuerpo = UB.st === "error" && !d ? `<p class="mut">No se pudo leer: ${esc(UB.error)} <button class="link" type="button" data-umb-re>Reintentar</button></p>`
     : !d ? `<p class="mut">Leyendo cuentas…</p>`
     : `${pagosHTML(d.rechazadas || [])}${tarjetasUmb(d)}${!xs.length ? `<p class="mut">Ninguna cuenta activa con campañas prendidas.</p>` : `<ul class="umb-lista">${xs.map((c) => filaUmb(c, maxU)).join("")}</ul>`}`;
-  sec.innerHTML = `<details class="prob-det"${UB.abierto ? " open" : ""}>
+  const pie = `${d?.errores?.length ? `<p class="mut prob-err">⚠ ${esc(d.errores.join(" · "))}</p>` : ""}<p class="mut prob-pie">${d?.actualizado ? `Meta leído ${haceUmb(d.actualizado)}` : ""} <button class="link" type="button" data-umb-re>Actualizar</button></p>`;
+  sec.innerHTML = sec.classList.contains("umb-full") // (02/11) sección propia: siempre abierta
+    ? `<h2 class="umb-tit" id="t-umb">Cuentas y umbral <small class="mut">${d ? xs.length : "…"}</small></h2><div class="prob-cuerpo">${cuerpo}${pie}</div>`
+    : `<details class="prob-det"${UB.abierto ? " open" : ""}>
     <summary><h2 id="t-umb">Cuentas y umbral <small class="mut">${d ? xs.length : "…"}</small></h2></summary>
-    <div class="prob-cuerpo">${cuerpo}${d?.errores?.length ? `<p class="mut prob-err">⚠ ${esc(d.errores.join(" · "))}</p>` : ""}<p class="mut prob-pie">${d?.actualizado ? `Meta leído ${haceUmb(d.actualizado)}` : ""} <button class="link" type="button" data-umb-re>Actualizar</button></p></div>
+    <div class="prob-cuerpo">${cuerpo}${pie}</div>
   </details>`;
-  $("details", sec).ontoggle = (e) => { UB.abierto = e.target.open; ls.set("dash_umb_abierto", UB.abierto ? "1" : "0"); if (UB.abierto) ubicarPctUmb(); };
+  const det = $("details", sec); if (det) det.ontoggle = (e) => { UB.abierto = e.target.open; ls.set("dash_umb_abierto", UB.abierto ? "1" : "0"); if (UB.abierto) ubicarPctUmb(); };
   $$("[data-umb-re]", sec).forEach((b) => b.onclick = () => cargarUmbrales(true));
   $$("[data-umb-edit]", sec).forEach((b) => b.onclick = () => { UB.edit = UB.edit === b.dataset.umbEdit ? null : b.dataset.umbEdit; pintarUmbrales(); $("#umb-in", sec)?.focus(); });
   $$("[data-umb-cancelar]", sec).forEach((b) => b.onclick = () => { UB.edit = null; pintarUmbrales(); });
@@ -3264,6 +3273,8 @@ const SECCIONES = [
     montar: () => { try { history.replaceState(null, "", location.pathname + location.search); } catch {} montar(); window.scrollTo(0, 0); } },
   { id: "reportes", nombre: "Reportes", raiz: "#rp", icono: "M5 4.5 C 9.5 4.3, 14 4.6, 18.8 4.4 L18.6 19.6 C 14 19.8, 9.5 19.5, 5.2 19.7 Z M8.3 15.5 L11 12.3 L13.2 14.2 L16 10 M8.4 8.2 H12.6",
     montar: () => montarReportes() }, // (02/11) control de lo que hacemos: surfeos, campañas, cuentas, gastos, mínimos, escala, bot y umbrales
+  { id: "umbrales", nombre: "Umbrales", raiz: "#sec-umb", icono: "M4.5 15.5 C 4.6 10.8, 8 7.2, 12 7.1 C 16.1 7, 19.5 10.6, 19.5 15.4 M12 15.2 L15.4 10.6 M3.8 18.6 H20.2",
+    montar: () => montarUmbrales() }, // (02/11) saldo de Whop, pagos rechazados y umbrales de cada cuenta (antes, al final del Dashboard)
   { id: "ranking", nombre: "Ranking", raiz: "#rk", icono: "M4.5 6 C 6 5.8, 7.4 5.9, 8.6 6 M4.5 12 C 6.5 11.8, 9 11.9, 11.6 12 M4.5 18 C 7.5 17.8, 11 17.9, 14.6 18 M15.5 8.5 L18.5 5.2 L21 8.4",
     montar: (o) => montarRanking(o), ya: (o) => { if (o.pedido != null) abrirPedido(o.pedido); } },
   { id: "cazador", nombre: "Cazador", raiz: "#caz", icono: "M12 4.2 C 16.5 4, 19.9 7.4, 19.8 12 C 19.7 16.6, 16.4 19.9, 12 19.8 C 7.5 19.7, 4.2 16.5, 4.2 12 C 4.3 7.6, 7.4 4.3, 12.6 4.3 M12 1.8 V7 M12 17 V22.2 M1.8 12 H7 M17 12 H22.2 M11.9 11.6 L12.1 12.4",
@@ -3407,6 +3418,17 @@ async function montarAtc() {
   window.Atc.montar($("#atc"), { login: (msg) => login(msg), toast });
 }
 
+// ---------- Umbrales (02/11, Lorenzo): sección propia con el saldo de Whop grande, pagos rechazados y la barra de cada cuenta ----------
+function montarUmbrales() {
+  cerrarMenu(); pararRanking();
+  S.vista = "umbrales"; ls.set("dash_seccion", "umbrales");
+  try { history.replaceState(null, "", location.pathname + location.search + "#umbrales"); } catch {}
+  pintarNav();
+  $("#main").innerHTML = `<div class="umb-pagina"><div class="whop-barra" id="whop-barra" role="status" aria-live="polite"></div><section class="seccion-umb umb-full" id="sec-umb" aria-labelledby="t-umb"></section></div>`;
+  pintarBarra(); window.scrollTo(0, 0);
+  pintarUmbrales(); pintarWhop(); cargarUmbrales();
+}
+
 // ---------- Reportes (02/11, Lorenzo): reportes.js se carga la primera vez. Backend: Edge Function «reportes» ----------
 // Las acciones que tocan Meta (presupuesto, apagar, sacar mínimo) pasan por app-movil, como el resto del Dashboard, siempre con confirmación.
 let rpCarga = null;
@@ -3415,11 +3437,11 @@ function cargarReportes() {
   if (rpCarga) return rpCarga;
   const css = new Promise((ok) => {
     if ($('link[href^="reportes.css"]')) return ok();
-    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "reportes.css?v=3";
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "reportes.css?v=4";
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "reportes.js?v=2";
+    const sc = document.createElement("script"); sc.src = "reportes.js?v=3";
     sc.onload = () => window.Reportes ? ok() : mal(new Error("Reportes no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar Reportes. ¿Hay conexión?")); };
     document.head.appendChild(sc);
