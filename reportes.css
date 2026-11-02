@@ -162,3 +162,37 @@
 .rp-cuerpo { grid-template-columns: minmax(0, 1fr); }
 @media (max-width: 720px) { html .rp-seg { white-space: nowrap; flex: none; } }
 .rp-auto { margin: 4px 0 0; padding: 10px 12px; border-radius: 14px; background: rgba(0,8,20,.3); font: 12.5px/1.5 var(--f-texto); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow: auto; }
+
+/* (02/11 noche) Surfeos por DÍAS: cabecera con la tira exprés de ROAS por fecha a la derecha + filas por día abajo */
+.rp-surf2 { display: grid; gap: 10px; padding: 14px 16px; border-radius: 22px; border: 1px solid var(--g-borde); background: var(--g-vidrio); box-shadow: var(--g-sombra); }
+.rp-s2-cab { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px 16px; flex-wrap: wrap; }
+.rp-s2-nom { display: grid; gap: 3px; min-width: 0; flex: 1 1 260px; }
+.rp-s2-nom > b { font-size: 15.5px; overflow-wrap: anywhere; }
+.rp-s2-nom > .mut { font-size: 12.5px; }
+.rp-s2-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 2px; }
+.rp-s2-mot { font-style: italic; font-size: 12px; }
+.rp-s2-tira { display: flex; align-items: center; gap: 4px; flex: none; }
+.rp-s2-tira .rp-paso { flex-direction: column; gap: 0; height: auto; min-width: 62px; padding: 5px 10px 6px; border-radius: 16px; }
+.rp-s2-tira .rp-paso small { position: static; background: none; padding: 0; font-size: 10.5px; color: var(--mut); }
+.rp-s2-tira .rp-paso.curso small::after { content: " ●"; color: var(--ambar); }
+.rp-fl { font-style: normal; color: var(--mut); font-size: 16px; }
+.rp-s2-tabla { display: grid; border-radius: 16px; overflow: hidden; border: 1px solid var(--linea); }
+.rp-s2-f { display: grid; grid-template-columns: minmax(150px, 1.6fr) repeat(4, minmax(70px, 1fr)); align-items: center; gap: 8px; padding: 7px 12px; font-size: 13.5px; font-variant-numeric: tabular-nums; border-top: 1px solid var(--linea); background: rgba(0,8,20,.18); }
+.rp-s2-f > span:not(:first-child) { text-align: right; }
+.rp-s2-f > span:first-child { display: grid; } .rp-s2-f small { font-size: 11px; color: var(--mut); }
+.rp-s2-th { border-top: 0; background: rgba(170,210,255,.06); font-size: 11.5px; color: var(--mut); padding: 6px 12px; }
+.rp-s2-f.surf { background: rgba(124,200,255,.08); }
+.rp-s2-f.curso { background: rgba(255,201,100,.05); }
+.rp-s2-f b { font-weight: 600; }
+.rp-s2-acc { justify-content: flex-end; }
+@media (max-width: 720px) {
+  .rp-surf2 { padding: 12px; }
+  .rp-s2-tira { width: 100%; justify-content: space-between; }
+  .rp-s2-tira .rp-paso { min-width: 0; flex: 1; padding: 4px 6px; }
+  .rp-s2-th { display: none; }
+  .rp-s2-f { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px 8px; padding: 8px 10px; }
+  .rp-s2-f > span:first-child { grid-column: 1 / -1; display: flex; gap: 8px; align-items: baseline; }
+  .rp-s2-f > span:not(:first-child) { text-align: left; }
+  .rp-s2-f > span[data-l]::before { content: attr(data-l); display: block; font-size: 10.5px; color: var(--mut); }
+  .rp-s2-acc { justify-content: stretch; }
+}

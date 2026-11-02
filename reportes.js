@@ -178,41 +178,37 @@ function notaHTML(n, h, final) {
     <span class="rp-ver">${final ? VER[n.ver] || n.ver : "en curso"}${n.cortado ? ` · otro cambio a las ${fecha(n.cortado)}` : ""}</span></div>`;
 }
 function tabSurfeos(d) {
-  const hs = d.cfg?.h ?? [3, 12, 24];
-  const F = [["todos", "Todos"], ["revisar", "Para revisar"], ["seguimiento", "En seguimiento"], ["rindio", "Rindieron"], ["bajadas", "Bajadas"]];
-  const filtrar = (s) => R.filtro === "todos" || (R.filtro === "revisar" ? ["bajo", "techo", "sigue_mal"].includes(s.estado) : R.filtro === "bajadas" ? s.dir < 0 : R.filtro === "rindio" ? ["rindio", "mejoro"].includes(s.estado) : s.estado === "seguimiento");
-  const xs = (d.surfeos || []).filter(filtrar);
-  const nRev = (d.surfeos || []).filter((s) => ["bajo", "techo", "sigue_mal"].includes(s.estado)).length;
-  return `<p class="rp-ayuda">ROAS del día hasta el surfeo → ROAS de las primeras horas después. ↗ mejoró · → parecido · ↘ empeoró. Tocá una campaña para ver ventas, gasto, ganancia por hora y las acciones.</p>
-    ${nRev ? `<p class="rp-alerta">🔴 ${nRev} para revisar: bajaron después del cambio.</p>` : ""}
+  // (02/11 noche, Lorenzo) por DÍAS, como el Dashboard: al surfear → cierre de ese día → día siguiente → 2.º día.
+  const T = { empeoro: ["↘ Empeoró", "rp-chip-r"], mejoro: ["↗ Mejoró", "rp-chip-v"], estable: ["→ Estable", "rp-chip-a"], pronto: ["⏳ Muy pronto", ""] };
+  const xs0 = d.surfeos || [], ten = (s) => s.notas?.tendencia || "pronto";
+  const n = (k) => xs0.filter((s) => ten(s) === k).length;
+  const F = [["todos", `Todos ${xs0.length}`], ["empeoro", `Empeoró ${n("empeoro")}`], ["mejoro", `Mejoró ${n("mejoro")}`], ["estable", `Estable ${n("estable")}`], ["pronto", `Muy pronto ${n("pronto")}`]];
+  if (!F.some(([k]) => k === R.filtro)) R.filtro = "todos";
+  const xs = xs0.filter((s) => R.filtro === "todos" || ten(s) === R.filtro);
+  const fch = (dia) => `${dia.slice(8)}/${dia.slice(5, 7)}`;
+  return `<p class="rp-ayuda">Cada cambio de presupuesto, día por día como en el Dashboard: <b>cómo venía al surfear</b>, cómo cerró ese día y cómo le fue los días siguientes. «Mejoró / empeoró» compara el ROAS del momento del surfeo con el último día completo (umbral en Configuración).</p>
     ${segs(F, R.filtro, "data-f")}
-    <div class="rp-surf-cab" aria-hidden="true"><span>Campaña</span><span>Antes</span><span>${hs[0]} h</span><span>${hs[1]} h</span><span>${hs[2]} h</span></div>
     <div class="rp-lista rp-surfs">${xs.map((s) => {
-      const [et, ec] = ESTADO_SURF[s.estado] || [s.estado, ""], arriba = s.dir > 0;
-      const notas = hs.map((h) => { const n = s.notas?.[`${h}h`]; return notaHTML(n, h, n?.final); }).join("");
+      const arriba = s.dir > 0, dias = s.notas?.dias || [], [tt, tc] = T[ten(s)] || T.pronto;
       const puedeVolver = arriba && s.ahora != null && Number(s.ahora) > Number(s.de) + 0.01;
-      const antes = s.notas?.antes_dia?.roas ?? s.notas?.[`${hs[0]}h`]?.antes?.roas ?? null;
-      // un paso de la tira: ROAS de ese horizonte, con flecha y color según cómo viene contra el de antes
-      const paso = (h) => { const n = s.notas?.[`${h}h`], r = n?.despues?.roas;
-        if (!n || (!n.final && (n.despues?.h ?? 0) < 0.5)) return `<span class="rp-paso vacio"><i>→</i><b>—</b></span>`;
-        const dif = antes != null && r != null ? r - antes : 0, cls = r == null ? "" : dif >= 0.15 ? "sube" : dif <= -0.3 ? "baja" : "igual";
-        return `<span class="rp-paso ${cls}${n.final ? "" : " curso"}" title="${n.final ? "" : `en curso: van ${n.despues.h} h · `}${n.despues.v} ventas · gasto ${usd(n.despues.g)} · ganancia/h ${usd(n.despues.gan_h)}"><i>${cls === "sube" ? "↗" : cls === "baja" ? "↘" : "→"}</i><b class="${roasCls(r)}">${ro(r)}</b>${n.final ? "" : `<small>${Math.round(n.despues.h)} h</small>`}</span>`; };
-      const abierto = R.abiertos?.has(String(s.id));
-      return `<details class="rp-surf ${["bajo", "techo", "sigue_mal"].includes(s.estado) ? "rp-surf-r" : ["rindio", "mejoro"].includes(s.estado) ? "rp-surf-v" : ""}" data-surf-id="${s.id}"${abierto ? " open" : ""}>
-        <summary>
-          <span class="rp-surf-nom"><b>${esc(s.nombre || s.campana_id)}</b><span class="mut">${arriba ? "📈" : "📉"} ${usd2(s.de)} → ${usd2(s.a)} · ${fecha(s.t)}${s.cuenta ? ` · ${esc(s.cuenta)}` : ""}</span></span>
-          <span class="rp-paso base"><b class="${roasCls(antes)}">${ro(antes)}</b></span>${hs.map(paso).join("")}
-          <span class="rp-surf-est">${chip(et, ec)}${s.techo ? chip(`🧱 ${usd2(s.techo.monto)}`, "rp-chip-g") : ""}</span>
-        </summary>
-        <div class="rp-surf-det">
-          <div class="rp-cambio">${arriba ? "📈" : "📉"} ${usd2(s.de)} → <b>${usd2(s.a)}</b> <span class="mut">(${arriba ? "+" : ""}${Math.round((s.a / s.de - 1) * 100)} %) · ${esc(s.quien || s.origen)}${s.ahora != null && Math.abs(s.ahora - s.a) > 0.01 ? ` · hoy en ${usd2(s.ahora)}` : ""}</span></div>
-          ${s.motivo ? `<p class="rp-motivo">«${esc(s.motivo)}»</p>` : ""}
-          <div class="rp-notas">${notas}</div>
-          <div class="rp-acc">${puedeVolver ? `<button class="btn chico pri" data-volver="${s.id}">Volver a ${usd2(s.de)} + 🧱 techo</button>` : ""}
-            ${s.techo ? `<button class="btn chico" data-quitar="${esc(s.campana_id)}">Quitar techo</button>` : `<button class="btn chico" data-techo="${s.id}">Marcar 🧱 techo</button>`}
-            <button class="btn chico" data-motivo="${s.id}">${s.motivo ? "Cambiar motivo" : "Anotar motivo"}</button></div>
+      const base = dias[0]?.roas;
+      const pill = (x, i) => { if (!x) return ""; const dif = i && base != null && x.roas != null ? x.roas - base : 0, cls = !i || x.roas == null ? "" : dif >= 0.25 ? "sube" : dif <= -0.25 ? "baja" : "igual";
+        return `${i ? `<i class="rp-fl">›</i>` : ""}<span class="rp-paso ${cls}${x.final ? "" : " curso"}" title="${esc(x.et)} · ${fch(x.dia)}"><small>${i ? fch(x.dia) : "surf"}</small><b class="${roasCls(x.roas)}">${ro(x.roas)}</b></span>`; };
+      return `<article class="rp-surf2 ${ten(s) === "empeoro" ? "rp-surf-r" : ten(s) === "mejoro" ? "rp-surf-v" : ""}">
+        <div class="rp-s2-cab">
+          <div class="rp-s2-nom"><b>${esc(s.nombre || s.campana_id)}</b>
+            <span class="mut">${arriba ? "📈" : "📉"} ${usd2(s.de)} → <b>${usd2(s.a)}</b> · ${fecha(s.t)}${s.cuenta ? ` · ${esc(s.cuenta)}` : ""}${s.quien ? ` · ${esc(s.quien)}` : ""}</span>
+            <span class="rp-s2-chips">${chip(tt, tc)}${s.techo ? chip(`🧱 ${usd2(s.techo.monto)}`, "rp-chip-g") : ""}${s.motivo ? `<span class="mut rp-s2-mot">«${esc(s.motivo)}»</span>` : ""}</span></div>
+          <div class="rp-s2-tira" aria-label="ROAS por día">${dias.map(pill).join("")}</div>
         </div>
-      </details>`;
+        <div class="rp-s2-tabla" role="table">
+          <div class="rp-s2-f rp-s2-th" role="row"><span>Día</span><span>Presupuesto</span><span>Gastado</span><span>Ventas</span><span>ROAS</span></div>
+          ${dias.map((x) => `<div class="rp-s2-f${x.k === "surf" ? " surf" : ""}${x.final ? "" : " curso"}" role="row"><span><b>${esc(x.et)}</b><small>${fch(x.dia)}${x.final ? "" : " · en curso"}</small></span><span data-l="Presupuesto">${x.p != null ? usd2(x.p) : "—"}</span><span data-l="Gastado">${usd(x.g)}</span><span data-l="Ventas">${x.v}</span><span data-l="ROAS"><b class="${roasCls(x.roas)}">${ro(x.roas)}</b></span></div>`).join("")}
+        </div>
+        <div class="rp-acc rp-s2-acc">${puedeVolver ? `<button class="btn chico pri" data-volver="${s.id}">Volver a ${usd2(s.de)} + 🧱</button>` : ""}
+          ${s.techo ? `<button class="btn chico" data-quitar="${esc(s.campana_id)}">Quitar techo</button>` : `<button class="btn chico" data-techo="${s.id}">Marcar 🧱 techo</button>`}
+          <button class="btn chico" data-motivo="${s.id}">${s.motivo ? "Cambiar motivo" : "Anotar motivo"}</button></div>
+      </article>`;
     }).join("") || `<p class="vacio">Nada en este filtro (últimos 7 días).</p>`}</div>`;
 }
 function tabCampanas(d) {
