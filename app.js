@@ -1760,7 +1760,14 @@ function modificarPresupuesto() {
   const modoTx = DEMO ? `<p class="mut">Demo: se simula en el navegador, no toca Meta.</p>` : dryOn() ? `<p class="mut"><b>Modo prueba:</b> se manda con dry=1, Meta no se toca.</p>` : "";
   const lista = () => `<ul class="lista-nombres">${its.map((i) => { const a = i.ref.presupuesto;
       return `<li><span class="niv">${NIVEL[i.nivel][0]}</span><span>${esc(i.nombre)}<br><small class="mut">${listo() ? `${montoTx(a)} → <b>${montoTx(nuevoPres(a, modo, pct, fijo))}</b>` : `hoy ${montoTx(a)}`}</small></span></li>`; }).join("")}
-    ${fuera.map((i) => `<li><span class="niv">${NIVEL[i.nivel][0]}</span><span>${esc(i.nombre)}<br><small class="neg">No se toca: ${esc(motivoNoPres(i))}</small></span></li>`).join("")}</ul>`;
+    ${fuera.map((i) => `<li><span class="niv">${NIVEL[i.nivel][0]}</span><span>${esc(i.nombre)}<br><small class="neg">No se toca: ${esc(motivoNoPres(i))}</small></span></li>`).join("")}</ul>${totalTx()}`;
+  // (02/11 noche, Lorenzo) abajo de todo: cuánto gasto diario se sube y se baja en total
+  const difs = () => listo() ? its.map((i) => nuevoPres(i.ref.presupuesto, modo, pct, fijo) - i.ref.presupuesto) : [];
+  const totalTx = () => { const d = difs(); if (!d.length) return "";
+    const sube = d.filter((x) => x > 0).reduce((t, x) => t + x, 0), baja = -d.filter((x) => x < 0).reduce((t, x) => t + x, 0);
+    return `<div class="pres-total">${sube ? `<span class="pos">↑ Sube <b>${montoTx(sube)}</b> de gasto diario</span>` : ""}${baja ? `<span class="neg">↓ Baja <b>${montoTx(baja)}</b> de gasto diario</span>` : ""}</div>`; };
+  const preguntaTotal = () => { const d = difs(), sube = d.filter((x) => x > 0).reduce((t, x) => t + x, 0), baja = -d.filter((x) => x < 0).reduce((t, x) => t + x, 0);
+    return [sube ? `subir <b>${montoTx(sube)}</b>` : "", baja ? `bajar <b>${montoTx(baja)}</b>` : ""].filter(Boolean).join(" y "); };
   const m = abrirModal("", { bloqueado: () => enviando });
   const paso1 = () => {
     const ps = PCTS_PRES[modo] || [];
@@ -1786,7 +1793,7 @@ function modificarPresupuesto() {
   };
   const paso2 = () => {
     const puedeTecho = its.some((i) => i.nivel === "campana") && (modo === "bajar" || (modo === "fijo" && its.every((i) => fijo < (i.ref.presupuesto ?? 0))));
-    m.set(`<h3>¿Seguro que querés ${verbo()}?</h3>${lista()}${avisoTecho(its, modo)}${puedeTecho ? casillaTecho("pres-techo") : ""}${modoTx}
+    m.set(`<h3>¿Seguro que querés ${verbo()}?</h3>${lista()}${preguntaTotal() ? `<p class="pres-pregunta">¿Estás seguro que querés ${preguntaTotal()} al gasto diario?</p>` : ""}${avisoTecho(its, modo)}${puedeTecho ? casillaTecho("pres-techo") : ""}${modoTx}
       <div class="botones"><button class="btn" data-atras>Atrás</button><button class="btn pri" data-ok data-foco>Sí, ${modo === "fijo" ? `poner ${montoTx(fijo)}` : `${modo === "bajar" ? "bajar −" : "subir +"}${pct} %`}</button></div>`);
     $("[data-atras]", m.dlg).onclick = paso1;
     $("[data-ok]", m.dlg).onclick = async (e) => {

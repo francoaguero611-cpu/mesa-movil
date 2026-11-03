@@ -458,3 +458,5 @@ html .techo-aviso { border: 1px solid rgba(255,201,100,.4); border-radius: 16px;
 .ph-tabla th[scope=row] { min-width: 0; width: 1%; padding-right: 6px; }
 .ph-tabla th, .ph-tabla td { padding-left: 8px; padding-right: 8px; }
 .ph-tabla tr.ph-ahora th, .ph-tabla tr.ph-ahora td { font-weight: 700; }
+.pres-total { display: flex; gap: 14px; flex-wrap: wrap; justify-content: flex-end; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--g-borde); font-size: 14.5px; }
+.pres-pregunta { margin: 12px 0 0; font-size: 15.5px; font-weight: 600; text-align: center; }
