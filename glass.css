@@ -451,3 +451,6 @@ html .techo-aviso { border: 1px solid rgba(255,201,100,.4); border-radius: 16px;
 .ph-tipo { display: inline-block; padding: 2px 10px; margin-right: 8px; border-radius: 999px; font-weight: 700; font-size: 13px; }
 .ph-tipo.sube { color: #04241a; background: var(--pos); }
 .ph-tipo.baja { color: #2a0509; background: var(--rojo); }
+.flecha-roas.parejo { color: #2a2205; background: var(--ambar); box-shadow: 0 0 8px rgba(255,200,90,.45); }
+.flecha-roas.pronto { color: var(--mut); background: rgba(255,255,255,.08); border: 1px solid var(--g-borde); box-shadow: none; }
+.ph-tabla tr.ph-total th, .ph-tabla tr.ph-total td { border-top: 1px solid var(--g-borde-luz); font-weight: 700; }

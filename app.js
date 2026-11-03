@@ -1350,7 +1350,8 @@ async function verHistorial(c, ancla, forzar = false, sel = 0) {
   document.addEventListener("keydown", escHist);
   let d = CACHE_HIST.get(c.id);
   if (forzar || !d || Date.now() - d.t > 2 * 60e3) {
-    try { d = { t: Date.now(), r: await api("dash_historial", { q: `&id=${encodeURIComponent(c.id)}&act=${encodeURIComponent(c.act)}` }) }; CACHE_HIST.set(c.id, d); }
+    try { const rr = await fetch(`https://tppcpnfzcxxusdhrlmdx.supabase.co/functions/v1/reportes?accion=surfeos_campana&id=${encodeURIComponent(c.id)}`, { headers: { "x-app-clave": clave() }, cache: "no-store" });
+      if (!rr.ok) throw new Error("HTTP " + rr.status); d = { t: Date.now(), r: await rr.json() }; CACHE_HIST.set(c.id, d); }
     catch (e) { const cu = $(".ph-cuerpo", m); if (cu) cu.innerHTML = `<div class="neg">No se pudo: ${esc(e.message)}</div>`; return; }
   }
   if (!document.body.contains(m)) return;
@@ -1372,9 +1373,9 @@ function accionesHist(g) {
   for (const [n, k] of Object.entries(creados)) out.push(`Creó ${k === 1 ? (n === "anuncio" ? "1 anuncio" : n === "conjunto" ? "1 conjunto" : "la campaña") : `${k} ${n === "anuncio" ? "anuncios" : "conjuntos"}`}`);
   return [...new Set(out)];
 }
-// (02/11 noche, Lorenzo) relojito simple: solo cambios de presupuesto de la campaña (Surfeo ↑ / Tirón de oreja ↓),
-// «Antes» = cómo estaba al cambiar y «Después» = SOLO lo que pasó desde el cambio. El veredicto usa la MISMA regla y los
-// MISMOS números que la flechita del ROAS (reportes dash_info), así nunca se contradicen.
+// (02/11 noche, Lorenzo) relojito por días: cada cambio de presupuesto de la campaña (↑ Surfeo / ↓ Tirón de oreja) con
+// cómo estaba al cambiarlo, cómo cerró ese día, cada día siguiente, hoy hasta ahora y el total desde el cambio. Sale de
+// rep_surfeos (reportes), los MISMOS datos y la MISMA regla que la flechita del ROAS: nunca se contradicen.
 const COLS_HIST = [["roas", "ROAS"], ["ventas", "Ventas"], ["aov", "AOV"], ["gasto", "Importe gastado"], ["ganancia", "Ganancia"], ["presupuesto", "Presupuesto"]];
 function celdaHist(k, mm) {
   const v = mm[k];
@@ -1384,48 +1385,41 @@ function celdaHist(k, mm) {
   if (k === "ganancia") return `<span class="${v >= 0 ? "pos" : "neg"}">${NF2.format(v)}</span>`;
   return NF2.format(v);
 }
-const cambioPres = (g) => g.cambios.find((x) => x.nivel === "campana" && /budget/i.test(x.tipo || ""));
-const metH = (g, v, val, gan) => ({ gasto: g, ventas: v, valor: val, roas: g > 0 ? Math.round((val / g) * 100) / 100 : null, aov: v > 0 ? val / v : null, ganancia: gan ?? (g || val ? val * 0.9 - g : null) });
-function datosHist(c, g, sel) {
-  const ch = cambioPres(g), de = Number(ch?.antes), a = Number(ch?.despues);
-  let antes = { ...g.antes, aov: g.antes.aov ?? (g.antes.ventas ? g.antes.valor / g.antes.ventas : null) }, desp = metH(g.despues.gasto ?? 0, g.despues.ventas ?? 0, g.despues.valor ?? 0, g.despues.ganancia), tend = null;
-  const p = DI.pres?.[String(c.id)];
-  if (!sel && p?.post && p.al && Math.abs(Date.parse(p.t) - Date.parse(g.t)) <= 20 * 60e3) { // el mismo cambio que mira la flechita
-    antes = metH(p.al.g, p.al.v, p.al.val, p.al.gan); desp = metH(p.post.g, p.post.v ?? 0, p.post.val, p.post.gan); tend = p.tend;
-  }
-  antes.presupuesto = isFinite(de) ? de : null; desp.presupuesto = isFinite(a) ? a : null;
-  if (!tend) { const C = DI.cfg, b = antes.ventas ? antes.roas : null, d = desp.gasto > 0 ? desp.roas ?? 0 : null;
-    tend = b == null || d == null || desp.gasto < C.gasto_min ? "pronto" : d - b >= C.b_tendencia ? "mejoro" : b - d >= C.b_tendencia && d < C.b_roas_ok ? "empeoro" : "estable"; }
-  return { antes, desp, tend, sube: a > de, de, a };
-}
-function resumenHist(D) {
-  const { antes: A, desp: N, tend } = D, out = [];
-  out.push(N.gasto < 1 ? `Desde el cambio casi no gastó${N.ventas ? `, pero cayeron ${N.ventas} venta${N.ventas === 1 ? "" : "s"}` : " y no cayeron ventas"}.`
-    : `Desde el cambio gastó ${NF2.format(N.gasto)} y ${N.ventas ? `cayeron ${N.ventas} venta${N.ventas === 1 ? "" : "s"}` : "no cayó ninguna venta"}.`);
-  if (A.ventas && N.ventas) out.push(`ROAS antes ${NF2.format(A.roas)} → después ${NF2.format(N.roas)}.`);
-  const ver = { mejoro: "Mejoró.", empeoro: "Empeoró.", estable: "Se mantuvo.", pronto: "Todavía es pronto para saber." }[tend];
-  if (tend === "estable" && N.roas != null && A.roas != null && N.roas < A.roas) out.push(`Bajó un poco, pero sigue rentable (ROAS ${NF2.format(N.roas)}).`);
-  if (tend === "pronto") out.push(`Hace falta que gaste al menos ${NF2.format(DI.cfg.gasto_min)} desde el cambio.`);
-  return { ver, cls: tend === "mejoro" ? "mejoro" : tend === "empeoro" ? "empeoro" : "igual", txt: out };
+const metH = (x, pres) => x ? ({ gasto: x.g ?? 0, ventas: x.v ?? 0, valor: x.val ?? 0, roas: x.g > 0 ? x.roas ?? Math.round((x.val / x.g) * 100) / 100 : null, aov: x.v > 0 ? x.val / x.v : null, ganancia: x.gan ?? null, presupuesto: pres ?? x.p ?? null }) : null;
+const TEND_TX = { mejoro: "Mejoró.", empeoro: "Empeoró.", estable: "Se mantuvo parejo.", pronto: "Todavía es pronto para saber." };
+function listaSurfeos(c, r) {
+  const xs = [...(r.surfeos || [])], p = DI.pres?.[String(c.id)];
+  // un cambio recién hecho desde el Dashboard que el bot todavía no levantó (corre cada 30 min)
+  if (p && !xs.some((x) => Math.abs(Date.parse(x.t) - Date.parse(p.t)) <= 40 * 60e3)) xs.unshift({ t: p.t, de: p.de, a: p.a, dir: p.dir, tend: "pronto", dias: null, post: null, nuevo: true });
+  return xs.sort((a, b) => Date.parse(b.t) - Date.parse(a.t));
 }
 function pintarHist(m, c, r, sel) {
-  const gs = (r.grupos || []).filter(cambioPres), cu = $(".ph-cuerpo", m);
-  if (!gs.length) { cu.innerHTML = `<div class="ph-tit">${esc(c.nombre)}</div><div class="mut">Sin cambios de presupuesto en los últimos 7 días.</div>`; return; }
+  const gs = listaSurfeos(c, r), cu = $(".ph-cuerpo", m);
+  if (!gs.length) { cu.innerHTML = `<div class="ph-tit">${esc(c.nombre)}</div><div class="mut">Sin cambios de presupuesto en los últimos 8 días.</div>`; return; }
   sel = Math.min(sel, gs.length - 1);
-  const g = gs[sel], D = datosHist(c, g, sel), R = resumenHist(D);
-  const fecha = (dia) => `${dia.slice(8, 10)}/${dia.slice(5, 7)}`, hora = (h, mi) => `${String(h).padStart(2, "0")}:${String(mi ?? 0).padStart(2, "0")}`;
-  const nombreC = (x) => { const ch = cambioPres(x); return Number(ch?.despues) > Number(ch?.antes) ? "Surfeo" : "Tirón de oreja"; };
-  const filaH = (t, sub, mm) => `<tr><th scope="row">${t}<small>${sub}</small></th>${COLS_HIST.map(([k]) => `<td>${celdaHist(k, mm)}</td>`).join("")}</tr>`;
+  const s = gs[sel], sube = s.a > s.de, dias = s.dias || [];
+  const fh = (iso) => new Intl.DateTimeFormat("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(iso)).replace(",", "");
+  const filaH = (t, sub, mm, cls = "") => `<tr${cls ? ` class="${cls}"` : ""}><th scope="row">${t}${sub ? `<small>${sub}</small>` : ""}</th>${COLS_HIST.map(([k]) => `<td>${celdaHist(k, mm)}</td>`).join("")}</tr>`;
+  const filas = [];
+  if (dias.length) {
+    filas.push(filaH(`Al ${sube ? "surfear" : "bajarlo"} · ${dias[0].hora ?? fh(s.t).slice(6)}`, "cómo venía el día hasta el cambio", metH(dias[0], s.de)));
+    dias.slice(1).forEach((d, i) => filas.push(filaH(d.et, i === 0 ? (d.final ? "cómo cerró el día del cambio" : "el día del cambio, hasta ahora") : d.final ? "cómo cerró" : "", metH(d))));
+    if (s.post) filas.push(filaH("Total desde el cambio", "solo lo que pasó después, todos los días juntos", metH(s.post, dias[dias.length - 1]?.p ?? s.a), "ph-total"));
+  }
+  const A = metH(dias[0]), N = metH(s.post), txt = [];
+  if (A) txt.push(`Antes del cambio venía con ${A.ventas} venta${A.ventas === 1 ? "" : "s"} y ROAS ${A.ventas ? NF2.format(A.roas) : "—"}, con presupuesto ${NF2.format(s.de)}.`);
+  if (N) txt.push(N.gasto < 1 ? "Desde el cambio casi no gastó." : `Desde el cambio gastó ${NF2.format(N.gasto)} más y tiró ${N.ventas} venta${N.ventas === 1 ? "" : "s"} más: ROAS ${N.ventas ? NF2.format(N.roas) : "—"}.`);
+  if (s.tend === "pronto") txt.push(`Para opinar tiene que gastar al menos ${NF2.format(DI.cfg.gasto_min)} desde el cambio.`);
+  if (s.tend === "estable" && A?.roas != null && N?.roas != null && N.roas < A.roas) txt.push(`Bajó un poco, pero sigue rentable (ROAS ${NF2.format(N.roas)}).`);
+  const cls = s.tend === "mejoro" ? "mejoro" : s.tend === "empeoro" ? "empeoro" : "igual";
   cu.innerHTML = `<div class="ph-tit">${esc(c.nombre)}</div>
     <div class="ph-ultima"><span class="lbl">${sel ? "Cambio del" : "Último cambio"}</span>
-      <div class="ph-cuando"><b>${fecha(g.dia)}</b> <b>${hora(g.hora, g.min)}</b> <span class="mut">· ${haceTx(g.t)}</span></div></div>
-    <div class="ph-mod"><span class="ph-tipo ${D.sube ? "sube" : "baja"}">${D.sube ? "↑ Surfeo" : "↓ Tirón de oreja"}</span> Presupuesto de <b>${NF2.format(D.de)}</b> a <b>${NF2.format(D.a)}</b></div>
-    <div class="ph-tabla-wrap"><table class="ph-tabla num"><thead><tr><th></th>${COLS_HIST.map(([, t]) => `<th>${esc(t)}</th>`).join("")}</tr></thead><tbody>
-      ${filaH("Antes", `del día, hasta las ${hora(g.hora, g.min)}`, D.antes)}
-      ${filaH("Después", g.hasta ? `desde el cambio hasta el siguiente (${fecha(g.hasta)} ${g.hasta.slice(11)})` : "solo lo que pasó desde el cambio", D.desp)}
-    </tbody></table></div>
-    <div class="ph-frases v-${R.cls}"><span class="lbl">Resumen</span><p class="ph-ver">${R.ver}</p>${R.txt.map((t) => `<p>${esc(t)}</p>`).join("")}</div>
-    ${gs.length > 1 ? `<div class="ph-otros"><span class="mut">Otros cambios:</span> ${gs.map((x, i) => `<button type="button" class="ph-chip${i === sel ? " on" : ""}" data-sel="${i}">${nombreC(x) === "Surfeo" ? "↑" : "↓"} ${fecha(x.dia)} ${hora(x.hora, x.min)}</button>`).join("")}</div>` : ""}`;
+      <div class="ph-cuando"><b>${fh(s.t)}</b> <span class="mut">· ${haceTx(s.t)}</span></div></div>
+    <div class="ph-mod"><span class="ph-tipo ${sube ? "sube" : "baja"}">${sube ? "↑ Surfeo" : "↓ Tirón de oreja"}</span> Presupuesto de <b>${NF2.format(s.de)}</b> a <b>${NF2.format(s.a)}</b>${dias.length && dias[dias.length - 1].p != null && Math.abs(dias[dias.length - 1].p - s.a) > 0.5 ? ` <span class="mut">· hoy: ${NF2.format(dias[dias.length - 1].p)}</span>` : ""}</div>
+    ${filas.length ? `<div class="ph-tabla-wrap"><table class="ph-tabla num"><thead><tr><th></th>${COLS_HIST.map(([, t]) => `<th>${esc(t)}</th>`).join("")}</tr></thead><tbody>${filas.join("")}</tbody></table></div>`
+      : `<div class="mut">Recién cambiado: las métricas por día aparecen en unos minutos.</div>`}
+    <div class="ph-frases v-${cls}"><span class="lbl">Resumen</span><p class="ph-ver">${TEND_TX[s.tend] ?? TEND_TX.pronto}</p>${txt.map((t) => `<p>${esc(t)}</p>`).join("")}</div>
+    ${gs.length > 1 ? `<div class="ph-otros"><span class="mut">Otros cambios:</span> ${gs.map((x, i) => `<button type="button" class="ph-chip${i === sel ? " on" : ""}" data-sel="${i}">${x.a > x.de ? "↑" : "↓"} ${fh(x.t)}</button>`).join("")}</div>` : ""}`;
   $$("[data-sel]", cu).forEach((b) => b.onclick = () => pintarHist(m, c, r, Number(b.dataset.sel)));
 }
 function verHoras(c, ancla) {
@@ -3517,9 +3511,10 @@ async function cargarTechos(forzar = false) {
 }
 // flechita al lado del ROAS: ↑ verde si mejoró desde el último cambio de presupuesto, ↓ roja si empeoró
 function flechaRoas(x) {
-  const p = DI.pres?.[String(x.id)]; if (!p || !["mejoro", "empeoro"].includes(p.tend)) return "";
-  const t = `Desde el último cambio de presupuesto (${haceTx(p.t)}: ${montoTx(p.de)} → ${montoTx(p.a)}): ROAS ${p.base != null ? NF2.format(p.base) : "—"} → ${p.despues != null ? NF2.format(p.despues) : "—"}`;
-  return p.tend === "mejoro" ? `<span class="flecha-roas sube" title="${esc(t)}">↑</span>` : `<span class="flecha-roas baja" title="${esc(t)}">↓</span>`;
+  const p = DI.pres?.[String(x.id)]; if (!p) return "";
+  const t = `${p.a > p.de ? "Surfeo" : "Tirón de oreja"} ${haceTx(p.t)} (${montoTx(p.de)} → ${montoTx(p.a)}): ROAS ${p.base != null ? NF2.format(p.base) : "—"} al cambiar → ${p.despues != null ? NF2.format(p.despues) : "—"} desde el cambio`;
+  const F = { mejoro: ["sube", "↑", "Mejoró"], empeoro: ["baja", "↓", "Empeoró"], estable: ["parejo", "=", "Parejo"], pronto: ["pronto", "·", "Todavía es pronto"] }[p.tend] ?? ["pronto", "·", "Todavía es pronto"];
+  return `<span class="flecha-roas ${F[0]}" title="${esc(F[2] + " · " + t)}">${F[1]}</span>`;
 }
 const tagTecho = (x) => { const t = TECHOS.get(String(x.id)); return t ? `<span class="techo-tag" title="Techo marcado${t.quien ? " por " + esc(t.quien) : ""}: no subir arriba de ${esc(montoTx(Number(t.monto)))}${t.motivo ? " · " + esc(t.motivo) : ""}">Techo ${esc(montoTx(Number(t.monto)))}</span>` : ""; };
 function avisoTecho(its, modo) {
