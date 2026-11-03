@@ -454,3 +454,7 @@ html .techo-aviso { border: 1px solid rgba(255,201,100,.4); border-radius: 16px;
 .flecha-roas.parejo { color: #2a2205; background: var(--ambar); box-shadow: 0 0 8px rgba(255,200,90,.45); }
 .flecha-roas.pronto { color: var(--mut); background: rgba(255,255,255,.08); border: 1px solid var(--g-borde); box-shadow: none; }
 .ph-tabla tr.ph-total th, .ph-tabla tr.ph-total td { border-top: 1px solid var(--g-borde-luz); font-weight: 700; }
+/* (02/11 noche) relojito: primera columna angosta para dejar lugar a las métricas */
+.ph-tabla th[scope=row] { min-width: 0; width: 1%; padding-right: 6px; }
+.ph-tabla th, .ph-tabla td { padding-left: 8px; padding-right: 8px; }
+.ph-tabla tr.ph-ahora th, .ph-tabla tr.ph-ahora td { font-weight: 700; }

@@ -1376,7 +1376,7 @@ function accionesHist(g) {
 // (02/11 noche, Lorenzo) relojito por días: cada cambio de presupuesto de la campaña (↑ Surfeo / ↓ Tirón de oreja) con
 // cómo estaba al cambiarlo, cómo cerró ese día, cada día siguiente, hoy hasta ahora y el total desde el cambio. Sale de
 // rep_surfeos (reportes), los MISMOS datos y la MISMA regla que la flechita del ROAS: nunca se contradicen.
-const COLS_HIST = [["roas", "ROAS"], ["ventas", "Ventas"], ["aov", "AOV"], ["gasto", "Importe gastado"], ["ganancia", "Ganancia"], ["presupuesto", "Presupuesto"]];
+const COLS_HIST = [["roas", "ROAS"], ["presupuesto", "Presupuesto"], ["ganancia", "Ganancia"], ["ventas", "Ventas"], ["gasto", "Importe gastado"], ["aov", "AOV"]];
 function celdaHist(k, mm) {
   const v = mm[k];
   if (k === "roas") return `<span class="roas ${colorRoas(mm.ventas ? v : null)} chip-roas">${mm.ventas ? roasTx(v) : "—"}</span>`;
@@ -1402,9 +1402,10 @@ function pintarHist(m, c, r, sel) {
   const filaH = (t, sub, mm, cls = "") => `<tr${cls ? ` class="${cls}"` : ""}><th scope="row">${t}${sub ? `<small>${sub}</small>` : ""}</th>${COLS_HIST.map(([k]) => `<td>${celdaHist(k, mm)}</td>`).join("")}</tr>`;
   const filas = [];
   if (dias.length) {
-    filas.push(filaH(`Al ${sube ? "surfear" : "bajarlo"} · ${dias[0].hora ?? fh(s.t).slice(6)}`, "cómo venía el día hasta el cambio", metH(dias[0], s.de)));
-    dias.slice(1).forEach((d, i) => filas.push(filaH(d.et, i === 0 ? (d.final ? "cómo cerró el día del cambio" : "el día del cambio, hasta ahora") : d.final ? "cómo cerró" : "", metH(d))));
-    if (s.post) filas.push(filaH("Total desde el cambio", "solo lo que pasó después, todos los días juntos", metH(s.post, dias[dias.length - 1]?.p ?? s.a), "ph-total"));
+    // (02/11 noche, Lorenzo) solo: el momento del cambio, el cierre de cada día y, al final, ahora (la hora en que se mira)
+    const dm = (d) => `${d.slice(8, 10)}/${d.slice(5, 7)}`, ahoraTx = fh(new Date().toISOString()).slice(6);
+    filas.push(filaH(`${sube ? "Surfeo" : "Tirón"} ${dias[0].hora ?? fh(s.t).slice(6)}`, dm(dias[0].dia), metH(dias[0], s.de)));
+    dias.slice(1).forEach((d) => filas.push(d.final ? filaH("Cierre", dm(d.dia), metH(d)) : filaH(`Ahora ${ahoraTx}`, dm(d.dia), metH(d), "ph-ahora")));
   }
   const A = metH(dias[0]), N = metH(s.post), txt = [];
   if (A) txt.push(`Antes del cambio venía con ${A.ventas} venta${A.ventas === 1 ? "" : "s"} y ROAS ${A.ventas ? NF2.format(A.roas) : "—"}, con presupuesto ${NF2.format(s.de)}.`);
