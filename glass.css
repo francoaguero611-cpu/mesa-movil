@@ -445,3 +445,9 @@ html .techo-aviso { border: 1px solid rgba(255,201,100,.4); border-radius: 16px;
 .techo-casilla { display: flex; gap: 10px; align-items: flex-start; margin: 12px 0 4px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--g-borde); background: rgba(0,8,20,.25); cursor: pointer; font-size: 14px; }
 .techo-casilla input { width: 18px; height: 18px; margin-top: 1px; accent-color: var(--celeste); }
 .ult-mod { display: grid; gap: 1px; } .ult-que { font-size: 12.5px; } .ult-cuando { font-size: 11px; color: var(--mut); }
+/* (02/11 noche) la flechita va a la derecha del ROAS sin correrlo: el ROAS queda siempre en la misma línea */
+.roas-f { position: relative; display: inline-block; }
+.roas-f .flecha-roas { position: absolute; left: 100%; top: 50%; transform: translateY(-50%); margin-left: 5px; }
+.ph-tipo { display: inline-block; padding: 2px 10px; margin-right: 8px; border-radius: 999px; font-weight: 700; font-size: 13px; }
+.ph-tipo.sube { color: #04241a; background: var(--pos); }
+.ph-tipo.baja { color: #2a0509; background: var(--rojo); }
