@@ -3262,6 +3262,14 @@ async function prepararEvento(ev, its) {
   if (!eventoAbierto) pintarTodo(); else { pintarCarrusel(); pintarTabla(); }
   return { claves: claves.filter((k) => S.sel.has(k)), faltan };
 }
+// (03/11, Lorenzo) Jarvis (Telegram) manda «Ver campaña»: #ev={"sec":"camp","id":"<campaña>"} → la campaña marcada en la
+// tabla de hoy y el relojito abierto, para ver el antes y el después del surfeo sin buscarla.
+async function abrirCampanaReloj(id) {
+  const it = { n: "campana", id };
+  await mostrarEnTabla(prepararEvento({ t: "surf", items: [it] }, [it]));
+  const c = campanaPorId(id); if (!c) return;
+  setTimeout(() => verHistorial(c, null), 500);
+}
 async function mostrarEnTabla(prep) {
   const r = await prep;
   if (!r || r.fallo) { if (r?.msg) toast(r.msg, "error"); return; }
@@ -3293,6 +3301,7 @@ async function recibirEvento(ev) {
   // (12/10) respuesta de Claude en Correcciones: abre la carpeta y el chat
   if (ev.sec === "creativos" && ev.cr) { if (!DEMO && !clave()) { ls.set("dash_ev_pend", JSON.stringify(ev)); return; } irASeccion("creativos", { ruta: { g: ev.cr.g, f: ev.cr.f, chat: ev.cr.chat } }); return; }
   if (ev.sec === "pagos") { mostrarEventoPagos(ev); return; } // (30/10) el link a Facturación no necesita sesión
+  if (ev.sec === "camp" && ev.id) { if (!DEMO && !clave()) { ls.set("dash_ev_pend", JSON.stringify(ev)); return; } abrirCampanaReloj(String(ev.id)); return; } // (03/11) link «Ver campaña» de Jarvis
   if (ev.demo) { await cargarDemo(); ev = window.DemoAPI.ejemplo(ev.demo); }
   if (!DEMO && !clave()) { ls.set("dash_ev_pend", JSON.stringify(ev)); return; }
   mostrarEvento(ev);
