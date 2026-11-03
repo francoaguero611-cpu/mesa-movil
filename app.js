@@ -921,14 +921,17 @@ function secundariasHTML(g) {
   const d = S.datos[S.periodo] || {};
   const cs = (d.campanas || []).filter((c) => (g.clave === "todas" || c.grupo === g.clave) && deCuenta(c));
   const T = cs.reduce((t, c) => { t.g += +c.gasto || 0; t.imp += +c.impresiones || 0; t.cl += +c.clics || 0; t.vis += +c.visitas || 0; t.car += +c.carritos || 0; t.pi += +c.pagos_iniciados || 0; t.v += +c.ventas || 0;
-    if (c.frecuencia != null && c.impresiones) { t.fw += c.frecuencia * c.impresiones; t.fi += +c.impresiones; } if (c.retencion != null && c.impresiones) { t.rw += c.retencion * c.impresiones; t.ri += +c.impresiones; } return t; },
-    { g: 0, imp: 0, cl: 0, vis: 0, car: 0, pi: 0, v: 0, fw: 0, fi: 0, rw: 0, ri: 0 });
+    // frecuencia = impresiones ÷ alcance (Meta da el alcance exacto por campaña)
+    if (c.frecuencia > 0 && c.impresiones) { t.fi += +c.impresiones; t.alc += c.alcance > 0 ? +c.alcance : c.impresiones / c.frecuencia; }
+    if (c.retencion != null && c.impresiones) { t.rw += c.retencion * c.impresiones; t.ri += +c.impresiones; }
+    if (c.retencion_3s != null && c.impresiones) { t.hw += c.retencion_3s * c.impresiones; t.hi += +c.impresiones; } return t; },
+    { g: 0, imp: 0, cl: 0, vis: 0, car: 0, pi: 0, v: 0, fi: 0, alc: 0, rw: 0, ri: 0, hw: 0, hi: 0 });
   const dv = (a, b) => b ? a / b : null, n = (x) => x == null ? "—" : ent(Math.round(x)), p = (x) => x == null ? "—" : pct(x), u = (x) => x == null ? "—" : usdG(x);
   const M = [["CTR", p(dv(T.cl, T.imp)), "clics ÷ impresiones"], ["CPM", u(T.imp ? (T.g / T.imp) * 1000 : null), "costo por mil"], ["CPC", u(dv(T.g, T.cl)), "costo por clic"],
-    ["Frecuencia", T.fi ? NF2.format(T.fw / T.fi) : "—", "veces que lo ve cada uno"], ["Impresiones", n(T.imp), "veces que se mostró"], ["Clics", n(T.cl), "en el enlace"],
+    ["Retención 3 s", p(T.hi ? T.hw / T.hi : null), "vieron los primeros 3 s"], ["Frecuencia", T.alc ? NF2.format(T.fi / T.alc) : "—", "veces que lo ve cada uno"], ["Impresiones", n(T.imp), "veces que se mostró"], ["Clics", n(T.cl), "en el enlace"],
     ["Visitas a la landing", n(T.vis), "cargaron la página"], ["Costo por visita", u(dv(T.g, T.vis)), "gasto ÷ visitas"], ["Conv. de la landing", p(dv(T.v, T.vis)), "ventas ÷ visitas"],
     ["Carritos", n(T.car), "agregaron al carrito"], ["Costo por carrito", u(dv(T.g, T.car)), "gasto ÷ carritos"], ["Pagos iniciados", n(T.pi), "llegaron al checkout"],
-    ["Costo por pago iniciado", u(dv(T.g, T.pi)), "gasto ÷ pagos iniciados"], ["Conv. del checkout", p(dv(T.v, T.pi)), "ventas ÷ pagos iniciados"], ["Retención del video", p(T.ri ? T.rw / T.ri : null), "vieron el video completo"]];
+    ["Costo por pago iniciado", u(dv(T.g, T.pi)), "gasto ÷ pagos iniciados"], ["Conv. del checkout", p(dv(T.v, T.pi)), "ventas ÷ pagos iniciados"], ["Video completo", p(T.ri ? T.rw / T.ri : null), "ThruPlay ÷ impresiones"]];
   return `<div class="sec-grid">${M.map(([l, v, sub]) => `<div class="met met-chica boceto"><div class="lbl">${l}</div><div class="val num">${v}</div><div class="sub">${sub}</div></div>`).join("")}</div>`;
 }
 document.addEventListener("click", (e) => { const b = e.target.closest && e.target.closest("[data-sec]"); if (!b) return; S.secAbierto = !S.secAbierto; pintarCarrusel(); });
