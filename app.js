@@ -3268,7 +3268,10 @@ async function abrirCampanaReloj(id) {
   const it = { n: "campana", id };
   await mostrarEnTabla(prepararEvento({ t: "surf", items: [it] }, [it]));
   const c = campanaPorId(id); if (!c) return;
-  setTimeout(() => verHistorial(c, null), 500);
+  // si hay avisos del Workspace en pantalla (.av-pop-fondo), espera a que se cierren (hasta 2 min) y recién abre el relojito
+  const t0 = Date.now();
+  const abrir = () => { if (document.querySelector(".av-pop-fondo, .ev-fondo") && Date.now() - t0 < 120000) return setTimeout(abrir, 600); if (!$("#pop-hist")) verHistorial(c, null); };
+  setTimeout(abrir, 500);
 }
 async function mostrarEnTabla(prep) {
   const r = await prep;
