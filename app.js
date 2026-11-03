@@ -3304,6 +3304,7 @@ async function recibirEvento(ev) {
   // (12/10) respuesta de Claude en Correcciones: abre la carpeta y el chat
   if (ev.sec === "creativos" && ev.cr) { if (!DEMO && !clave()) { ls.set("dash_ev_pend", JSON.stringify(ev)); return; } irASeccion("creativos", { ruta: { g: ev.cr.g, f: ev.cr.f, chat: ev.cr.chat } }); return; }
   if (ev.sec === "pagos") { mostrarEventoPagos(ev); return; } // (30/10) el link a Facturación no necesita sesión
+  if (ev.sec === "camps" && Array.isArray(ev.ids) && ev.ids.length) { if (!DEMO && !clave()) { ls.set("dash_ev_pend", JSON.stringify(ev)); return; } const its = ev.ids.map((id) => ({ n: "campana", id: String(id) })); mostrarEnTabla(prepararEvento({ t: "surf", items: its }, its)); return; } // (03/11) Jarvis: «seleccioná todas juntas» → quedan marcadas para Modificar presupuesto
   if (ev.sec === "camp" && ev.id) { if (!DEMO && !clave()) { ls.set("dash_ev_pend", JSON.stringify(ev)); return; } abrirCampanaReloj(String(ev.id)); return; } // (03/11) link «Ver campaña» de Jarvis
   if (ev.demo) { await cargarDemo(); ev = window.DemoAPI.ejemplo(ev.demo); }
   if (!DEMO && !clave()) { ls.set("dash_ev_pend", JSON.stringify(ev)); return; }
