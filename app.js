@@ -3355,6 +3355,8 @@ function eventoPendiente() {
 //   montar  → función que pinta la sección en #main (tiene que poner S.vista = id y llamar a pintarNav())
 //   ya      → (opcional) qué hacer si se toca la sección estando adentro; si no está, sube arriba de todo
 const SECCIONES = [
+  { id: "jarvis", nombre: "Jarvis", raiz: "#jv", icono: "M12 3.2 C 12.6 7.6, 14.4 9.4, 18.8 10 C 14.4 10.6, 12.6 12.4, 12 16.8 C 11.4 12.4, 9.6 10.6, 5.2 10 C 9.6 9.4, 11.4 7.6, 12 3.2 Z M18.2 15.6 C 18.4 17.2, 19 17.8, 20.6 18 C 19 18.2, 18.4 18.8, 18.2 20.4 C 18 18.8, 17.4 18.2, 15.8 18 C 17.4 17.8, 18 17.2, 18.2 15.6 Z",
+    montar: () => montarJarvis() }, // (03/11, Lorenzo) el inicio: qué hay que hacer y qué pasó, con «Hecho» compartido
   { id: "dash", nombre: "Dashboard", raiz: "#carr", icono: "M4 20 C 9 19.6, 15 20.2, 20.5 19.8 M6.5 17 V11.5 M11.5 17 V6.5 M16.5 17 V9.5",
     montar: () => { try { history.replaceState(null, "", location.pathname + location.search); } catch {} montar(); window.scrollTo(0, 0); } },
   { id: "reportes", nombre: "Reportes", raiz: "#rp", icono: "M5 4.5 C 9.5 4.3, 14 4.6, 18.8 4.4 L18.6 19.6 C 14 19.8, 9.5 19.5, 5.2 19.7 Z M8.3 15.5 L11 12.3 L13.2 14.2 L16 10 M8.4 8.2 H12.6",
@@ -3409,7 +3411,7 @@ function abrirInicial() {
   pintarHola();
   const h = location.hash.slice(1).split("/")[0]; // (12/10) #creativos/<oferta>/<fecha>
   const guardada = ls.get("dash_seccion");
-  const s = seccionDe(h) || seccionDe(guardada) || SECCIONES[0];
+  const s = seccionDe(h) || SECCIONES[0]; // (03/11) el inicio es siempre Jarvis; «guardada» ya no manda
   s.montar({}); pintarTitulo(s.id);
   if (URLP.get("malos") === "1") { try { history.replaceState(null, "", location.pathname); } catch {} setTimeout(seleccionarMalos, 300); }
 }
@@ -3513,6 +3515,54 @@ function montarUmbrales() {
   $("#main").innerHTML = `<div class="umb-pagina"><div class="whop-barra" id="whop-barra" role="status" aria-live="polite"></div><section class="seccion-umb umb-full" id="sec-umb" aria-labelledby="t-umb"></section></div>`;
   pintarBarra(); window.scrollTo(0, 0);
   pintarUmbrales(); pintarWhop(); cargarUmbrales();
+}
+
+// ---------- Jarvis (03/11, Lorenzo): la pantalla de inicio. jarvis.js se carga la primera vez. Backend: Edge Function «asistente» ----------
+let jvCarga = null;
+function cargarJarvis() {
+  if (window.Jarvis) return Promise.resolve();
+  if (jvCarga) return jvCarga;
+  const css = new Promise((ok) => {
+    if ($('link[href^="jarvis.css"]')) return ok();
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "jarvis.css?v=2";
+    l.onload = l.onerror = () => ok(); document.head.appendChild(l);
+  });
+  const js = new Promise((ok, mal) => {
+    const sc = document.createElement("script"); sc.src = "jarvis.js?v=1";
+    sc.onload = () => window.Jarvis ? ok() : mal(new Error("Jarvis no arrancó"));
+    sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar Jarvis. ¿Hay conexión?")); };
+    document.head.appendChild(sc);
+  });
+  jvCarga = Promise.all([css, js]).catch((e) => { jvCarga = null; throw e; });
+  return jvCarga;
+}
+// Los números de hoy y ayer salen del mismo «dash» que la tabla (y quedan guardados para cuando abras el Dashboard)
+async function dashPara(per) {
+  const d = S.datos[per];
+  if (d && Date.now() - new Date(d.generado || 0) < 5 * 60000) return d;
+  const n = await api("dash", { q: `&periodo=${per}` }); S.datos[per] = n; return n;
+}
+async function montarJarvis() {
+  cerrarMenu(); pararRanking();
+  S.vista = "jarvis"; ls.set("dash_seccion", "jarvis");
+  try { history.replaceState(null, "", location.pathname + location.search); } catch {}
+  pintarNav();
+  $("#main").innerHTML = `<section class="jv" id="jv" aria-labelledby="jv-t"><h2 class="sr" id="jv-t">Jarvis</h2><p class="vacio"><span class="cargador"></span>Abriendo Jarvis…</p></section>`;
+  pintarBarra();
+  window.scrollTo(0, 0);
+  try { await cargarJarvis(); }
+  catch (e) {
+    if (S.vista !== "jarvis" || !$("#jv")) return;
+    $("#jv").innerHTML = `<div class="err-box" role="alert"><b>No se pudo abrir Jarvis.</b> ${esc(e.message)}<div><button type="button" class="btn chico" id="jv-reintentar">Reintentar</button></div></div>`;
+    $("#jv-reintentar").onclick = () => montarJarvis();
+    return;
+  }
+  if (S.vista !== "jarvis" || !$("#jv")) return;
+  window.Jarvis.montar($("#jv"), {
+    login: (msg) => login(msg), toast, demo: DEMO, clave,
+    usuario: () => usuarioActual()?.id || "", nombre: () => usuarioActual()?.nombre || "",
+    dash: dashPara,
+  });
 }
 
 // ---------- Reportes (02/11, Lorenzo): reportes.js se carga la primera vez. Backend: Edge Function «reportes» ----------

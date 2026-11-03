@@ -1,0 +1,74 @@
+/* Jarvis (03/11): pantalla de inicio. Va con el liquid glass (glass.css): «html » adelante para ganarle a lo que carga antes. */
+html .jv { display: grid; gap: 16px; max-width: 860px; margin: 0 auto; padding-bottom: 40px; }
+
+/* saludo */
+html .jv-hero { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 4px 4px 0; }
+html .jv-fecha { margin: 0; font-size: 13px; color: var(--mut); }
+html .jv-fecha::first-letter { text-transform: uppercase; }
+html .jv-hero h2 { margin: 2px 0 4px; font: 600 clamp(26px, 6vw, 34px)/1.1 var(--f-titulo); letter-spacing: -.8px; }
+html .jv-frase { margin: 0; font-size: 15.5px; color: var(--tinta-2); }
+html .jv-frase b { color: var(--tinta); }
+html .jv-refrescar { flex: none; width: 40px; height: 40px; border-radius: 999px; border: 1px solid var(--g-borde); background: var(--g-vidrio); color: var(--tinta-2); font-size: 18px; cursor: pointer; }
+html .jv-refrescar .gira { display: inline-block; animation: jv-gira .9s linear infinite; }
+@keyframes jv-gira { to { transform: rotate(360deg); } }
+
+/* hoy / ayer */
+html .jv-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+html .jv-kpi { display: grid; gap: 2px; text-align: left; padding: 14px 16px; border-radius: var(--g-r); border: 1px solid var(--g-borde); background: var(--g-vidrio); box-shadow: var(--g-sombra); color: var(--tinta); cursor: pointer; font: inherit;
+  transition: transform .18s var(--suave), border-color .18s; }
+html .jv-kpi:active { transform: scale(.98); }
+html .jv-kpi-t { font-size: 12.5px; color: var(--mut); text-transform: uppercase; letter-spacing: .6px; }
+html .jv-kpi-v { font: 600 clamp(22px, 5.4vw, 28px)/1.15 var(--f-titulo); font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+html .jv-kpi-s { font-size: 12.5px; color: var(--tinta-2); font-variant-numeric: tabular-nums; }
+html .jv-bien .jv-kpi-v { color: var(--pos); } html .jv-justo .jv-kpi-v { color: var(--ambar); } html .jv-mal .jv-kpi-v { color: var(--rojo); }
+html .jv-bien { border-color: rgba(111,242,200,.22); } html .jv-mal { border-color: rgba(255,122,133,.22); }
+html .jv-cargando { color: var(--mut); animation: jv-lat 1.2s ease-in-out infinite; }
+@keyframes jv-lat { 50% { opacity: .4; } }
+
+/* paneles */
+html .jv-panel { display: grid; gap: 12px; padding: 16px 18px; border-radius: var(--g-r); border: 1px solid var(--g-borde); background: var(--g-vidrio); box-shadow: var(--g-sombra); min-width: 0; }
+html .jv-panel > header h3 { margin: 0; font: 600 18px var(--f-titulo); letter-spacing: -.3px; display: flex; align-items: center; gap: 8px; }
+html .jv-cont { display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 7px; border-radius: 999px; background: var(--celeste); color: var(--celeste-tx); font-size: 13px; font-weight: 700; }
+html .jv-hacer { border-color: rgba(124,200,255,.22); }
+html .jv-grupo { display: grid; gap: 8px; }
+html .jv-grupo h4 { margin: 4px 0 0; font: 600 13px var(--f-titulo); color: var(--mut); display: flex; gap: 6px; align-items: center; }
+html .jv-grupo h4 span { font-weight: 500; opacity: .8; }
+html .jv-vacio { margin: 0; color: var(--tinta-2); font-size: 14.5px; }
+
+/* tareas */
+html .jv-lista, html .jv-feed { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+html .jv-tarea { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 12px; border-radius: 16px; background: rgba(0,8,20,.28); border: 1px solid var(--linea);
+  animation: jv-entra .35s var(--suave) both; animation-delay: var(--d, 0s); transition: opacity .25s, transform .25s var(--suave); }
+html .jv-tarea.jv-saliendo { opacity: 0; transform: translateX(24px) scale(.98); }
+html .jv-vivo { border-color: rgba(255,122,133,.3); background: rgba(255,122,133,.07); grid-template-columns: 30px minmax(0, 1fr); }
+html .jv-ok { opacity: .62; grid-template-columns: 30px minmax(0, 1fr); } html .jv-ok .jv-ico { color: var(--pos); }
+@keyframes jv-entra { from { opacity: 0; transform: translateY(6px); } }
+html .jv-ico { font-size: 20px; line-height: 1.3; text-align: center; }
+html .jv-cuerpo { min-width: 0; display: grid; gap: 8px; }
+html .jv-cuerpo p { margin: 0; font-size: 14.5px; line-height: 1.42; color: var(--tinta-2); overflow-wrap: anywhere; }
+html .jv-cuerpo p b { color: var(--tinta); font-weight: 600; }
+html .jv-acc { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+html .jv-ir { padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(124,200,255,.35); background: rgba(124,200,255,.1); color: var(--celeste); font: 500 13px var(--f-texto); cursor: pointer; white-space: nowrap; }
+html .jv-ir:active { transform: scale(.97); }
+html .jv-cuando { font-size: 12px; color: var(--mut); margin-left: auto; white-space: nowrap; }
+html .jv-hecho { width: 38px; height: 38px; border-radius: 999px; border: 1.5px solid var(--g-borde-luz); background: transparent; color: var(--mut); cursor: pointer; display: grid; place-items: center; transition: background .15s, color .15s, border-color .15s; }
+html .jv-hecho:hover, html .jv-hecho:focus-visible { background: rgba(111,242,200,.14); color: var(--pos); border-color: var(--pos); }
+html .jv-mas { justify-self: start; padding: 4px 2px; border: 0; background: none; color: var(--celeste); font: 500 13.5px var(--f-texto); cursor: pointer; }
+
+/* novedades */
+html .jv-filtros { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 -4px; padding: 0 4px 2px; }
+html .jv-filtros::-webkit-scrollbar { display: none; }
+html .jv-fil { flex: none; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--g-borde); background: rgba(0,8,20,.25); color: var(--tinta-2); font: 500 13px var(--f-texto); cursor: pointer; white-space: nowrap; }
+html .jv-fil[aria-selected="true"] { background: var(--celeste); color: var(--celeste-tx); border-color: transparent; }
+html .jv-feed li { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; padding: 10px 4px; border-bottom: 1px solid var(--linea); }
+html .jv-feed li:last-child { border-bottom: 0; }
+html .jv-feed .jv-cuerpo p { font-size: 14px; }
+html .jv-pie { margin: 0; text-align: center; font-size: 12px; color: var(--mut); }
+
+@media (max-width: 600px) {
+  html .jv { gap: 12px; }
+  html .jv-panel { padding: 14px 12px; }
+  html .jv-tarea { padding: 10px; gap: 8px; grid-template-columns: 26px minmax(0, 1fr) auto; }
+  html .jv-kpi { padding: 12px 14px; }
+}
+@media (prefers-reduced-motion: reduce) { html .jv-tarea { animation: none; } html .jv-refrescar .gira, html .jv-cargando { animation: none; } }
