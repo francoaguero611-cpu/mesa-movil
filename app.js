@@ -912,8 +912,26 @@ function metricasHTML(g) {
     <div class="met boceto"><div class="lbl">CPA</div><div class="val num">${m.ventas ? usdG(m.gasto / m.ventas) : "—"}</div><div class="sub">gasto ÷ ventas</div></div>
     <div class="met boceto"><div class="lbl">Ticket promedio</div><div class="val num">${m.ventas ? usdG(m.facturacion / m.ventas) : "—"}</div><div class="sub">facturación ÷ ventas</div></div>
     <div class="met boceto"><div class="lbl">% Order bump</div><div class="val num">${m.pct_bump != null ? pct(m.pct_bump) : "—"}</div><div class="sub num">${m.con_bump != null ? `${ent(m.con_bump)} de ${ent(m.ventas_principales ?? m.ventas)} ventas` : "&nbsp;"}</div></div>
-    <div class="met boceto"><div class="lbl">% Post-compra</div><div class="val num">${m.pct_post != null ? pct(m.pct_post) : "—"}</div><div class="sub num">${m.con_post != null ? `${ent(m.con_post)} de ${ent(m.ventas_principales ?? m.ventas)} ventas` : "&nbsp;"}</div></div>`;
+    <div class="met boceto"><div class="lbl">% Post-compra</div><div class="val num">${m.pct_post != null ? pct(m.pct_post) : "—"}</div><div class="sub num">${m.con_post != null ? `${ent(m.con_post)} de ${ent(m.ventas_principales ?? m.ventas)} ventas` : "&nbsp;"}</div></div>
+    <div class="sec-fila"><button type="button" class="sec-link" data-sec aria-expanded="${!!S.secAbierto}">${S.secAbierto ? "Ocultar métricas secundarias ▴" : "Ver métricas secundarias ▾"}</button></div>
+    ${S.secAbierto ? secundariasHTML(g) : ""}`;
 }
+// (03/11, Lorenzo) métricas secundarias del grupo (las de Ads Manager que no están arriba), sumadas de sus campañas
+function secundariasHTML(g) {
+  const d = S.datos[S.periodo] || {};
+  const cs = (d.campanas || []).filter((c) => (g.clave === "todas" || c.grupo === g.clave) && deCuenta(c));
+  const T = cs.reduce((t, c) => { t.g += +c.gasto || 0; t.imp += +c.impresiones || 0; t.cl += +c.clics || 0; t.vis += +c.visitas || 0; t.car += +c.carritos || 0; t.pi += +c.pagos_iniciados || 0; t.v += +c.ventas || 0;
+    if (c.frecuencia != null && c.impresiones) { t.fw += c.frecuencia * c.impresiones; t.fi += +c.impresiones; } if (c.retencion != null && c.impresiones) { t.rw += c.retencion * c.impresiones; t.ri += +c.impresiones; } return t; },
+    { g: 0, imp: 0, cl: 0, vis: 0, car: 0, pi: 0, v: 0, fw: 0, fi: 0, rw: 0, ri: 0 });
+  const dv = (a, b) => b ? a / b : null, n = (x) => x == null ? "—" : ent(Math.round(x)), p = (x) => x == null ? "—" : pct(x), u = (x) => x == null ? "—" : usdG(x);
+  const M = [["CTR", p(dv(T.cl, T.imp)), "clics ÷ impresiones"], ["CPM", u(T.imp ? (T.g / T.imp) * 1000 : null), "costo por mil"], ["CPC", u(dv(T.g, T.cl)), "costo por clic"],
+    ["Frecuencia", T.fi ? NF2.format(T.fw / T.fi) : "—", "veces que lo ve cada uno"], ["Impresiones", n(T.imp), "veces que se mostró"], ["Clics", n(T.cl), "en el enlace"],
+    ["Visitas a la landing", n(T.vis), "cargaron la página"], ["Costo por visita", u(dv(T.g, T.vis)), "gasto ÷ visitas"], ["Conv. de la landing", p(dv(T.v, T.vis)), "ventas ÷ visitas"],
+    ["Carritos", n(T.car), "agregaron al carrito"], ["Costo por carrito", u(dv(T.g, T.car)), "gasto ÷ carritos"], ["Pagos iniciados", n(T.pi), "llegaron al checkout"],
+    ["Costo por pago iniciado", u(dv(T.g, T.pi)), "gasto ÷ pagos iniciados"], ["Conv. del checkout", p(dv(T.v, T.pi)), "ventas ÷ pagos iniciados"], ["Retención del video", p(T.ri ? T.rw / T.ri : null), "vieron el video completo"]];
+  return `<div class="sec-grid">${M.map(([l, v, sub]) => `<div class="met met-chica boceto"><div class="lbl">${l}</div><div class="val num">${v}</div><div class="sub">${sub}</div></div>`).join("")}</div>`;
+}
+document.addEventListener("click", (e) => { const b = e.target.closest && e.target.closest("[data-sec]"); if (!b) return; S.secAbierto = !S.secAbierto; pintarCarrusel(); });
 function pintarCarrusel() {
   const t = $("#tarjetas"); if (!t) return;
   const gs = grupos(); const g = grupoActual(); const n = gs.length;
