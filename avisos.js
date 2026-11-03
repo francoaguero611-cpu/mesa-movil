@@ -79,8 +79,8 @@ function pintarLista() {
 function botonAccion(a) {
   const x = a.accion || {};
   if (x.tipo === "link") return `<button type="button" class="av-b" data-av="ir">${escA(x.t || "Abrir")} ↗</button>`;
-  if (x.tipo === "prender") return `<button type="button" class="av-b ok" data-av="prender">▶ Prender campaña</button>${x.item ? `<button type="button" class="av-b" data-av="ver">Ver</button>` : ""}`;
-  if (x.tipo === "abrir") return `<button type="button" class="av-b" data-av="ver">Ver en Workspace</button>`;
+  if (x.tipo === "prender") return `<button type="button" class="av-b ok" data-av="prender">▶ Prender campaña</button>`;
+  if (x.tipo === "abrir") return ""; // (03/11) el Workspace salió del menú: sin «Ver en Workspace»
   return "";
 }
 

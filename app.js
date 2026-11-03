@@ -3366,8 +3366,7 @@ const SECCIONES = [
     montar: (o) => montarRanking(o), ya: (o) => { if (o.pedido != null) abrirPedido(o.pedido); } },
   { id: "cazador", nombre: "Cazador", raiz: "#caz", icono: "M12 4.2 C 16.5 4, 19.9 7.4, 19.8 12 C 19.7 16.6, 16.4 19.9, 12 19.8 C 7.5 19.7, 4.2 16.5, 4.2 12 C 4.3 7.6, 7.4 4.3, 12.6 4.3 M12 1.8 V7 M12 17 V22.2 M1.8 12 H7 M17 12 H22.2 M11.9 11.6 L12.1 12.4",
     montar: (o) => montarCazador(o), ya: (o) => { if (o.pedido != null) window.Cazador?.abrirPedido(o.pedido); } },
-  { id: "workspace", nombre: "Workspace", raiz: "#tl", icono: "M3.8 5 C 9 4.8, 15 5.1, 20.2 4.9 L20 19.2 C 14.8 19.4, 9 19.1, 4 19.2 Z M7 9.5 L9.8 12 L7 14.5 M12 15 H16.5",
-    montar: () => montarTaller() }, // (22/10) el tablero en vivo (ex «Taller») reemplazó al Workspace viejo de etapas; montarWorkspace queda sin usar
+  // (03/11, Lorenzo) Workspace fuera del menú: «no lo usamos nunca». montarTaller sigue en el código por si vuelve.
   { id: "creativos", nombre: "Creativos", raiz: "#cr", icono: "M3.6 7 C 3.5 6, 4.1 5.3, 5 5.3 L9.3 5.2 L11.1 7.2 L19 7.1 C 20 7.1, 20.6 7.7, 20.5 8.6 L20.3 17.9 C 20.2 18.8, 19.6 19.3, 18.8 19.3 L5.1 19.1 C 4.2 19.1, 3.7 18.5, 3.7 17.7 Z M10.2 10.8 L14.6 13.2 L10.3 15.6 Z",
     montar: (o) => montarCreativos(o), ya: (o) => window.Creativos?.abrir(o.ruta || {}) }, // tocarla estando adentro = volver a todas las carpetas
   { id: "atc", nombre: "ATC", raiz: "#atc", icono: "M4.5 5.2 C 9.5 5, 14.5 5.1, 19.6 5 C 20.3 5, 20.6 5.4, 20.6 6 L20.5 14.2 C 20.5 14.9, 20.1 15.3, 19.4 15.3 L11 15.4 L6.6 19 L6.8 15.4 L4.6 15.4 C 3.9 15.4, 3.5 15, 3.5 14.3 L3.6 6.1 C 3.6 5.5, 3.9 5.2, 4.5 5.2 Z M7.8 9.4 H16.2 M7.8 12 H13",
@@ -3527,7 +3526,7 @@ function cargarJarvis() {
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "jarvis.js?v=3";
+    const sc = document.createElement("script"); sc.src = "jarvis.js?v=4";
     sc.onload = () => window.Jarvis ? ok() : mal(new Error("Jarvis no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar Jarvis. ¿Hay conexión?")); };
     document.head.appendChild(sc);

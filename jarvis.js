@@ -133,7 +133,7 @@ function pintar() {
   box.innerHTML = (J.msgs.length ? "" : `<div class="jv-hola"><span class="jv-orbe grande">${ICONO}</span><p><b>Hola${J.ctx.nombre?.() ? ", " + esc(J.ctx.nombre()) : ""}.</b> Acá te aviso todo lo que pasa y me podés pedir lo que quieras: cómo viene una campaña, surfearla, abrir el Drive de las renos…</p></div>`)
     + J.msgs.map((m, i) => {
       if (m.rol === "user") return `<div class="jv-m yo"><p>${esc(m.texto)}</p></div>`;
-      const acc = (m.acciones || []).map((a, k) => `<button type="button" class="jv-b${a.tipo === "nada" || a.tipo === "cancelar" ? " suave" : ""}${a.tipo === "confirmar" ? " fuerte" : ""}" data-m="${i}" data-a="${k}" ${m.usado ? "disabled" : ""}>${esc(a.titulo)}</button>`).join("");
+      const acc = (m.acciones || []).map((a, k) => /#(workspace|taller)/.test(a.url || "") || a.sec === "workspace" ? "" : `<button type="button" class="jv-b${a.tipo === "nada" || a.tipo === "cancelar" ? " suave" : ""}${a.tipo === "confirmar" ? " fuerte" : ""}" data-m="${i}" data-a="${k}" ${m.usado ? "disabled" : ""}>${esc(a.titulo)}</button>`).join("");
       return `<div class="jv-m el${m.rol === "aviso" ? " aviso" : ""}${m.urgente ? " urgente" : ""}${m.rol === "aviso" && !m.leido ? " nuevo" : ""}">
         <p>${md(m.texto)}</p>${acc ? `<div class="jv-acc">${acc}</div>` : ""}<time>${m.t ? hora(m.t) : ""}</time></div>`;
     }).join("")
