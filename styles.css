@@ -1406,3 +1406,16 @@ input.campo.f-buscar { font-size: 16px; padding: 9px 12px; max-width: 460px; }
 /* (02/11) Techo marcado a mano desde Reportes: 🧱 al lado del nombre y aviso antes de subir */
 .techo-tag { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 6px; border: 1.5px solid var(--r-gris-tx); background: var(--r-gris-bg); color: var(--r-gris-tx); font-size: 12px; font-weight: 700; white-space: nowrap; vertical-align: 1px; }
 .techo-aviso { margin: 8px 0; padding: 8px 12px; border: 1px solid var(--g-borde); border-radius: 8px; background: var(--r-ama-bg); color: var(--r-ama-tx); font-weight: 600; }
+
+/* (03/11) barra en el celular: textos cortos para que entren Presupuesto y Escala (antes «Modificar presupuesto» quedaba afuera) */
+.t-cel { display: none; }
+@media (max-width: 720px) {
+  .t-pc { display: none; } .t-cel { display: inline; }
+  .barra:not(.rk-barra) .acciones-sel { flex-wrap: wrap; gap: 8px; }
+}
+/* (03/11) pop-up «todas juntas» de Jarvis */
+.ph-varias-lista { display: flex; flex-direction: column; gap: 8px; max-height: 62dvh; overflow: auto; }
+.ph-varias { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--g-borde, rgba(255,255,255,.12)); background: rgba(255,255,255,.04); font-size: 14px; }
+.ph-varias:hover, .ph-varias:focus-visible { background: rgba(255,255,255,.08); outline: 2px solid transparent; }
+.ph-varias.v-mejoro { border-left: 4px solid #2fd07a; } .ph-varias.v-empeoro { border-left: 4px solid #ff5a5f; } .ph-varias.v-igual { border-left: 4px solid #8a93a6; }
+.ph-varias .ph-ad { font-size: 13px; }

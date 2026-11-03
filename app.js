@@ -1644,9 +1644,9 @@ function pintarBarraBase() {
     <button type="button" class="btn chico" id="b-limpiar">limpiar</button>
     <span class="sp"></span>
     <div class="acciones-sel">
-    ${conPres ? `<button type="button" class="btn chico" id="b-pres">Modificar presupuesto</button>` : ""}
+    ${conPres ? `<button type="button" class="btn chico" id="b-pres"><span class="t-pc">Modificar presupuesto</span><span class="t-cel">Presupuesto</span></button>` : ""}
     ${unaCamp ? `<button type="button" class="btn chico b-reloj-sel" id="b-reloj-sel" aria-label="Historial de cambios de la campaña">${RELOJ_SVG}<span>Historial</span></button>` : ""}
-    ${conCamp ? `<button type="button" class="btn chico" id="b-hz" title="CBO 1-1 con los anuncios que elijas en otras cuentas">Escala horizontal</button>` : ""}
+    ${conCamp ? `<button type="button" class="btn chico" id="b-hz" title="CBO 1-1 con los anuncios que elijas en otras cuentas"><span class="t-pc">Escala horizontal</span><span class="t-cel">Escala</span></button>` : ""}
     ${soloAds ? `<span class="caps">${its.length === 1 ? `<button type="button" class="btn chico" id="b-aislada">Aislada</button>` : ""}<button type="button" class="btn chico" id="b-bidcap">BidCap</button><button type="button" class="btn chico" id="b-costcap">CostCap</button><button type="button" class="btn chico" id="b-horizontal" title="Madre topada: CBO 1-1-winners en otra cuenta">Escala</button></span>` : ""}
     <div class="grupo-sw"><span class="sw-lbl" id="sw-lbl">${lbl}</span>
       <button type="button" class="switch" role="switch" id="sw" aria-checked="${est}" aria-labelledby="sw-lbl" aria-describedby="sw-ayuda"><span class="perilla" aria-hidden="true"></span></button>
@@ -3262,6 +3262,36 @@ async function prepararEvento(ev, its) {
   if (!eventoAbierto) pintarTodo(); else { pintarCarrusel(); pintarTabla(); }
   return { claves: claves.filter((k) => S.sel.has(k)), faltan };
 }
+// (03/11, Lorenzo) «Ver todas juntas» de Jarvis: un pop-up con el último cambio de cada campaña seleccionada (antes vs
+// después del surfeo) y, debajo, la barra con Presupuesto para cambiarlas todas de una. Tocar una abre su relojito completo.
+async function abrirVariosReloj(ids) {
+  const t0 = Date.now();
+  while (document.querySelector(".av-pop-fondo, .ev-fondo") && Date.now() - t0 < 120000) await new Promise((r) => setTimeout(r, 600));
+  const cs = ids.map(campanaPorId).filter(Boolean); if (!cs.length) return;
+  cerrarHoras(); cerrarHist();
+  const m = document.createElement("div"); m.id = "pop-hist"; m.className = "pop-hist-fondo";
+  m.innerHTML = `<div class="pop-hist boceto" role="dialog" aria-modal="true" aria-label="Antes y después"><button type="button" class="ph-x" aria-label="Cerrar">✕</button><div class="ph-cuerpo"><div class="bh-cargando"><span class="cargador"></span>Cargando ${cs.length} campañas…</div></div></div>`;
+  document.body.appendChild(m);
+  m.addEventListener("click", (e) => { if (e.target === m || e.target.closest(".ph-x")) cerrarHist(); });
+  document.addEventListener("keydown", escHist);
+  const datos = await Promise.all(cs.map(async (c) => {
+    let d = CACHE_HIST.get(c.id);
+    if (!d || Date.now() - d.t > 2 * 60e3) { try { const rr = await fetch(`https://tppcpnfzcxxusdhrlmdx.supabase.co/functions/v1/reportes?accion=surfeos_campana&id=${encodeURIComponent(c.id)}`, { headers: { "x-app-clave": clave() }, cache: "no-store" }); if (!rr.ok) throw 0; d = { t: Date.now(), r: await rr.json() }; CACHE_HIST.set(c.id, d); } catch { d = null; } }
+    return { c, r: d?.r };
+  }));
+  if (!document.body.contains(m)) return;
+  const roas = (x) => x && x.ventas ? NF2.format(x.roas) : "—";
+  const tarjetas = datos.map(({ c, r }) => {
+    const s = r ? listaSurfeos(c, r)[0] : null;
+    if (!s) return `<button type="button" class="ph-varias" data-c="${esc(c.id)}"><b>${esc(c.nombre)}</b><span class="mut">${esc(c.cuenta || "")} · sin cambios recientes · hoy ROAS ${c.ventas ? NF2.format(c.roas) : "—"}</span></button>`;
+    const A = metH((s.dias || [])[0]), N = metH(s.post), sube = s.a > s.de;
+    const cls = s.tend === "mejoro" ? "mejoro" : s.tend === "empeoro" ? "empeoro" : "igual";
+    return `<button type="button" class="ph-varias v-${cls}" data-c="${esc(c.id)}"><b>${esc(c.nombre)}</b><span class="mut">${esc(c.cuenta || "")} · ${sube ? "↑" : "↓"} ${NF2.format(s.de)} → ${NF2.format(s.a)} · ${haceTx(s.t)}</span>
+      <span class="ph-ad">Antes ROAS <b>${roas(A)}</b> → después <b>${roas(N)}</b>${N ? ` · ${N.ventas} venta${N.ventas === 1 ? "" : "s"}` : ""} · <b>${TEND_TX[s.tend] ?? TEND_TX.pronto}</b></span></button>`;
+  }).join("");
+  $(".ph-cuerpo", m).innerHTML = `<div class="ph-tit">${cs.length} campañas seleccionadas</div><div class="mut" style="margin-bottom:10px">Antes y después del último cambio de cada una. Tocá una para ver su detalle. Cerrá este cartel y usá <b>Presupuesto</b> abajo para cambiarlas todas juntas.</div><div class="ph-varias-lista">${tarjetas}</div>`;
+  $$("[data-c]", m).forEach((b) => b.onclick = () => { const c = campanaPorId(b.dataset.c); if (c) verHistorial(c, null); });
+}
 // (03/11, Lorenzo) Jarvis (Telegram) manda «Ver campaña»: #ev={"sec":"camp","id":"<campaña>"} → la campaña marcada en la
 // tabla de hoy y el relojito abierto, para ver el antes y el después del surfeo sin buscarla.
 async function abrirCampanaReloj(id) {
@@ -3304,7 +3334,7 @@ async function recibirEvento(ev) {
   // (12/10) respuesta de Claude en Correcciones: abre la carpeta y el chat
   if (ev.sec === "creativos" && ev.cr) { if (!DEMO && !clave()) { ls.set("dash_ev_pend", JSON.stringify(ev)); return; } irASeccion("creativos", { ruta: { g: ev.cr.g, f: ev.cr.f, chat: ev.cr.chat } }); return; }
   if (ev.sec === "pagos") { mostrarEventoPagos(ev); return; } // (30/10) el link a Facturación no necesita sesión
-  if (ev.sec === "camps" && Array.isArray(ev.ids) && ev.ids.length) { if (!DEMO && !clave()) { ls.set("dash_ev_pend", JSON.stringify(ev)); return; } const its = ev.ids.map((id) => ({ n: "campana", id: String(id) })); mostrarEnTabla(prepararEvento({ t: "surf", items: its }, its)); return; } // (03/11) Jarvis: «seleccioná todas juntas» → quedan marcadas para Modificar presupuesto
+  if (ev.sec === "camps" && Array.isArray(ev.ids) && ev.ids.length) { if (!DEMO && !clave()) { ls.set("dash_ev_pend", JSON.stringify(ev)); return; } const its = ev.ids.map((id) => ({ n: "campana", id: String(id) })); mostrarEnTabla(prepararEvento({ t: "surf", items: its }, its)).then(() => abrirVariosReloj(ev.ids.map(String))); return; } // (03/11) Jarvis: «seleccioná todas juntas» → quedan marcadas para Modificar presupuesto + pop-up con el antes/después de cada una
   if (ev.sec === "camp" && ev.id) { if (!DEMO && !clave()) { ls.set("dash_ev_pend", JSON.stringify(ev)); return; } abrirCampanaReloj(String(ev.id)); return; } // (03/11) link «Ver campaña» de Jarvis
   if (ev.demo) { await cargarDemo(); ev = window.DemoAPI.ejemplo(ev.demo); }
   if (!DEMO && !clave()) { ls.set("dash_ev_pend", JSON.stringify(ev)); return; }
