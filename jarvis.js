@@ -175,9 +175,11 @@ function montarUI() {
     <div class="jv-rapidas" id="jv-rapidas"></div>
     <div class="jv-cita" id="jv-cita" hidden><span class="jv-cita-ico">${FLECHA_RESP}</span><div><small>Respondiendo a Jarvis</small><p id="jv-cita-t"></p></div><button type="button" id="jv-cita-x" aria-label="Cancelar respuesta">✕</button></div>
     <form class="jv-form" id="jv-form" autocomplete="off"><textarea id="jv-in" rows="1" placeholder="Preguntale lo que quieras…" enterkeyhint="send"></textarea>
+      <button type="button" class="jv-mic" id="jv-mic" aria-label="Hablar con Jarvis"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>
       <button type="submit" class="jv-enviar" aria-label="Enviar"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 12 L20 4 L13 20 L11 13 Z" fill="currentColor"/></svg></button></form>`;
   document.body.append(p, fab);
   $("#jv-cerrar").onclick = cerrar;
+  $("#jv-mic").onclick = () => Voz.abrir();
   $("#jv-cita-x").onclick = () => soltarCita();
   const ta = $("#jv-in");
   ta.addEventListener("input", () => { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 120) + "px"; });
@@ -562,6 +564,165 @@ function iniciar(ctx) {
   J.timerChat = setInterval(() => { if (!document.hidden && (J.abierto || Date.now() - J.ultLectura > 20e3)) traerChat(); }, 4e3);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) { traerAvisos(); traerChat(); } });
 }
+
+// ---------- (04/11, Lorenzo) modo voz: una bola en el medio de la pantalla, como ChatGPT ----------
+// Escucha (micrófono → WAV 16 kHz), corta sola cuando dejás de hablar, manda a asistente-wa «app_voz» (Gemini transcribe,
+// Jarvis contesta corto, ElevenLabs habla con la voz «Tomás») y la bola se mueve con tu voz y con la de Jarvis.
+// Después de hablar vuelve a escuchar (charla de corrido). Tocar la bola mientras habla = cortarlo y hablar vos.
+const Voz = (() => {
+  const V = { estado: "cerrado", nivel: 0, suave: 0, t0: performance.now(), ctx: null, mic: null, proc: null, anal: null, buf: [], habla: 0, silencio: 0, fuente: null, raf: 0, gen: 0 };
+  const TXT = { escucha: "Te escucho…", oye: "Te escucho…", piensa: "Pensando…", habla: "", error: "", pausa: "Tocá la bola para hablar" };
+  function montar() {
+    if ($("#jv-voz")) return;
+    const d = document.createElement("div"); d.id = "jv-voz"; d.className = "jv-voz"; d.hidden = true; d.setAttribute("role", "dialog"); d.setAttribute("aria-label", "Hablar con Jarvis");
+    d.innerHTML = `<div class="jv-voz-top"><span>Jarvis</span><small id="jv-voz-sub">modo voz</small></div>
+      <button type="button" class="jv-voz-bola" id="jv-voz-bola" aria-label="Hablar o cortar"><canvas id="jv-voz-cv"></canvas></button>
+      <div class="jv-voz-tx"><p class="oido" id="jv-voz-oido"></p><p class="dice" id="jv-voz-dice"></p><small id="jv-voz-est"></small></div>
+      <div class="jv-voz-bot"><button type="button" id="jv-voz-mute" class="jv-voz-b" aria-label="Pausar el micrófono"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+        <button type="button" id="jv-voz-x" class="jv-voz-b cerrar" aria-label="Terminar">✕</button></div>`;
+    document.body.append(d);
+    $("#jv-voz-x").onclick = cerrarVoz;
+    $("#jv-voz-mute").onclick = () => (V.estado === "escucha" || V.estado === "oye" ? pausar() : escuchar());
+    $("#jv-voz-bola").onclick = () => { if (V.estado === "habla") { callar(); escuchar(); } else if (V.estado === "pausa" || V.estado === "error") escuchar(); else if (V.estado === "oye") enviar(); };
+    addEventListener("keydown", (e) => { if (e.key === "Escape" && V.estado !== "cerrado") cerrarVoz(); });
+  }
+  function estado(e, extra) {
+    V.estado = e; const d = $("#jv-voz"); if (!d) return;
+    d.dataset.estado = e; $("#jv-voz-est").textContent = extra ?? TXT[e] ?? "";
+    $("#jv-voz-mute").classList.toggle("off", e === "pausa");
+  }
+  async function abrirVoz() {
+    montar(); desbloquear(); V.ctx = actx; if (!V.ctx) return;
+    const d = $("#jv-voz"); d.hidden = false; requestAnimationFrame(() => d.classList.add("visible"));
+    document.documentElement.classList.add("jv-voz-on");
+    $("#jv-voz-oido").textContent = ""; $("#jv-voz-dice").textContent = "";
+    estado("inicio", ""); cancelAnimationFrame(V.raf); dibujar(); await escuchar(); // estado antes de dibujar: con «cerrado» la animación se cortaba en el primer cuadro
+  }
+  function cerrarVoz() {
+    V.gen++; callar(); soltarMic(); cancelAnimationFrame(V.raf); V.estado = "cerrado";
+    const d = $("#jv-voz"); if (!d) return; d.classList.remove("visible"); document.documentElement.classList.remove("jv-voz-on");
+    setTimeout(() => { if (V.estado === "cerrado") d.hidden = true; }, 320);
+    pintar(); abajo();
+  }
+  async function escuchar() {
+    callar();
+    try {
+      if (!V.mic) {
+        const st = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+        const src = V.ctx.createMediaStreamSource(st);
+        const an = V.ctx.createAnalyser(); an.fftSize = 512; src.connect(an);
+        const pr = V.ctx.createScriptProcessor(4096, 1, 1); src.connect(pr); pr.connect(V.ctx.destination);
+        pr.onaudioprocess = (ev) => { if (V.estado === "escucha" || V.estado === "oye") V.buf.push(new Float32Array(ev.inputBuffer.getChannelData(0))); };
+        V.mic = { st, src, pr }; V.anal = an;
+      }
+    } catch { estado("error", "Necesito permiso para usar el micrófono"); return; }
+    V.buf = []; V.habla = 0; V.silencio = 0; V.anal = V.anal || null; V.oyendoDesde = performance.now();
+    estado("escucha");
+  }
+  function soltarMic() { if (!V.mic) return; try { V.mic.pr.disconnect(); V.mic.src.disconnect(); V.mic.st.getTracks().forEach((t) => t.stop()); } catch {} V.mic = null; V.anal = null; }
+  function pausar() { V.buf = []; estado("pausa"); }
+  // WAV 16 kHz mono (lo entiende Gemini en cualquier navegador, también en el iPhone)
+  function wav() {
+    const n = V.buf.reduce((a, b) => a + b.length, 0), todo = new Float32Array(n); let o = 0; for (const b of V.buf) { todo.set(b, o); o += b.length; }
+    const k = V.ctx.sampleRate / 16000, m = Math.floor(n / k), dv = new DataView(new ArrayBuffer(44 + m * 2));
+    const w = (p, t) => { for (let i = 0; i < t.length; i++) dv.setUint8(p + i, t.charCodeAt(i)); };
+    w(0, "RIFF"); dv.setUint32(4, 36 + m * 2, true); w(8, "WAVE"); w(12, "fmt "); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+    dv.setUint32(24, 16000, true); dv.setUint32(28, 32000, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true); w(36, "data"); dv.setUint32(40, m * 2, true);
+    for (let i = 0; i < m; i++) { const x = Math.max(-1, Math.min(1, todo[Math.floor(i * k)])); dv.setInt16(44 + i * 2, x < 0 ? x * 0x8000 : x * 0x7fff, true); }
+    const u = new Uint8Array(dv.buffer); let s = ""; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000));
+    return btoa(s);
+  }
+  // escucha: arranca cuando hablás y corta solo después de ~1,1 s de silencio (o a los 30 s)
+  function detectar(dt) {
+    if (V.estado !== "escucha" && V.estado !== "oye") return;
+    const umbral = 0.035;
+    if (V.nivel > umbral) { V.habla += dt; V.silencio = 0; if (V.habla > 0.18 && V.estado === "escucha") estado("oye"); }
+    else if (V.estado === "oye") { V.silencio += dt; if (V.silencio > 1.1) enviar(); }
+    else if (V.estado === "escucha" && V.buf.length > 4) V.buf.splice(0, V.buf.length - 4); // lo de antes de hablar no sirve
+    if (V.estado === "oye" && performance.now() - V.oyendoDesde > 30e3) enviar();
+  }
+  async function enviar() {
+    if (V.estado !== "oye") return;
+    const audio = wav(); V.buf = []; const g = ++V.gen;
+    estado("piensa"); $("#jv-voz-dice").textContent = "";
+    J.pensando = true; pintar();
+    let r;
+    try { r = J.ctx.demo ? await demoVoz() : await pedir(BASE + "asistente-wa?accion=app_voz", { audio, mime: "audio/wav" }); }
+    catch (e) { r = { error: e.message }; }
+    J.pensando = false;
+    if (g !== V.gen) { pintar(); return; } // la cerraste mientras pensaba (igual queda en el chat)
+    if (r.error) { pintar(); estado("error", `Uh, ${r.error}. Tocá la bola y probá de nuevo.`); return; }
+    if (!r.oido) { pintar(); escuchar(); return; } // no se entendió nada: sigue escuchando
+    $("#jv-voz-oido").textContent = "«" + r.oido + "»";
+    if (r.id_user && !porU("c" + r.id_user)) agregar({ u: "c" + r.id_user, rol: "user", texto: r.oido, de: yo(), voz: true });
+    if (r.id_resp && !porU("c" + r.id_resp)) agregar({ u: "c" + r.id_resp, rol: "assistant", texto: r.texto, acciones: r.acciones || [], para: yo() });
+    else if (!r.id_resp) agregar({ rol: "assistant", texto: r.texto, acciones: r.acciones || [] });
+    J.ultChat = Math.max(J.ultChat, r.id_resp || 0); guardar(); pintar();
+    $("#jv-voz-dice").textContent = String(r.texto || "").replace(/\*\*?/g, "");
+    if (r.audio) await decir64(r.audio, g); else estado("pausa");
+    if (g === V.gen && V.estado === "habla") escuchar();
+  }
+  async function decir64(b64, g) {
+    try {
+      const bin = atob(b64), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+      const buf = await V.ctx.decodeAudioData(u.buffer);
+      if (g !== V.gen) return;
+      const src = V.ctx.createBufferSource(); src.buffer = buf;
+      const an = V.ctx.createAnalyser(); an.fftSize = 512; src.connect(an); an.connect(V.ctx.destination);
+      V.fuente = src; V.analSal = an; estado("habla");
+      await new Promise((ok) => { src.onended = ok; src.start(); });
+    } catch { /* si no se puede reproducir, queda el texto */ }
+    V.fuente = null; V.analSal = null;
+  }
+  function callar() { if (V.fuente) { try { V.fuente.onended?.(); V.fuente.stop(); } catch {} V.fuente = null; V.analSal = null; } }
+  // ---- la bola: una masa que respira y se deforma con el sonido ----
+  const datos = new Uint8Array(512);
+  function medir(an) { if (!an) return 0; an.getByteTimeDomainData(datos); let s = 0; for (let i = 0; i < datos.length; i++) { const x = (datos[i] - 128) / 128; s += x * x; } return Math.sqrt(s / datos.length); }
+  let ult = performance.now();
+  function dibujar() {
+    const cv = $("#jv-voz-cv"); if (!cv) return;
+    const ahora = performance.now(), dt = Math.min(0.1, (ahora - ult) / 1000); ult = ahora;
+    V.nivel = V.estado === "habla" ? medir(V.analSal) : (V.estado === "escucha" || V.estado === "oye") ? medir(V.anal) : 0;
+    detectar(dt);
+    const meta = Math.min(1, V.nivel * (V.estado === "habla" ? 3.2 : 6));
+    V.suave += (meta - V.suave) * (meta > V.suave ? 0.35 : 0.08); // sube rápido, baja suave
+    const dpr = Math.min(2, devicePixelRatio || 1), W = cv.clientWidth, H = cv.clientHeight;
+    if (cv.width !== W * dpr) { cv.width = W * dpr; cv.height = H * dpr; }
+    const c = cv.getContext("2d"); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
+    const t = (ahora - V.t0) / 1000, cx = W / 2, cy = H / 2, R0 = Math.min(W, H) * 0.25, RH = Math.min(W, H) / 2; // el halo termina antes del borde del lienzo (si no, se ve el cuadrado)
+    const piensa = V.estado === "piensa", quiet = quieto();
+    const resp = quiet ? 0 : Math.sin(t * (piensa ? 3 : 1.2)) * 0.025;
+    const R = R0 * (1 + resp + V.suave * 0.22);
+    // halo
+    const col = piensa ? [167, 139, 250] : V.estado === "habla" ? [96, 180, 255] : V.estado === "error" ? [255, 90, 100] : [124, 200, 255];
+    const halo = c.createRadialGradient(cx, cy, R * 0.6, cx, cy, RH);
+    halo.addColorStop(0, `rgba(${col},${0.28 + V.suave * 0.3})`); halo.addColorStop(1, `rgba(${col},0)`);
+    c.fillStyle = halo; c.beginPath(); c.arc(cx, cy, RH, 0, Math.PI * 2); c.fill();
+    // masa deformada (suma de ondas que giran)
+    const N = 96, amp = quiet ? 0 : 0.035 + V.suave * 0.16 + (piensa ? 0.05 : 0);
+    c.beginPath();
+    for (let i = 0; i <= N; i++) {
+      const a = (i / N) * Math.PI * 2;
+      const d = Math.sin(a * 3 + t * 1.7) * 0.5 + Math.sin(a * 5 - t * 2.3 + 1.3) * 0.3 + Math.sin(a * 2 + t * (piensa ? 4 : 0.9)) * 0.4;
+      const r = R * (1 + amp * d);
+      const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r; i ? c.lineTo(x, y) : c.moveTo(x, y);
+    }
+    c.closePath();
+    const g = c.createRadialGradient(cx - R * 0.35, cy - R * 0.4, R * 0.1, cx, cy, R * 1.15);
+    if (piensa) { g.addColorStop(0, "#f3e8ff"); g.addColorStop(0.35, "#a78bfa"); g.addColorStop(0.75, "#5b3fd6"); g.addColorStop(1, "#1b1446"); }
+    else if (V.estado === "error") { g.addColorStop(0, "#ffe3e5"); g.addColorStop(0.4, "#ff6b75"); g.addColorStop(1, "#4a0d14"); }
+    else { g.addColorStop(0, "#f2fbff"); g.addColorStop(0.3, "#8fd3ff"); g.addColorStop(0.7, "#2f7cf6"); g.addColorStop(1, "#0b1f4d"); }
+    c.fillStyle = g; c.fill();
+    // brillo que gira adentro
+    c.save(); c.clip(); c.globalCompositeOperation = "screen";
+    const bx = cx + Math.cos(t * (piensa ? 2.4 : 0.7)) * R * 0.35, by = cy + Math.sin(t * (piensa ? 2.4 : 0.7)) * R * 0.3;
+    const b = c.createRadialGradient(bx, by, 0, bx, by, R * 0.8); b.addColorStop(0, `rgba(255,255,255,${0.22 + V.suave * 0.3})`); b.addColorStop(1, "rgba(255,255,255,0)");
+    c.fillStyle = b; c.fillRect(cx - R * 2, cy - R * 2, R * 4, R * 4); c.restore();
+    if (V.estado !== "cerrado") V.raf = requestAnimationFrame(dibujar);
+  }
+  async function demoVoz() { await new Promise((ok) => setTimeout(ok, 1200)); return { oido: "¿Cómo venimos hoy?", texto: "Bro, en la demo no tengo datos reales, pero así te hablaría.", acciones: [], audio: null }; }
+  return { abrir: abrirVoz, cerrar: cerrarVoz };
+})();
 
 // ---------- demo ----------
 const DEMO_C = { id: "demo", act: "demo", nombre: "🇦🇷 23.10 CBO Panza Cero 40+ (AR)", presupuesto: 268, gasto: 262, ventas: 12, roas: 0.68, ganancia: -116 };
