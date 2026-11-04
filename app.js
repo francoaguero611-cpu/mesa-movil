@@ -503,7 +503,7 @@ function montar() {
     <section class="seccion-camp" aria-labelledby="t-camp">
       <div class="cab-tabla">
         <h2 id="t-camp">Campañas <small id="n-camp"></small></h2>
-        <span class="cab-der"><span id="acc-barra"></span><button type="button" class="btn chico" id="b-malos" title="Tilda los conjuntos y anuncios con ROAS < 1,3 de las campañas con ROAS < 1,3 (últimos 3 días)">Lo que viene mal</button><button type="button" class="toggle-chico" role="switch" id="t-solosel" aria-checked="${S.soloSel}"><span class="mini" aria-hidden="true"></span><span id="t-solosel-tx">solo seleccionadas</span></button><button type="button" class="btn chico" id="b-cols" aria-haspopup="dialog">Columnas</button><button type="button" class="toggle-chico" role="switch" id="t-apagadas" aria-checked="${S.verApagadas}"><span class="mini" aria-hidden="true"></span><span id="t-apagadas-tx">ver apagadas</span></button></span>
+        <span class="cab-der"><span id="acc-barra"></span><button type="button" class="btn chico" id="b-cmp" aria-haspopup="dialog" title="Cada campaña día por día: gasto, ventas, ROAS, ganancia y CPM">Comparar días</button><button type="button" class="btn chico" id="b-malos" title="Tilda los conjuntos y anuncios con ROAS < 1,3 de las campañas con ROAS < 1,3 (últimos 3 días)">Lo que viene mal</button><button type="button" class="toggle-chico" role="switch" id="t-solosel" aria-checked="${S.soloSel}"><span class="mini" aria-hidden="true"></span><span id="t-solosel-tx">solo seleccionadas</span></button><button type="button" class="btn chico" id="b-cols" aria-haspopup="dialog">Columnas</button><button type="button" class="toggle-chico" role="switch" id="t-apagadas" aria-checked="${S.verApagadas}"><span class="mini" aria-hidden="true"></span><span id="t-apagadas-tx">ver apagadas</span></button></span>
       </div>
       <div class="filtro-camp"><label class="sr" for="f-buscar">Buscar por nombre</label><input type="search" id="f-buscar" class="campo f-buscar" placeholder="Buscar campaña, conjunto o anuncio…" autocomplete="off" value="${esc(S.buscar)}"><label class="sr" for="f-cuenta">Cuenta publicitaria</label><select id="f-cuenta" class="campo f-cuenta"></select></div>
       <div class="tabla-con-reloj"><div class="tabla-caja boceto"><div class="tabla-scroll" id="tabla-scroll"></div></div><div class="riel-reloj" id="riel-reloj" aria-label="Historial de cambios por campaña"></div></div>
@@ -517,6 +517,7 @@ function montar() {
   $("#t-apagadas").onclick = () => { S.verApagadas = !S.verApagadas; ls.set("dash_ver_apagadas", S.verApagadas ? "1" : "0"); $("#t-apagadas").setAttribute("aria-checked", S.verApagadas); pintarTabla(); };
   $("#t-solosel").onclick = alternarSoloSel;
   $("#b-malos").onclick = () => seleccionarMalos();
+  $("#b-cmp").onclick = () => compararDias();
   $("#f-cuenta").onchange = (e) => { S.cuenta = e.target.value; ls.set("dash_cuenta", S.cuenta); pintarTabla(); pintarProblemas(); };
   let tb = null;
   $("#f-buscar").oninput = (e) => { clearTimeout(tb); tb = setTimeout(() => { S.buscar = e.target.value; pintarTabla(); }, 150); };
@@ -3217,6 +3218,130 @@ async function seleccionarMalos() {
   S.soloSel = S.sel.size > 0;
   pintarSoloSel(); pintarTodo();
   toast(S.sel.size ? `Tildé ${nS} conjunto${nS === 1 ? "" : "s"} y ${nA} anuncio${nA === 1 ? "" : "s"} de ${cs.length} campaña${cs.length === 1 ? "" : "s"} que vienen mal. Revisalos y apagá con la barra de abajo; «solo seleccionadas» los muestra juntos.` : "Las campañas malas no tienen conjuntos prendidos con ROAS < 1,3.", "ok", 9000);
+}
+// (04/11, Lorenzo) «Comparar días»: cada campaña día por día con los MISMOS números del Dashboard (ROAS real con postventa,
+// ganancia de Codicia). Cada día es el «dash» de ese día (hoy / ayer / r:d:d); el Total suma los días elegidos.
+const CMP_METS = [["gasto", "Gasto"], ["ventas", "Ventas"], ["roas", "ROAS"], ["ganancia", "Ganancia"], ["cpm", "CPM"]];
+const CMP_DSEM = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+const CMP = { met: "roas", dias: null, soloMalas: true, grupo: "todas", cuenta: "", abierta: null, gastoMin: 15, st: "", umbral: (() => { const n = parseFloat(ls.get("cmp_umbral", "")); return n > 0 ? n : 1.3; })() };
+const isoMenos = (iso, n) => new Date(Date.parse(iso + "T12:00:00Z") - n * 86400e3).toISOString().slice(0, 10);
+const cmpPer = (iso) => { const h = isoAR(new Date()); return iso === h ? "hoy" : iso === isoMenos(h, 1) ? "ayer" : `r:${iso}:${iso}`; };
+const cmpDiaTx = (iso) => `${CMP_DSEM[new Date(iso + "T12:00:00Z").getUTCDay()]} ${dm(iso)}`;
+function cmpSumar(xs) {
+  const t = { gasto: 0, ventas: 0, facturacion: 0, ganancia: 0, impresiones: 0 };
+  for (const x of xs) for (const k in t) t[k] += +x[k] || 0;
+  t.roas = t.gasto ? t.facturacion / t.gasto : null;
+  t.cpm = t.impresiones ? (t.gasto / t.impresiones) * 1000 : null;
+  return t;
+}
+function cmpFilas() {
+  const por = new Map();
+  for (const iso of CMP.dias) for (const c of S.datos[cmpPer(iso)]?.campanas || []) {
+    const f = por.get(c.id) || { id: c.id, d: {} };
+    Object.assign(f, { act: c.act, nombre: c.nombre, cuenta: c.cuenta, grupo: c.grupo, estado: c.estado }); // el último día manda
+    f.d[iso] = c; por.set(c.id, f);
+  }
+  const malo = (x) => x && (x.gasto || 0) >= CMP.gastoMin && (x.roas ?? 0) < CMP.umbral;
+  const out = [];
+  for (const f of por.values()) {
+    f.tot = cmpSumar(Object.values(f.d));
+    if (!f.tot.gasto) continue;
+    f.malos = CMP.dias.filter((iso) => malo(f.d[iso]));
+    f.mala = f.malos.length > 0 || malo(f.tot);
+    out.push(f);
+  }
+  return out.sort((a, b) => b.tot.gasto - a.tot.gasto);
+}
+function cmpCelda(x, m) {
+  if (!x || !(x.gasto > 0)) return `<td class="cmp-vacia">—</td>`;
+  const poco = x.gasto < CMP.gastoMin ? " cmp-poco" : "";
+  const roas = x.roas ?? (x.gasto ? (x.facturacion || 0) / x.gasto : null);
+  const v = m === "roas" ? `<span class="roas ${roas < CMP.umbral ? "rojo" : colorRoas(roas)} num">${roasTx(roas)}</span>`
+    : m === "ganancia" ? `<span class="${signo(x.ganancia)}">${usdG(x.ganancia)}</span>`
+    : m === "ventas" ? entN(x.ventas)
+    : m === "cpm" ? usdG(x.cpm ?? (x.impresiones ? (x.gasto / x.impresiones) * 1000 : null))
+    : usdG(x.gasto);
+  return `<td class="num${poco}"${poco ? ` title="Gastó menos de US$ ${CMP.gastoMin}: número poco confiable"` : ""}>${v}</td>`;
+}
+async function compararDias() {
+  const h = isoAR(new Date());
+  if (!CMP.dias) CMP.dias = [isoMenos(h, 2), isoMenos(h, 1), h];
+  CMP.grupo = S.grupoClave || "todas"; CMP.cuenta = S.cuenta || ""; CMP.abierta = null;
+  abrirModal(`<div class="cmp" id="cmp"></div>`, { ancho: true });
+  modalActual.dlg.classList.add("cmp-dlg");
+  pintarCmp(); cargarCmp();
+}
+async function cargarCmp(forzar = false) {
+  const falta = CMP.dias.map(cmpPer).filter((p) => forzar || !S.datos[p]);
+  if (!falta.length) return pintarCmp();
+  let n = 0; CMP.st = `Cargando ${falta.length} día${falta.length === 1 ? "" : "s"}…`; pintarCmp();
+  await Promise.all(falta.map(async (p) => {
+    try { S.datos[p] = await api("dash", { q: `&periodo=${p}${forzar ? "&forzar=1" : ""}` }); }
+    catch (e) { if (e.code === 401) { ls.del("dash_clave"); cerrarModal(); return login("Clave incorrecta"); } toast(esc(e.message), "error"); }
+    n++; CMP.st = n < falta.length ? `Cargando… ${n} de ${falta.length} días` : ""; pintarCmp();
+  }));
+  CMP.st = ""; pintarCmp();
+}
+function pintarCmp() {
+  const raiz = $("#cmp"); if (!raiz) return;
+  const h = isoAR(new Date()), ult7 = [6, 5, 4, 3, 2, 1, 0].map((n) => isoMenos(h, n));
+  const todas = cmpFilas();
+  const gruposM = new Map();
+  for (const iso of CMP.dias) for (const g of S.datos[cmpPer(iso)]?.grupos || []) if (g.clave !== "todas") gruposM.set(g.clave, g.etiqueta);
+  const cuentasM = new Map(todas.map((f) => [f.act, f.cuenta || f.act]));
+  let fs = todas.filter((f) => (CMP.grupo === "todas" || f.grupo === CMP.grupo) && (!CMP.cuenta || f.act === CMP.cuenta));
+  const nMalas = fs.filter((f) => f.mala).length;
+  if (CMP.soloMalas) fs = fs.filter((f) => f.mala);
+  const cols = [...CMP.dias, "tot"];
+  const th = cols.map((k) => `<th scope="col">${k === "tot" ? "Total" : esc(cmpDiaTx(k)) + (k === h ? "<span class='cmp-hoy' title='Día en curso'>*</span>" : "")}</th>`).join("");
+  const det = (f) => `<tr class="cmp-det"><td colspan="${cols.length + 1}"><div class="cmp-det-caja">
+      <table class="cmp-mini num"><thead><tr><th></th>${th}</tr></thead><tbody>
+      ${CMP_METS.map(([m, t]) => `<tr><th scope="row">${t}</th>${cols.map((k) => cmpCelda(k === "tot" ? f.tot : f.d[k], m)).join("")}</tr>`).join("")}
+      </tbody></table>
+      <div class="cmp-det-pie"><span class="mut">${esc(f.cuenta || "")}${prendido(f.estado) ? "" : " · apagada"}</span><button type="button" class="btn chico" data-cmp-ver="${esc(f.id)}">Ver en el Dashboard</button></div>
+    </div></td></tr>`;
+  const filas = fs.map((f) => `<tr class="cmp-fila${f.mala ? " mala" : ""}${CMP.abierta === f.id ? " abierta" : ""}" data-cmp-id="${esc(f.id)}" tabindex="0" aria-expanded="${CMP.abierta === f.id}">
+      <th scope="row" class="cmp-nom"><span class="cmp-n">${esc(f.nombre)}</span><span class="cmp-c">${esc(f.cuenta || "")}</span></th>
+      ${cols.map((k) => cmpCelda(k === "tot" ? f.tot : f.d[k], CMP.met)).join("")}</tr>${CMP.abierta === f.id ? det(f) : ""}`).join("");
+  const cargando = CMP.dias.some((iso) => !S.datos[cmpPer(iso)]);
+  raiz.innerHTML = `
+    <div class="cmp-cab"><h2>Comparar días</h2><button type="button" class="btn chico" id="cmp-x" aria-label="Cerrar">✕</button></div>
+    <div class="cmp-dias" role="group" aria-label="Días">${ult7.map((iso) => `<button type="button" class="btn chico" data-cmp-dia="${iso}" aria-pressed="${CMP.dias.includes(iso)}">${esc(cmpDiaTx(iso))}${iso === h ? "*" : ""}</button>`).join("")}</div>
+    <div class="cmp-ctrl">
+      <div class="periodos cmp-mets" role="group" aria-label="Métrica">${CMP_METS.map(([m, t]) => `<button type="button" class="btn chico" data-cmp-met="${m}" aria-pressed="${CMP.met === m}">${t}</button>`).join("")}</div>
+      <select class="campo" id="cmp-grupo" aria-label="Oferta"><option value="todas">Todas las ofertas</option>${[...gruposM].map(([k, t]) => `<option value="${esc(k)}"${k === CMP.grupo ? " selected" : ""}>${esc(t)}</option>`).join("")}</select>
+      <select class="campo" id="cmp-cuenta" aria-label="Cuenta"><option value="">Todas las cuentas</option>${[...cuentasM].sort((a, b) => a[1].localeCompare(b[1])).map(([k, t]) => `<option value="${esc(k)}"${k === CMP.cuenta ? " selected" : ""}>${esc(t)}</option>`).join("")}</select>
+      <button type="button" class="toggle-chico" role="switch" id="cmp-malas" aria-checked="${CMP.soloMalas}"><span class="mini" aria-hidden="true"></span>solo las malas (${nMalas})</button>
+      <label class="cmp-umb">ROAS malo &lt; <input type="number" class="campo" id="cmp-umb" step="0.05" min="0.5" max="5" value="${CMP.umbral}"></label>
+      <button type="button" class="btn chico" id="cmp-act" title="Volver a traer los días elegidos">↻</button>
+    </div>
+    ${CMP.st ? `<div class="bh-cargando"><span class="cargador"></span>${esc(CMP.st)}</div>` : ""}
+    ${cargando && !fs.length ? "" : fs.length ? `<div class="cmp-tabla-caja"><table class="cmp-tabla num"><thead><tr><th scope="col" class="cmp-nom">Campaña <small>(${fs.length})</small></th>${th}</tr></thead><tbody>${filas}</tbody></table></div>`
+      : `<p class="mut cmp-nada">${CMP.soloMalas ? `Ninguna campaña con ROAS menor a ${roasTx(CMP.umbral)} en estos días.` : "No hay campañas con gasto en estos días."}</p>`}
+    <p class="mut cmp-nota">Mismos números que el Dashboard (ventas reales con bumps y post-venta). Mala = ROAS menor a ${roasTx(CMP.umbral)} un día con US$ ${CMP.gastoMin} o más de gasto, o en el total. Las celdas claritas gastaron menos de US$ ${CMP.gastoMin}.${CMP.dias.includes(h) ? " * Hoy todavía está en curso." : ""} Tocá una campaña para ver todo.</p>`;
+  $("#cmp-x", raiz).onclick = () => modalActual?.cerrar();
+  $$("[data-cmp-dia]", raiz).forEach((b) => b.onclick = () => {
+    const iso = b.dataset.cmpDia, s = new Set(CMP.dias);
+    if (s.has(iso)) { if (s.size === 1) return; s.delete(iso); } else s.add(iso);
+    CMP.dias = [...s].sort(); cargarCmp();
+  });
+  $$("[data-cmp-met]", raiz).forEach((b) => b.onclick = () => { CMP.met = b.dataset.cmpMet; pintarCmp(); });
+  $("#cmp-grupo", raiz).onchange = (e) => { CMP.grupo = e.target.value; pintarCmp(); };
+  $("#cmp-cuenta", raiz).onchange = (e) => { CMP.cuenta = e.target.value; pintarCmp(); };
+  $("#cmp-malas", raiz).onclick = () => { CMP.soloMalas = !CMP.soloMalas; pintarCmp(); };
+  $("#cmp-umb", raiz).onchange = (e) => { const n = parseFloat(e.target.value); if (n > 0) { CMP.umbral = n; ls.set("cmp_umbral", String(n)); } pintarCmp(); };
+  $("#cmp-act", raiz).onclick = () => cargarCmp(true);
+  const abrir = (tr) => { const id = tr.dataset.cmpId; CMP.abierta = CMP.abierta === id ? null : id; pintarCmp(); $(`[data-cmp-id="${CSS.escape(id)}"]`, raiz)?.focus({ preventScroll: true }); };
+  $$("[data-cmp-id]", raiz).forEach((tr) => { tr.onclick = () => abrir(tr); tr.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); abrir(tr); } }; });
+  $$("[data-cmp-ver]", raiz).forEach((b) => b.onclick = (e) => {
+    e.stopPropagation();
+    const f = todas.find((x) => x.id === b.dataset.cmpVer); if (!f) return;
+    modalActual?.cerrar();
+    if (!irAlDash()) return;
+    S.grupoClave = "todas"; ajustarIdx(); S.cuenta = f.act; ls.set("dash_cuenta", f.act);
+    S.buscar = f.nombre; const i = $("#f-buscar"); if (i) i.value = f.nombre;
+    pintarTodo();
+  });
 }
 async function esperarDetalle(c) {
   cargarDetalle(c);

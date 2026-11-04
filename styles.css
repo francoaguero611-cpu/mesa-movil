@@ -1419,3 +1419,49 @@ input.campo.f-buscar { font-size: 16px; padding: 9px 12px; max-width: 460px; }
 .ph-varias:hover, .ph-varias:focus-visible { background: rgba(255,255,255,.08); outline: 2px solid transparent; }
 .ph-varias.v-mejoro { border-left: 4px solid #2fd07a; } .ph-varias.v-empeoro { border-left: 4px solid #ff5a5f; } .ph-varias.v-igual { border-left: 4px solid #8a93a6; }
 .ph-varias .ph-ad { font-size: 13px; }
+
+/* (04/11, Lorenzo) Comparar días: campañas × días con la métrica elegida */
+html .dialogo.cmp-dlg { width: min(1180px, 100%); }
+.cmp-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.cmp-cab h2 { margin: 0; font-family: var(--f-titulo); font-size: 20px; }
+.cmp-dias { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.cmp-dias .btn[aria-pressed="true"] { background: var(--marca); border-color: var(--marca-borde); color: var(--tinta); }
+.cmp-ctrl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-bottom: 12px; }
+.cmp-ctrl select.campo { width: auto; max-width: 240px; padding-block: 6px; }
+.cmp-umb { display: inline-flex; align-items: center; gap: 6px; color: var(--mut); font-size: 13px; }
+.cmp-umb input { width: 70px; padding: 5px 8px; }
+.cmp-tabla-caja { overflow: auto; max-height: min(62dvh, 680px); border: 1px solid var(--g-borde); border-radius: 14px; background: var(--tarjeta); }
+.cmp-tabla, .cmp-mini { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; font-variant-numeric: tabular-nums; }
+.cmp-tabla th, .cmp-tabla td, .cmp-mini th, .cmp-mini td { padding: 8px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--linea); }
+.cmp-tabla thead th { position: sticky; top: 0; z-index: 2; background: var(--papel); color: var(--mut); font-weight: 600; font-size: 13px; }
+.cmp-tabla thead th:last-child, .cmp-tabla tbody tr.cmp-fila td:last-child { border-left: 1px solid var(--g-borde-luz); font-weight: 700; }
+.cmp-tabla .cmp-nom { text-align: left; position: sticky; left: 0; z-index: 1; background: var(--papel); min-width: 220px; max-width: 340px; white-space: normal; }
+.cmp-tabla thead .cmp-nom { z-index: 3; }
+.cmp-nom .cmp-n { display: block; font-weight: 600; color: var(--tinta); }
+.cmp-nom .cmp-c { display: block; font-size: 12px; color: var(--mut); font-weight: 400; }
+.cmp-fila { cursor: pointer; }
+.cmp-fila:hover td, .cmp-fila:hover th, .cmp-fila.abierta td, .cmp-fila.abierta th { background-color: var(--papel-2); }
+.cmp-fila.abierta th.cmp-nom { background: #0d1520; }
+.cmp-fila.mala th.cmp-nom { box-shadow: inset 3px 0 0 var(--rojo); }
+.cmp-fila:focus-visible { outline: 2px solid var(--foco); outline-offset: -2px; }
+.cmp-poco { opacity: .45; }
+.cmp-vacia { color: var(--mut); }
+.cmp-hoy { color: var(--ambar); margin-left: 1px; }
+.cmp-tabla .gana, .cmp-mini .gana { color: var(--ok); font-weight: 600; }
+.cmp-tabla .pierde, .cmp-mini .pierde { color: var(--peligro); font-weight: 600; }
+.cmp-tabla .roas, .cmp-mini .roas { min-width: 48px; padding: 1px 7px; font-size: 13px; }
+.cmp-det > td { padding: 0 !important; background: rgba(124,200,255,.04); }
+.cmp-det-caja { position: sticky; left: 0; max-width: calc(min(1180px, 100vw) - 60px); padding: 10px 12px 12px; }
+.cmp-mini { width: auto; min-width: min(560px, 100%); }
+.cmp-mini thead th { color: var(--mut); font-weight: 600; font-size: 12.5px; }
+.cmp-mini th[scope=row] { text-align: left; color: var(--tinta-2); font-weight: 600; }
+.cmp-mini td:last-child, .cmp-mini thead th:last-child { border-left: 1px solid var(--g-borde-luz); font-weight: 700; }
+.cmp-det-pie { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+.cmp-nota { font-size: 12.5px; margin: 10px 2px 0; line-height: 1.45; }
+.cmp-nada { padding: 18px 4px; }
+@media (max-width: 640px) {
+  .cmp-tabla .cmp-nom { min-width: 150px; max-width: 170px; }
+  .cmp-tabla th, .cmp-tabla td { padding: 7px 7px; font-size: 13px; }
+  .cmp-ctrl select.campo { max-width: 46vw; }
+  .cmp-tabla-caja { max-height: 58dvh; }
+}
