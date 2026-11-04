@@ -1192,8 +1192,41 @@ function fila({ nivel, n, x, act, sub, abrible, abierto, extraEstado }) {
   return `<tr class="fila nivel-${n}${abierto ? " abierta" : ""}${sel ? " sel" : ""}" data-k="${esc(k)}" data-act="${esc(act)}" tabindex="0" aria-selected="${sel}">
     <td class="nom">${dotEstado(x.estado).replace('class="dot ', 'class="dot dot-esq ')}<div class="nomwrap">
       ${abrible ? `<button type="button" class="tg" data-tg="${esc((nivel === "campana" ? "c:" : "s:") + x.id)}" aria-expanded="${abierto}" aria-label="${abierto ? "Ocultar" : "Ver"} ${etiquetaTg} de ${esc(x.nombre)}"><span aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9.5 5.5 C 12 8, 14 10.5, 15.5 12.2 C 13.6 14, 11.6 16.4, 9.2 18.6" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>` : `<span class="tg-hueco" aria-hidden="true"></span>`}
-      <div class="txt"><span class="niv-tag niv-${nivel}">${NIVEL[nivel][0]}</span><div class="n">${nivel === "campana" ? tagTecho(x) : ""}${esc(x.nombre)}</div>${sub ? `<div class="sub">${sub}</div>` : ""}</div>
+      ${nivel === "anuncio" ? portadaAd(x, act) : ""}<div class="txt"><span class="niv-tag niv-${nivel}">${NIVEL[nivel][0]}</span><div class="n">${nivel === "campana" ? tagTecho(x) : ""}${esc(x.nombre)}</div>${sub ? `<div class="sub">${sub}</div>` : ""}</div>
     </div></td>${celdas(x, nivel)}</tr>${filaNube(x)}`;
+}
+// (04/11, Lorenzo) portada del anuncio a la izquierda (como en Meta): al tocarla se abre el anuncio en vertical en el medio
+const portadaAd = (x, act) => `<button type="button" class="ad-portada" data-ver-ad="${esc(x.id)}" data-ver-act="${esc(act)}" data-nosel aria-label="Ver el anuncio ${esc(x.nombre)}" title="Ver el anuncio">${x.thumb ? `<img src="${esc(x.thumb)}" alt="" loading="lazy" decoding="async">` : `<span class="ad-sin" aria-hidden="true">▶</span>`}<span class="ad-play" aria-hidden="true"><svg viewBox="0 0 24 24" width="12" height="12"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg></span></button>`;
+async function verAnuncio(id, act, nombre, desde) {
+  document.querySelector(".ad-ver")?.remove();
+  const thumb = desde?.querySelector("img")?.src || "";
+  const v = document.createElement("div"); v.className = "ad-ver"; v.setAttribute("role", "dialog"); v.setAttribute("aria-modal", "true"); v.setAttribute("aria-label", "Anuncio " + nombre);
+  v.innerHTML = `<div class="ad-ver-caja"><div class="ad-ver-cab"><b>${esc(nombre)}</b><button type="button" class="ad-ver-x" aria-label="Cerrar">✕</button></div>
+    <div class="ad-ver-marco cargando">${thumb ? `<img class="ad-ver-poster" src="${esc(thumb)}" alt="">` : ""}<span class="ad-ver-spin" aria-hidden="true"></span></div>
+    <div class="ad-ver-pie"></div></div>`;
+  document.body.append(v);
+  // arranca desde la portada tocada (se agranda hasta el centro)
+  const r0 = desde?.getBoundingClientRect(), caja = v.querySelector(".ad-ver-caja");
+  requestAnimationFrame(() => {
+    v.classList.add("visible");
+    if (r0 && !reducido()) { const r1 = caja.getBoundingClientRect(); caja.animate([{ transform: `translate(${r0.left + r0.width / 2 - (r1.left + r1.width / 2)}px, ${r0.top + r0.height / 2 - (r1.top + r1.height / 2)}px) scale(${Math.max(0.08, r0.width / r1.width)})`, opacity: 0.4 }, { transform: "none", opacity: 1 }], { duration: 420, easing: "cubic-bezier(.22,1,.36,1)" }); }
+  });
+  const cerrarV = () => { v.classList.remove("visible"); setTimeout(() => v.remove(), 220); document.removeEventListener("keydown", tecla); desde?.focus({ preventScroll: true }); };
+  const tecla = (e) => { if (e.key === "Escape") cerrarV(); };
+  document.addEventListener("keydown", tecla);
+  v.addEventListener("click", (e) => { if (e.target === v || e.target.closest(".ad-ver-x")) cerrarV(); });
+  v.querySelector(".ad-ver-x").focus({ preventScroll: true });
+  const marco = v.querySelector(".ad-ver-marco"), pie = v.querySelector(".ad-ver-pie");
+  let m;
+  try { m = DEMO ? { imagen: thumb, aviso: thumb ? null : "En la demo no hay anuncios reales." } : await api("anuncio_media", { q: `&id=${encodeURIComponent(id)}&act=${encodeURIComponent(act)}` }); }
+  catch (e) { m = { aviso: "No pude traer el anuncio: " + e.message }; }
+  if (!v.isConnected) return;
+  marco.classList.remove("cargando");
+  if (m.video) marco.innerHTML = `<video src="${esc(m.video)}" ${m.poster ? `poster="${esc(m.poster)}"` : ""} controls autoplay playsinline></video>`;
+  else if (m.vista) { marco.classList.add("meta"); marco.innerHTML = `<iframe src="${esc(m.vista.src)}" title="Vista previa del anuncio" allow="autoplay; encrypted-media" loading="eager"></iframe>`; }
+  else if (m.imagen || m.poster) marco.innerHTML = `<img src="${esc(m.imagen || m.poster)}" alt="">`;
+  else marco.innerHTML = `<p class="ad-ver-aviso">${esc(m.aviso || "Meta no devolvió una vista previa de este anuncio.")}</p>`;
+  if (m.link) pie.innerHTML = `<a href="${esc(m.link)}" target="_blank" rel="noopener">Abrir en Facebook ↗</a>`;
 }
 function subCampana(c) {
   const p = [];
@@ -1588,6 +1621,8 @@ function clickTabla(e) {
   if (hb) { const c = campanaPorId(hb.dataset.hora); if (c) verHoras(c, hb); return; }
   const pb = e.target.closest("[data-paises]");
   if (pb) { const c = campanaPorId(pb.dataset.paises); if (c) verPaises(c, pb); return; }
+  const va = e.target.closest("[data-ver-ad]");
+  if (va) { const tr = va.closest("tr"); verAnuncio(va.dataset.verAd, va.dataset.verAct, tr?.querySelector(".n")?.textContent || "Anuncio", va); return; }
   const lp = e.target.closest("[data-pres]");
   if (lp) { const it = buscarItem(lp.dataset.pres); if (it) editarPresupuesto(it); return; }
   const tg = e.target.closest("[data-tg]");
@@ -3647,11 +3682,11 @@ function cargarJarvis() {
   if (jvCarga) return jvCarga;
   const css = new Promise((ok) => {
     if ($('link[href^="jarvis.css"]')) return ok();
-    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "jarvis.css?v=10";
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "jarvis.css?v=11";
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "jarvis.js?v=11";
+    const sc = document.createElement("script"); sc.src = "jarvis.js?v=12";
     sc.onload = () => window.Jarvis ? ok() : mal(new Error("Jarvis no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar Jarvis. ¿Hay conexión?")); };
     document.head.appendChild(sc);
@@ -3680,6 +3715,57 @@ async function seleccionarCampanaJarvis(id, pres) {
     return r;
   }));
 }
+// (04/11, Lorenzo) Jarvis «seleccioname las que vienen mal…»: va al tablero y tilda UNA POR UNA, deslizando hasta cada fila.
+// p = { nivel: campana|conjunto|anuncio, periodo, ids?, roas_max?, roas_min?, gasto_min?, texto?, cascada? }. Usa el mismo criterio
+// que «Lo que viene mal» (ROAS < 1,3 con gasto ≥ US$ 10) si no le dicen otro. No cambia nada en Meta: solo marca filas.
+async function seleccionarJarvis(p = {}) {
+  if (!irAlDash()) return { error: "no pude abrir el tablero" };
+  const per = periodoValido(p.periodo) ? p.periodo : S.periodo;
+  if (S.periodo !== per) { S.periodo = per; pintarTodo(); }
+  if (!S.datos[per]) await cargar();
+  const d = S.datos[per]; if (!d) return { error: "no pude traer los datos" };
+  if (S.buscar || S.cuenta) quitarFiltros();
+  const nivel = ["campana", "conjunto", "anuncio"].includes(p.nivel) ? p.nivel : "campana";
+  const ids = (p.ids || []).map(String);
+  const roasMax = p.roas_max ?? (ids.length || p.roas_min != null ? null : MALOS.roas);
+  const gMin = p.gasto_min ?? MALOS.gastoMin, txt = String(p.texto || "").toLowerCase();
+  const cumple = (x) => prendido(x.estado) && (x.gasto || 0) >= gMin && (roasMax == null || (x.roas ?? 0) < roasMax) && (p.roas_min == null || (x.roas ?? 0) >= p.roas_min);
+  const conTexto = (c) => !txt || String(c.nombre).toLowerCase().includes(txt);
+  const cascada = p.cascada !== false;
+  let cs = (d.campanas || []).filter((c) => (ids.length ? ids.includes(String(c.id)) : conTexto(c) && (nivel === "campana" || cascada ? cumple(c) : prendido(c.estado))));
+  S.grupoClave = "todas"; ajustarIdx(); S.sel.clear(); S.soloSel = false; pintarSoloSel();
+  let claves = [];
+  if (nivel === "campana") claves = cs.map((c) => "campana:" + c.id);
+  else {
+    for (const c of cs) S.open.add("c:" + c.id);
+    pintarTodo();
+    await Promise.all(cs.map(esperarDetalle));
+    for (const c of cs) for (const s of detDe(c)) {
+      if (cascada || nivel === "conjunto" ? !cumple(s) : !prendido(s.estado)) continue;
+      if (nivel === "conjunto") claves.push("conjunto:" + s.id);
+      else { const as = (s.anuncios || []).filter(cumple); if (as.length) { S.open.add("s:" + s.id); claves.push(...as.map((a) => "anuncio:" + a.id)); } }
+    }
+  }
+  pintarTodo(); pintarBarra();
+  if (!claves.length) { toast(`No encontré ${nivel === "campana" ? "campañas" : nivel === "conjunto" ? "conjuntos" : "anuncios"} que cumplan eso.`, "ok", 5000); return { n: 0 }; }
+  // una por una: desliza hasta la fila, la tilda y la hace brillar (rápido si son muchas)
+  const espera = Math.max(70, Math.min(320, 3600 / claves.length));
+  for (const k of claves) {
+    const it = buscarItem(k); if (!it) continue;
+    S.sel.set(k, { id: it.id, act: it.act, nivel: it.nivel, nombre: it.nombre, estado: it.estado, camp: it.camp, cj: it.cj });
+    const tr = $(`tr.fila[data-k="${CSS.escape(k)}"]`);
+    if (tr) {
+      tr.scrollIntoView({ behavior: reducido() ? "auto" : "smooth", block: "center", inline: "nearest" });
+      tr.classList.add("sel"); tr.setAttribute("aria-selected", "true");
+      tr.classList.remove("destello"); void tr.offsetWidth; tr.classList.add("destello");
+    }
+    pintarSoloSel(); pintarBarra();
+    await new Promise((ok) => setTimeout(ok, espera));
+  }
+  const n = S.sel.size, nom = nivel === "campana" ? "campaña" : nivel === "conjunto" ? "conjunto" : "anuncio";
+  toast(`Jarvis marcó ${n} ${nom}${n === 1 ? "" : nom === "campaña" ? "s" : "s"}. «solo seleccionadas» los muestra juntos.`, "ok", 6000);
+  return { n };
+}
 // (03/11, Lorenzo) Jarvis ya no es una sección: es el botón redondo de abajo a la derecha con el chat. Arranca al entrar.
 async function iniciarJarvis() {
   if (window.Jarvis?.__listo) return;
@@ -3693,7 +3779,7 @@ async function iniciarJarvis() {
     verCampana: (id) => abrirCampanaReloj(String(id)),
     verCampanas: (ids) => { const its = ids.map((id) => ({ n: "campana", id: String(id) })); mostrarEnTabla(prepararEvento({ t: "surf", items: its }, its)).then(() => abrirVariosReloj(ids.map(String))); },
     seccion: (sec) => irASeccion(sec),
-    seleccionar: seleccionarCampanaJarvis,
+    seleccionar: seleccionarCampanaJarvis, seleccionarVarias: seleccionarJarvis,
   });
 }
 

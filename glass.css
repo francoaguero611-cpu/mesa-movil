@@ -472,3 +472,35 @@ html .techo-aviso { border: 1px solid rgba(255,201,100,.4); border-radius: 16px;
 @keyframes secEntra { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .sec-grid { animation: none; } }
 @media (max-width: 720px) { .sec-grid { grid-template-columns: repeat(2, 1fr); } }
+/* (04/11, Lorenzo) totales flotantes: las celdas heredaban el borde transparente de 10 px y el redondeo de la fila real
+   → quedaba un escalón gris (la de «Resultados totales» desfasada). En la flotante todo parejo, una sola franja. */
+.pie-flotante { background: rgba(30,44,64,.97); }
+.pie-flotante .camp tfoot td, .pie-flotante .camp tfoot td.nom { border-top: 0; border-radius: 0; background: transparent; background-clip: border-box; }
+.pie-flotante .camp tfoot td.nom { background: rgb(30,44,64); }
+/* (04/11, Lorenzo) portada del anuncio en la fila + anuncio en vertical en el medio de la pantalla */
+.ad-portada { position: relative; flex: none; width: 38px; height: 52px; margin-right: 10px; padding: 0; border: 1px solid rgba(255,255,255,.14); border-radius: 8px; overflow: hidden; background: #0e1520; cursor: pointer; align-self: center; transition: transform .18s cubic-bezier(.22,1,.36,1), box-shadow .18s, border-color .18s; }
+.ad-portada img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ad-portada .ad-sin { display: grid; place-items: center; height: 100%; font-size: 13px; opacity: .5; }
+.ad-portada .ad-play { position: absolute; right: 3px; bottom: 3px; width: 16px; height: 16px; border-radius: 999px; display: grid; place-items: center; background: rgba(0,0,0,.6); color: #fff; }
+.ad-portada:hover { transform: scale(1.08); border-color: var(--celeste, #7cc8ff); box-shadow: 0 6px 16px -6px rgba(0,0,0,.8); }
+.ad-portada:active { transform: scale(.96); }
+.ad-portada:focus-visible { outline: 2px solid var(--celeste, #7cc8ff); outline-offset: 2px; }
+.ad-ver { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
+  background: rgba(3,7,14,.72); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); opacity: 0; transition: opacity .22s ease; }
+.ad-ver.visible { opacity: 1; }
+.ad-ver-caja { display: grid; gap: 10px; justify-items: center; max-width: 100%; }
+.ad-ver-cab { width: 100%; display: flex; align-items: center; gap: 12px; color: #eaf2ff; }
+.ad-ver-cab b { flex: 1; min-width: 0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ad-ver-x { flex: none; width: 36px; height: 36px; border-radius: 999px; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.1); color: #fff; font: 600 15px var(--f-texto); cursor: pointer; }
+.ad-ver-marco { position: relative; width: min(340px, 86vw); aspect-ratio: 9 / 16; max-height: calc(100vh - 150px); border-radius: 18px; overflow: hidden; background: #000; box-shadow: 0 30px 70px -20px rgba(0,0,0,.9), 0 0 0 1px rgba(255,255,255,.08); }
+.ad-ver-marco > video, .ad-ver-marco > img { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
+.ad-ver-marco .ad-ver-poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(.6); transform: scale(1.1); }
+.ad-ver-spin { position: absolute; left: 50%; top: 50%; width: 34px; height: 34px; margin: -17px; border-radius: 999px; border: 3px solid rgba(255,255,255,.25); border-top-color: #fff; animation: ad-gira .8s linear infinite; }
+@keyframes ad-gira { to { transform: rotate(360deg); } }
+/* la vista previa de Meta (Reels) mide 320×555 con 10 px de margen blanco: se recorta justo al anuncio */
+.ad-ver-marco.meta { width: 320px; height: 555px; aspect-ratio: auto; max-height: none; background: #000; }
+.ad-ver-marco.meta iframe { position: absolute; left: -10px; top: -10px; width: 340px; height: 575px; border: 0; }
+@media (max-height: 700px), (max-width: 380px) { .ad-ver-marco.meta { transform: scale(var(--ad-esc, .85)); transform-origin: top center; margin-bottom: -80px; } }
+.ad-ver-aviso { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: #cfe0f5; font-size: 14px; margin: 0; }
+.ad-ver-pie a { color: var(--celeste, #7cc8ff); font-size: 13px; text-decoration: none; }
+@media (prefers-reduced-motion: reduce) { .ad-ver { transition: none; } .ad-ver-spin { animation-duration: 2s; } .ad-portada { transition: none; } }
