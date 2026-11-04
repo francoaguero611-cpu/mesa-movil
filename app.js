@@ -3258,7 +3258,7 @@ async function seleccionarMalos() {
 // ganancia de Codicia). Cada día es el «dash» de ese día (hoy / ayer / r:d:d); el Total suma los días elegidos.
 const CMP_METS = [["gasto", "Gasto"], ["ventas", "Ventas"], ["roas", "ROAS"], ["ganancia", "Ganancia"], ["cpm", "CPM"]];
 const CMP_DSEM = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-const CMP = { met: "roas", dias: null, soloMalas: true, grupo: "todas", cuenta: "", abierta: null, gastoMin: 15, st: "", umbral: (() => { const n = parseFloat(ls.get("cmp_umbral", "")); return n > 0 ? n : 1.3; })() };
+const CMP = { crit: ls.get("cmp_crit", "") === "real" ? "real" : "dash", met: "roas", dias: null, soloMalas: true, grupo: "todas", cuenta: "", abierta: null, gastoMin: 15, st: "", umbral: (() => { const n = parseFloat(ls.get("cmp_umbral", "")); return n > 0 ? n : 1.3; })() };
 const isoMenos = (iso, n) => new Date(Date.parse(iso + "T12:00:00Z") - n * 86400e3).toISOString().slice(0, 10);
 const cmpPer = (iso) => { const h = isoAR(new Date()); return iso === h ? "hoy" : iso === isoMenos(h, 1) ? "ayer" : `r:${iso}:${iso}`; };
 const cmpDiaTx = (iso) => `${CMP_DSEM[new Date(iso + "T12:00:00Z").getUTCDay()]} ${dm(iso)}`;
@@ -3269,12 +3269,18 @@ function cmpSumar(xs) {
   t.cpm = t.impresiones ? (t.gasto / t.impresiones) * 1000 : null;
   return t;
 }
+// «Solo registradas»: solo lo que Impultienda le atribuye a la campaña (sin el pixel). La ganancia mantiene el margen neto del grupo.
+function cmpReal(c) {
+  const fr = +c.facturacion_real || 0, f = +c.facturacion || 0, g = +c.gasto || 0;
+  const ratio = f ? ((+c.ganancia || 0) + g) / f : 0.9;
+  return { ...c, ventas: +c.ventas_real || 0, facturacion: fr, roas: g ? fr / g : null, ganancia: fr * ratio - g };
+}
 function cmpFilas() {
   const por = new Map();
   for (const iso of CMP.dias) for (const c of S.datos[cmpPer(iso)]?.campanas || []) {
     const f = por.get(c.id) || { id: c.id, d: {} };
     Object.assign(f, { act: c.act, nombre: c.nombre, cuenta: c.cuenta, grupo: c.grupo, estado: c.estado }); // el último día manda
-    f.d[iso] = c; por.set(c.id, f);
+    f.d[iso] = CMP.crit === "real" ? cmpReal(c) : c; por.set(c.id, f);
   }
   const malo = (x) => x && (x.gasto || 0) >= CMP.gastoMin && (x.roas ?? 0) < CMP.umbral;
   const out = [];
@@ -3347,19 +3353,21 @@ function pintarCmp() {
       <select class="campo" id="cmp-grupo" aria-label="Oferta"><option value="todas">Todas las ofertas</option>${[...gruposM].map(([k, t]) => `<option value="${esc(k)}"${k === CMP.grupo ? " selected" : ""}>${esc(t)}</option>`).join("")}</select>
       <select class="campo" id="cmp-cuenta" aria-label="Cuenta"><option value="">Todas las cuentas</option>${[...cuentasM].sort((a, b) => a[1].localeCompare(b[1])).map(([k, t]) => `<option value="${esc(k)}"${k === CMP.cuenta ? " selected" : ""}>${esc(t)}</option>`).join("")}</select>
       <button type="button" class="toggle-chico" role="switch" id="cmp-malas" aria-checked="${CMP.soloMalas}"><span class="mini" aria-hidden="true"></span>solo las malas (${nMalas})</button>
+      <div class="periodos cmp-crit" role="group" aria-label="Ventas">${[["dash", "Como el Dashboard"], ["real", "Solo registradas"]].map(([k, t]) => `<button type="button" class="btn chico" data-cmp-crit="${k}" aria-pressed="${CMP.crit === k}" title="${k === "dash" ? "Por anuncio, el mayor entre lo que marca Meta y lo que registró Impultienda (igual que el Dashboard)" : "Solo las ventas que registró Impultienda para la campaña, sin el pixel de Meta"}">${t}</button>`).join("")}</div>
       <label class="cmp-umb">ROAS malo &lt; <input type="number" class="campo" id="cmp-umb" step="0.05" min="0.5" max="5" value="${CMP.umbral}"></label>
       <button type="button" class="btn chico" id="cmp-act" title="Volver a traer los días elegidos">↻</button>
     </div>
     ${CMP.st ? `<div class="bh-cargando"><span class="cargador"></span>${esc(CMP.st)}</div>` : ""}
     ${cargando && !fs.length ? "" : fs.length ? `<div class="cmp-tabla-caja"><table class="cmp-tabla num"><thead><tr><th scope="col" class="cmp-nom">Campaña <small>(${fs.length})</small></th>${th}</tr></thead><tbody>${filas}</tbody></table></div>`
       : `<p class="mut cmp-nada">${CMP.soloMalas ? `Ninguna campaña con ROAS menor a ${roasTx(CMP.umbral)} en estos días.` : "No hay campañas con gasto en estos días."}</p>`}
-    <p class="mut cmp-nota">Mismos números que el Dashboard (ventas reales con bumps y post-venta). Mala = ROAS menor a ${roasTx(CMP.umbral)} un día con US$ ${CMP.gastoMin} o más de gasto, o en el total. Las celdas claritas gastaron menos de US$ ${CMP.gastoMin}.${CMP.dias.includes(h) ? " * Hoy todavía está en curso." : ""} Tocá una campaña para ver todo.</p>`;
+    <p class="mut cmp-nota">${CMP.crit === "real" ? "Solo las ventas que registró Impultienda (con bumps y post-venta), sin el pixel de Meta." : "Mismos números que el Dashboard (ventas reales con bumps y post-venta)."} Mala = ROAS menor a ${roasTx(CMP.umbral)} un día con US$ ${CMP.gastoMin} o más de gasto, o en el total. Las celdas claritas gastaron menos de US$ ${CMP.gastoMin}.${CMP.dias.includes(h) ? " * Hoy todavía está en curso." : ""} Tocá una campaña para ver todo.</p>`;
   $("#cmp-x", raiz).onclick = () => modalActual?.cerrar();
   $$("[data-cmp-dia]", raiz).forEach((b) => b.onclick = () => {
     const iso = b.dataset.cmpDia, s = new Set(CMP.dias);
     if (s.has(iso)) { if (s.size === 1) return; s.delete(iso); } else s.add(iso);
     CMP.dias = [...s].sort(); cargarCmp();
   });
+  $$("[data-cmp-crit]", raiz).forEach((b) => b.onclick = () => { CMP.crit = b.dataset.cmpCrit; ls.set("cmp_crit", CMP.crit); pintarCmp(); });
   $$("[data-cmp-met]", raiz).forEach((b) => b.onclick = () => { CMP.met = b.dataset.cmpMet; pintarCmp(); });
   $("#cmp-grupo", raiz).onchange = (e) => { CMP.grupo = e.target.value; pintarCmp(); };
   $("#cmp-cuenta", raiz).onchange = (e) => { CMP.cuenta = e.target.value; pintarCmp(); };
