@@ -3522,11 +3522,11 @@ function cargarJarvis() {
   if (jvCarga) return jvCarga;
   const css = new Promise((ok) => {
     if ($('link[href^="jarvis.css"]')) return ok();
-    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "jarvis.css?v=8";
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "jarvis.css?v=9";
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "jarvis.js?v=9";
+    const sc = document.createElement("script"); sc.src = "jarvis.js?v=10";
     sc.onload = () => window.Jarvis ? ok() : mal(new Error("Jarvis no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar Jarvis. ¿Hay conexión?")); };
     document.head.appendChild(sc);

@@ -27,10 +27,11 @@ const porU = (u) => J.msgs.find((m) => m.u === u);
 const tocado = (m) => { m.v = (m.v || 0) + 1; };
 
 // ícono propio: un núcleo con dos órbitas (nada de estrellitas)
-const ICONO = `<svg viewBox="0 0 32 32" aria-hidden="true">
-  <ellipse cx="16" cy="16" rx="13" ry="5.2" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".9" transform="rotate(-28 16 16)"/>
-  <ellipse cx="16" cy="16" rx="13" ry="5.2" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".55" transform="rotate(32 16 16)"/>
+const orbita = (rot, op, dur, rev) => `<g>${dur ? `<animateTransform attributeName="transform" type="rotate" from="${rev ? 360 : 0} 16 16" to="${rev ? 0 : 360} 16 16" dur="${dur}s" repeatCount="indefinite"/>` : ""}<ellipse cx="16" cy="16" rx="13" ry="5.2" fill="none" stroke="currentColor" stroke-width="1.6" opacity="${op}" transform="rotate(${rot} 16 16)"/></g>`;
+const icono = (gira) => `<svg viewBox="0 0 32 32" aria-hidden="true">${orbita(-28, ".9", gira && 9)}${orbita(32, ".55", gira && 13, true)}
   <circle cx="16" cy="16" r="5.6" fill="#3d9dff"/><circle cx="16" cy="16" r="4" fill="#7cc8ff"/><circle cx="14.6" cy="14.4" r="1.6" fill="#eaf8ff"/></svg>`;
+// el del botón gira con SMIL (la animación CSS pisaba la inclinación de las órbitas y las deformaba)
+const ICONO = icono(false), ICONO_FAB = icono(!matchMedia("(prefers-reduced-motion: reduce)").matches);
 const FLECHA_RESP = `<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M10 6 L4 12 L10 18 M4.5 12 H14 C 17.5 12, 20 14.5, 20 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const FLECHA_VOLVER = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M14.5 5.5 L8 12 L14.5 18.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const CHECK = `<svg class="jv-check" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 12.5 L10.5 16 L17 9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -62,7 +63,7 @@ async function traerAvisos() {
   const feed = (d.feed || []).slice().sort((a, b) => a.id - b.id);
   for (const x of feed.filter((x) => x.id > J.ultFeed && (J.ultFeed || Date.now() - Date.parse(x.t) < 12 * 3600e3))) {
     const acc = x.acciones?.length ? x.acciones : (x.botones || []).map((b) => ({ tipo: "url", titulo: b.titulo, url: b.url }));
-    nuevos.push({ u: uid(), rol: "aviso", texto: x.texto, acciones: acc, t: x.t, feed: x.id, urgente: !!x.urgente });
+    nuevos.push({ u: uid(), rol: "aviso", texto: x.texto, acciones: acc, t: x.t, feed: x.id, urgente: !!x.urgente, verde: !!x.verde });
   }
   if (feed.length) J.ultFeed = Math.max(J.ultFeed, ...feed.map((x) => x.id));
   // estado en vivo que pide acción ya (lo deja la revisión de cada 15 min); cada cosa una vez cada 6 h
@@ -74,8 +75,9 @@ async function traerAvisos() {
   const charlaVacia = !J.msgs.length;
   J.msgs.push(...nuevos); guardar();
   if (primera && charlaVacia) { marcarVisto(); pintar(); return; } // la primera vez no hace sonar lo viejo
-  if (J.abierto) { marcarVisto(); pintar(); abajo(); sonar(nuevos.some((x) => x.urgente)); return; }
-  pintar(); sonar(nuevos.some((x) => x.urgente));
+  const tono = nuevos.some((x) => x.urgente) ? true : nuevos.every((x) => x.verde) ? "verde" : false;
+  if (J.abierto) { marcarVisto(); pintar(); abajo(); sonar(tono); return; }
+  pintar(); sonar(tono);
   if (nuevos.some((x) => x.urgente)) abrir(); // urgente: se abre solo
 }
 function vivoNuevo(lista, clave, texto, acciones = []) {
@@ -128,7 +130,7 @@ addEventListener("pointerdown", desbloquear, { once: true, capture: true });
 function sonar(urgente) {
   try {
     desbloquear(); if (!actx || actx.state !== "running") return;
-    const notas = urgente ? [880, 660, 880] : [740, 988];
+    const notas = urgente === "verde" ? [659, 784, 1047] : urgente ? [880, 660, 880] : [740, 988]; // verde: acorde que sube (buena noticia)
     notas.forEach((f, i) => {
       const o = actx.createOscillator(), g = actx.createGain(), t0 = actx.currentTime + i * 0.13;
       o.type = "sine"; o.frequency.value = f; g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.18, t0 + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.32);
@@ -163,7 +165,7 @@ function montarUI() {
   if ($("#jv-fab")) return;
   const fab = document.createElement("button");
   fab.id = "jv-fab"; fab.type = "button"; fab.className = "jv-fab"; fab.setAttribute("aria-label", "Abrir Jarvis");
-  fab.innerHTML = `<span class="jv-anillo" aria-hidden="true"></span><span class="jv-orbe">${ICONO}</span><span class="jv-badge" hidden></span>`;
+  fab.innerHTML = `<span class="jv-anillo" aria-hidden="true"></span><span class="jv-orbe">${ICONO_FAB}</span><span class="jv-badge" hidden></span>`;
   fab.onclick = () => (J.abierto ? cerrar() : abrir());
   const p = document.createElement("aside");
   p.id = "jv-panel"; p.className = "jv-panel"; p.hidden = true; p.setAttribute("aria-label", "Jarvis");
@@ -191,19 +193,53 @@ function pintarFab() {
   const fab = $("#jv-fab"); if (!fab) return;
   const n = J.abierto ? 0 : sinLeer().length;
   fab.classList.toggle("alerta", n > 0);
+  fab.classList.toggle("verde", n > 0 && sinLeer().every((m) => m.verde)); // (04/11) solo buenas noticias (cobro que impactó): anillo verde
   const b = $(".jv-badge", fab); b.hidden = !n; b.textContent = n > 9 ? "9+" : String(n);
   fab.setAttribute("aria-label", n ? `Jarvis: ${n} aviso${n > 1 ? "s" : ""} nuevo${n > 1 ? "s" : ""}` : "Abrir Jarvis");
 }
-const RAPIDAS = ["¿Cómo venimos hoy?", "¿Qué campaña surfeo?", "Mostrame el antes y después de lo que surfeé", "¿Cuánta plata hay en Whop?", "¿Cuáles son los winners?"];
-const claseMsg = (m) => m.rol === "user" ? (m.de && m.de !== yo() ? `jv-m otro${!m.leido ? " nuevo" : ""}` : "jv-m yo") : m.rol === "card" ? "jv-m card" : `jv-m el${m.rol === "aviso" ? " aviso" : ""}${m.urgente ? " urgente" : ""}${(m.rol === "aviso" || m.ajeno) && !m.leido ? " nuevo" : ""}${m.abierta && m.card ? " expandida" : ""}`;
+const RAPIDAS = ["📋 Resumen de hoy", "¿Cómo venimos hoy?", "¿Qué campaña surfeo?", "Mostrame el antes y después de lo que surfeé", "¿Cuánta plata hay en Whop?", "¿Cuáles son los winners?"];
+const claseMsg = (m) => m.rol === "user" ? (m.de && m.de !== yo() ? `jv-m otro${!m.leido ? " nuevo" : ""}` : "jv-m yo") : m.rol === "card" ? "jv-m card" : `jv-m el${m.rol === "aviso" ? " aviso" : ""}${m.urgente ? " urgente" : ""}${m.verde ? " verde" : ""}${(m.rol === "aviso" || m.ajeno) && !m.leido ? " nuevo" : ""}${m.abierta && m.card ? " expandida" : ""}`;
 const ocultarAcc = (a) => /#(workspace|taller)/.test(a.url || "") || a.sec === "workspace";
 function htmlMsg(m) {
   if (m.rol === "user") return `${m.de && m.de !== yo() ? `<small class="jv-quien">${esc(NOMBRE[m.de] || m.de)}</small>` : ""}${m.cita ? `<button type="button" class="jv-citado" data-ir="${esc(m.citaU || "")}"><small>Jarvis</small>${esc(m.cita)}</button>` : ""}<p>${esc(m.texto)}</p>${m.de && m.de !== yo() ? `<time>${m.t ? hora(m.t) : ""}</time>` : ""}`;
   // (03/11, Lorenzo) «Ver antes y después» se abre ADENTRO de la misma burbuja; la flechita de arriba a la izquierda la vuelve a cerrar
   if (m.abierta && m.card) return `<button type="button" class="jv-volver" data-volver="${m.u}" aria-label="Volver al mensaje">${FLECHA_VOLVER}</button><p class="jv-orig">${md(m.texto)}</p><div class="jv-card-host"></div>`;
-  const acc = (m.acciones || []).map((a, k) => ocultarAcc(a) || a.tipo === "mostrar_campana" ? "" : `<button type="button" class="jv-b${a.tipo === "nada" || a.tipo === "cancelar" ? " suave" : ""}${a.tipo === "confirmar" ? " fuerte" : ""}" data-mu="${m.u}" data-a="${k}" ${m.usado ? "disabled" : ""}>${esc(a.titulo)}</button>`).join("");
+  const res = (m.acciones || []).find((a) => a.tipo === "resumen");
+  const acc = (m.acciones || []).map((a, k) => ocultarAcc(a) || a.tipo === "mostrar_campana" || a.tipo === "resumen" ? "" : `<button type="button" class="jv-b${a.tipo === "nada" || a.tipo === "cancelar" ? " suave" : ""}${a.tipo === "confirmar" ? " fuerte" : ""}" data-mu="${m.u}" data-a="${k}" ${m.usado ? "disabled" : ""}>${esc(a.titulo)}</button>`).join("");
   return `<button type="button" class="jv-resp" data-resp="${m.u}" aria-label="Responder a este mensaje">${FLECHA_RESP}</button>
-    ${m.para && m.para !== yo() ? `<small class="jv-para">Respondiéndole a ${esc(NOMBRE[m.para] || m.para)}</small>` : ""}<p>${md(m.texto)}</p>${acc ? `<div class="jv-acc">${acc}</div>` : ""}<time>${m.t ? hora(m.t) : ""}</time>`;
+    ${m.para && m.para !== yo() ? `<small class="jv-para">Respondiéndole a ${esc(NOMBRE[m.para] || m.para)}</small>` : ""}<p>${md(m.texto)}</p>${res ? htmlResumen(m, res) : ""}${acc ? `<div class="jv-acc">${acc}</div>` : ""}<time>${m.t ? hora(m.t) : ""}</time>`;
+}
+// (04/11, Lorenzo) «Resumen»: lista con lo más importante arriba; cada punto se toca y despliega el detalle y los avisos de ese tema
+function htmlResumen(m, res) {
+  const ab = new Set(m.resAb || []);
+  return `<ol class="jv-res">${(res.items || []).map((it, i) => {
+    const orig = (it.orig || []).map((o, k) => {
+      const enChat = J.msgs.find((x) => x.feed === o.id);
+      const bs = (o.acciones || []).filter((a) => !ocultarAcc(a) && a.tipo !== "nada").slice(0, 3).map((a, j) => `<button type="button" class="jv-b" data-ru="${m.u}" data-ri="${i}" data-ro="${k}" data-ra="${j}">${esc(a.titulo)}</button>`).join("");
+      return `<div class="jv-res-av"><p>${md(o.texto)}</p><div class="jv-res-pie">${o.t ? `<time>${hora(o.t)}</time>` : ""}${enChat ? `<button type="button" class="jv-res-ir" data-ir="${enChat.u}">Ver el aviso ↗</button>` : ""}</div>${bs ? `<div class="jv-acc">${bs}</div>` : ""}</div>`;
+    }).join("");
+    return `<li class="${it.urgente ? "urg" : ""}${ab.has(i) ? " abierto" : ""}"><button type="button" class="jv-res-t" data-rt="${m.u}" data-ri="${i}" aria-expanded="${ab.has(i)}"><span class="ico">${esc(it.ico || "•")}</span><span class="tx">${md(it.titulo)}</span><svg class="fl" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <div class="jv-res-d"><div><p>${md(it.detalle || "")}</p>${orig}</div></div></li>`;
+  }).join("")}</ol>`;
+}
+function tocarResumen(e) {
+  const t = e.target.closest("[data-rt]");
+  if (t) { // desplegar / plegar sin redibujar la burbuja (así la animación es suave)
+    const m = porU(t.dataset.rt), i = Number(t.dataset.ri); if (!m) return true;
+    const ab = new Set(m.resAb || []); ab.has(i) ? ab.delete(i) : ab.add(i); m.resAb = [...ab]; guardar();
+    const li = t.closest("li"); li.classList.toggle("abierto", ab.has(i)); t.setAttribute("aria-expanded", String(ab.has(i)));
+    if (ab.has(i)) setTimeout(() => li.scrollIntoView({ block: "nearest", behavior: quieto() ? "auto" : "smooth" }), 260);
+    return true;
+  }
+  const b = e.target.closest("[data-ru]"); if (!b) return false;
+  const m = porU(b.dataset.ru), res = (m?.acciones || []).find((a) => a.tipo === "resumen");
+  const o = res?.items?.[Number(b.dataset.ri)]?.orig?.[Number(b.dataset.ro)], a = (o?.acciones || []).filter((a) => !ocultarAcc(a) && a.tipo !== "nada")[Number(b.dataset.ra)];
+  if (!a) return true;
+  const av = J.msgs.find((x) => x.feed === o.id); // si el aviso está en el chat, la tarjeta se abre en SU burbuja
+  if (av && ["ver_campana", "mostrar_campana", "presupuesto"].includes(a.tipo)) { ejecutar(av, a); irAMensaje(av.u); return true; }
+  if (a.tipo === "ver_campana" || a.tipo === "mostrar_campana") { tarjeta(a.id, { nombre: a.nombre || "" }); return true; }
+  if (a.tipo === "presupuesto") { tarjeta(a.id, { nombre: a.nombre || "", pre: { pct: a.pct ?? null, monto: a.monto ?? null } }); return true; }
+  ejecutar(m, a); return true;
 }
 // Dibuja solo lo nuevo o lo que cambió (cada mensaje tiene su u y su versión v)
 function pintar() {
@@ -339,8 +375,12 @@ async function tocar(e) {
   const r = e.target.closest("[data-resp]"); if (r) { citar(porU(r.dataset.resp)); return; }
   const ci = e.target.closest("[data-ir]"); if (ci) { irAMensaje(ci.dataset.ir); return; }
   const vo = e.target.closest("[data-volver]"); if (vo) { const m = porU(vo.dataset.volver); if (m) { m.abierta = false; tocado(m); guardar(); pintar(); } return; }
+  if (tocarResumen(e)) return;
   const b = e.target.closest("button[data-a]"); if (!b) return;
   const m = porU(b.dataset.mu), a = m?.acciones?.[Number(b.dataset.a)]; if (!a) return;
+  ejecutar(m, a);
+}
+function ejecutar(m, a) {
   if (a.tipo === "ver_campana" || a.tipo === "mostrar_campana") { expandir(m, a.id, { nombre: a.nombre || "" }); return; }
   if (a.tipo === "ver_campanas") { for (const id of (a.ids || []).slice(0, 4)) agregar({ rol: "card", id: String(id) }); guardar(); pintar(); abajo(); return; }
   if (a.tipo === "seccion") { if (movil()) cerrar(); J.ctx.seccion?.(a.sec); return; }
@@ -533,12 +573,18 @@ function demo() {
   const t = (min) => new Date(Date.now() - min * 60e3).toISOString();
   J.msgs = [
     { u: uid(), rol: "aviso", t: t(30), feed: 1, texto: "🔴 *Panza Cero 40+ · CP12*\nBro, la bajaste hace 3 h y sigue sin rendir (ROAS 0,83). ¿Le bajamos más?", acciones: [{ tipo: "presupuesto", titulo: "✂️ Bajarle 30 %", id: "demo", nombre: "Panza Cero 40+", pct: -30 }, { tipo: "ver_campana", titulo: "📈 Ver antes y después", id: "demo" }, { tipo: "nada", titulo: "Dejarla así" }] },
+    { u: uid(), rol: "aviso", t: t(12), feed: 2, verde: true, texto: "✅ **Impactó el cobro: Meta se llevó US$ 240 en Impultienda 6 · CP12.** En Whop te quedan US$ 4.068." },
     { u: uid(), rol: "aviso", t: t(2), feed: 3, urgente: true, texto: "🚨 **Bro, cargá US$ 600 en Whop ya mismo.** En ~5 min Meta te cobra US$ 1.000 y en Whop tenés US$ 500. Si no cargás, se frenan los anuncios." },
   ];
   J.ultFeed = 3; pintar(); sonar(true); setTimeout(abrir, 1200);
 }
 async function demoResp(t) {
   await new Promise((ok) => setTimeout(ok, 900));
+  if (/resum/i.test(t)) return { texto: "Bro, esto pasó desde anoche; lo más grosso es que el bot de surfeo está caído.", acciones: [{ tipo: "resumen", titulo: "Resumen", items: [
+    { ico: "🚨", urgente: true, titulo: "Bot de surfeo caído hace +8 h", detalle: "Avisó 3 veces desde las 2:34. Sin el bot los winners no se surfean solos. Pedime que lo revise y lo levanto.", orig: [{ id: 3, t: new Date(Date.now() - 2 * 60e3).toISOString(), texto: "🚨 **Se paró el bot de surfeo.** Última propuesta hace 514 min." }] },
+    { ico: "✅", titulo: "Meta cobró US$ 1.240 en Whop (4 cobros)", detalle: "Impactaron bien, sin rechazos. Te quedan US$ 4.068, alcanza para hoy." },
+    { ico: "🔴", titulo: "Panza CP12 sigue sin rendir: ROAS 0,83", detalle: "La bajaste hace 3 h y no levantó. Yo le bajaría otro 30 %.", orig: [{ id: 1, t: new Date(Date.now() - 30 * 60e3).toISOString(), texto: "🔴 *Panza Cero 40+ · CP12*\nBro, la bajaste hace 3 h y sigue sin rendir (ROAS 0,83).", acciones: [{ tipo: "presupuesto", titulo: "✂️ Bajarle 30 %", id: "demo", nombre: "Panza Cero 40+", pct: -30 }, { tipo: "ver_campana", titulo: "📈 Ver antes y después", id: "demo" }] }] },
+  ] }] };
   return { texto: `Che, en la demo no leo datos reales. Te muestro cómo se ve la tarjeta:`, acciones: [{ tipo: "mostrar_campana", titulo: "x", id: "demo" }] };
 }
 
