@@ -175,11 +175,9 @@ function montarUI() {
     <div class="jv-rapidas" id="jv-rapidas"></div>
     <div class="jv-cita" id="jv-cita" hidden><span class="jv-cita-ico">${FLECHA_RESP}</span><div><small>Respondiendo a Jarvis</small><p id="jv-cita-t"></p></div><button type="button" id="jv-cita-x" aria-label="Cancelar respuesta">✕</button></div>
     <form class="jv-form" id="jv-form" autocomplete="off"><textarea id="jv-in" rows="1" placeholder="Preguntale lo que quieras…" enterkeyhint="send"></textarea>
-      <button type="button" class="jv-mic" id="jv-mic" aria-label="Hablar con Jarvis"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>
       <button type="submit" class="jv-enviar" aria-label="Enviar"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 12 L20 4 L13 20 L11 13 Z" fill="currentColor"/></svg></button></form>`;
   document.body.append(p, fab);
   $("#jv-cerrar").onclick = cerrar;
-  $("#jv-mic").onclick = () => Voz.abrir();
   $("#jv-cita-x").onclick = () => soltarCita();
   const ta = $("#jv-in");
   ta.addEventListener("input", () => { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 120) + "px"; });
@@ -203,7 +201,6 @@ const RAPIDAS = ["📋 Resumen de hoy", "¿Cómo venimos hoy?", "¿Qué campaña
 const claseMsg = (m) => m.rol === "user" ? (m.de && m.de !== yo() ? `jv-m otro${!m.leido ? " nuevo" : ""}` : "jv-m yo") : m.rol === "card" ? "jv-m card" : `jv-m el${m.rol === "aviso" ? " aviso" : ""}${m.urgente ? " urgente" : ""}${m.verde ? " verde" : ""}${(m.rol === "aviso" || m.ajeno) && !m.leido ? " nuevo" : ""}${m.abierta && m.card ? " expandida" : ""}`;
 const ocultarAcc = (a) => /#(workspace|taller)/.test(a.url || "") || a.sec === "workspace";
 function htmlMsg(m) {
-  if (m.rol === "user" && m.escuchando) return `${m.texto ? `<p>${esc(m.texto)}</p>` : ""}<span class="jv-puntos" aria-label="Te estoy escuchando"><span></span><span></span><span></span></span>`;
   if (m.rol === "user") return `${m.de && m.de !== yo() ? `<small class="jv-quien">${esc(NOMBRE[m.de] || m.de)}</small>` : ""}${m.cita ? `<button type="button" class="jv-citado" data-ir="${esc(m.citaU || "")}"><small>Jarvis</small>${esc(m.cita)}</button>` : ""}<p>${esc(m.texto)}</p>${m.de && m.de !== yo() ? `<time>${m.t ? hora(m.t) : ""}</time>` : ""}`;
   // (03/11, Lorenzo) «Ver antes y después» se abre ADENTRO de la misma burbuja; la flechita de arriba a la izquierda la vuelve a cerrar
   if (m.abierta && m.card) return `<button type="button" class="jv-volver" data-volver="${m.u}" aria-label="Volver al mensaje">${FLECHA_VOLVER}</button><p class="jv-orig">${md(m.texto)}</p><div class="jv-card-host"></div>`;
@@ -300,7 +297,6 @@ function abrir() {
 }
 function cerrar() {
   const p = $("#jv-panel"); if (!p) return;
-  if (Voz.activo()) Voz.cerrar();
   J.abierto = false; p.classList.remove("visible"); document.documentElement.classList.remove("jv-abierto");
   setTimeout(() => { if (!J.abierto) p.hidden = true; }, 300);
   marcarVisto(); pintarFab();
@@ -569,183 +565,6 @@ function iniciar(ctx) {
   document.addEventListener("visibilitychange", () => { if (!document.hidden) { traerAvisos(); traerChat(); } });
 }
 
-// ---------- (04/11, Lorenzo) modo voz, como Wispr: la barra de escribir se vuelve una pastilla [✕ ·|||· ✓] ----------
-// El chat queda a la vista: lo que decís aparece transcripto como tu mensaje (para chequear que entendió bien) y la respuesta
-// como mensaje de Jarvis, mientras habla. Las barritas suben y bajan con tu voz y con la de él; en silencio son puntitos.
-// Micrófono → WAV 16 kHz → «oir» (Gemini transcribe, ~2,5 s) → respuesta + voz (ElevenLabs «Tomás»). Corta solo con ~1 s de silencio.
-// Mientras Jarvis habla se suelta el micrófono (si no, el Mac/iPhone baja o desvía el sonido y no se escucha).
-const Voz = (() => {
-  const V = { estado: "off", nivel: 0, suave: 0, ctx: null, mic: null, anal: null, buf: [], habla: 0, silencio: 0, fuente: null, analSal: null, raf: 0, gen: 0, barras: new Array(11).fill(0) };
-  const ESTX = { escucha: "Te escucho…", oye: "Te escucho…", oir: "Transcribiendo…", piensa: "Pensando…", habla: "Hablando… (✓ para cortarlo)", error: "" };
-  function montar() {
-    if ($("#jv-pill")) return;
-    const d = document.createElement("div"); d.id = "jv-pill"; d.className = "jv-pill"; d.hidden = true;
-    d.innerHTML = `<button type="button" class="jv-pill-x" id="jv-pill-x" aria-label="Salir del modo voz">✕</button>
-      <canvas id="jv-pill-cv" aria-hidden="true"></canvas>
-      <button type="button" class="jv-pill-ok" id="jv-pill-ok" aria-label="Listo, mandalo"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-      <small class="jv-pill-est" id="jv-pill-est" aria-live="polite"></small>`;
-    $("#jv-form").before(d);
-    $("#jv-pill-x").onclick = apagar;
-    $("#jv-pill-ok").onclick = () => { if (V.estado === "oye") cortar(); else if (V.estado === "habla") { callar(); escuchar(); } else if (V.estado === "error" || V.estado === "escucha") escuchar(); };
-  }
-  function estado(e, tx) {
-    V.estado = e; const d = $("#jv-pill"); if (!d) return;
-    d.dataset.estado = e; $("#jv-pill-est").textContent = tx ?? ESTX[e] ?? "";
-  }
-  async function prender() {
-    montar(); desbloquear(); V.ctx = actx; if (!V.ctx) return;
-    if (V.ctx.state === "suspended") { try { await V.ctx.resume(); } catch {} }
-    document.documentElement.classList.add("jv-voz-on"); $("#jv-pill").hidden = false;
-    requestAnimationFrame(() => $("#jv-pill").classList.add("visible"));
-    estado("escucha"); cancelAnimationFrame(V.raf); dibujar();
-    await escuchar();
-  }
-  function apagar() {
-    V.gen++; callar(); pararRec(); soltarMic();
-    if (V.mio?.escuchando && J.msgs.includes(V.mio)) { J.msgs.splice(J.msgs.indexOf(V.mio), 1); pintar(); } cancelAnimationFrame(V.raf); V.estado = "off";
-    document.documentElement.classList.remove("jv-voz-on");
-    const d = $("#jv-pill"); if (d) { d.classList.remove("visible"); d.hidden = true; }
-    $("#jv-in")?.focus({ preventScroll: true });
-  }
-  async function escuchar() {
-    callar();
-    try {
-      if (!V.mic) {
-        const st = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
-        const src = V.ctx.createMediaStreamSource(st);
-        const an = V.ctx.createAnalyser(); an.fftSize = 512; an.smoothingTimeConstant = 0.6; src.connect(an);
-        const pr = V.ctx.createScriptProcessor(4096, 1, 1); src.connect(pr); pr.connect(V.ctx.destination);
-        pr.onaudioprocess = (ev) => { if (V.estado === "escucha" || V.estado === "oye") V.buf.push(new Float32Array(ev.inputBuffer.getChannelData(0))); };
-        V.mic = { st, src, pr }; V.anal = an;
-      }
-    } catch { estado("error", "Necesito permiso para el micrófono"); return; }
-    if (V.estado === "off") return;
-    V.buf = []; V.habla = 0; V.silencio = 0; V.desde = performance.now(); V.mio = null;
-    estado("escucha"); arrancarRec();
-  }
-  // (04/11) transcripción EN VIVO con el reconocimiento del navegador (Chrome/Safari): las palabras aparecen mientras hablás
-  // y se manda apenas te callás. Si el navegador no lo tiene o falla, queda la grabación → Gemini como antes.
-  const REC = window.SpeechRecognition || window.webkitSpeechRecognition;
-  function arrancarRec() {
-    V.recFin = ""; V.recVivo = ""; V.rec = null;
-    if (!REC || V.sinRec) return;
-    try {
-      const r = new REC(); r.lang = "es-AR"; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
-      r.onresult = (ev) => {
-        let fin = "", vivo = "";
-        for (let i = 0; i < ev.results.length; i++) { const t = ev.results[i][0].transcript; ev.results[i].isFinal ? (fin += t) : (vivo += t); }
-        V.recFin = fin; V.recVivo = vivo; V.ultVoz = performance.now();
-        if (V.estado === "escucha" && (fin + vivo).trim()) estado("oye");
-        burbuja((fin + vivo).trim());
-      };
-      r.onerror = (e) => { if (e.error === "not-allowed" || e.error === "service-not-allowed" || e.error === "audio-capture") V.sinRec = true; };
-      r.onend = () => { V.recListo?.(); if (V.rec === r && (V.estado === "escucha" || V.estado === "oye")) { try { r.start(); } catch {} } }; // Chrome lo corta solo a veces: se reengancha
-      r.start(); V.rec = r;
-    } catch { V.rec = null; }
-  }
-  function pararRec() { const r = V.rec; V.rec = null; if (!r) return Promise.resolve(); return new Promise((ok) => { V.recListo = () => { V.recListo = null; ok(); }; try { r.stop(); } catch { ok(); } setTimeout(() => { V.recListo = null; ok(); }, 700); }); }
-  // tu burbuja: aparece con los puntitos apenas empezás a hablar y se va llenando con lo que vas diciendo
-  function burbuja(texto) {
-    if (!V.mio || !J.msgs.includes(V.mio)) { V.mio = agregar({ rol: "user", texto: "", de: yo(), temp: true, voz: true, escuchando: true }); }
-    if (texto != null && V.mio.texto !== texto) { V.mio.texto = texto; tocado(V.mio); }
-    pintar(); abajo();
-  }
-  function soltarMic() { if (!V.mic) return; try { V.mic.pr.disconnect(); V.mic.src.disconnect(); V.mic.st.getTracks().forEach((t) => t.stop()); } catch {} V.mic = null; V.anal = null; }
-  function wav() {
-    const n = V.buf.reduce((a, b) => a + b.length, 0), todo = new Float32Array(n); let o = 0; for (const b of V.buf) { todo.set(b, o); o += b.length; }
-    const k = V.ctx.sampleRate / 16000, m = Math.floor(n / k), dv = new DataView(new ArrayBuffer(44 + m * 2));
-    const w = (p, t) => { for (let i = 0; i < t.length; i++) dv.setUint8(p + i, t.charCodeAt(i)); };
-    w(0, "RIFF"); dv.setUint32(4, 36 + m * 2, true); w(8, "WAVE"); w(12, "fmt "); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
-    dv.setUint32(24, 16000, true); dv.setUint32(28, 32000, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true); w(36, "data"); dv.setUint32(40, m * 2, true);
-    for (let i = 0; i < m; i++) { const x = Math.max(-1, Math.min(1, todo[Math.floor(i * k)])); dv.setInt16(44 + i * 2, x < 0 ? x * 0x8000 : x * 0x7fff, true); }
-    const u = new Uint8Array(dv.buffer); let s = ""; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000));
-    return btoa(s);
-  }
-  function detectar(dt) {
-    if (V.estado !== "escucha" && V.estado !== "oye") return;
-    if (V.nivel > 0.03) { V.habla += dt; V.silencio = 0; if (V.habla > 0.15 && V.estado === "escucha") { estado("oye"); burbuja(); } }
-    else if (V.estado === "oye") { V.silencio += dt; if (V.silencio > 0.8) cortar(); } // 0,8 s callado = terminaste
-    else if (V.buf.length > 4) V.buf.splice(0, V.buf.length - 4);
-    if (V.estado === "oye" && performance.now() - V.desde > 30e3) cortar();
-  }
-  // 1) transcribir y mostrarlo ya en el chat · 2) respuesta + voz
-  async function cortar() {
-    if (V.estado !== "oye") return;
-    const audio = wav(); V.buf = []; const g = ++V.gen;
-    estado("oir"); burbuja();
-    await pararRec(); soltarMic();
-    const mio = V.mio;
-    let oido = (V.recFin + " " + V.recVivo).replace(/\s+/g, " ").trim(); // lo del navegador, si hubo: no hace falta esperar a Gemini
-    try { if (!oido) oido = J.ctx.demo ? "¿Cómo venimos hoy?" : (await pedir(BASE + "asistente-wa?accion=app_voz", { fase: "oir", audio, mime: "audio/wav" })).oido || ""; }
-    catch (e) { J.msgs.splice(J.msgs.indexOf(mio), 1); pintar(); if (g === V.gen) estado("error", `No te pude escuchar (${e.message}). Tocá ✓ y probá de nuevo.`); return; }
-    if (g !== V.gen) { J.msgs.splice(J.msgs.indexOf(mio), 1); pintar(); return; }
-    if (!oido.trim()) { J.msgs.splice(J.msgs.indexOf(mio), 1); pintar(); escuchar(); return; }
-    mio.texto = oido; delete mio.escuchando; tocado(mio); guardar(); pintar(); abajo();
-    estado("piensa"); J.pensando = true; pintar(); abajo();
-    let r;
-    try { r = J.ctx.demo ? await demoVoz(oido) : await pedir(BASE + "asistente-wa?accion=app_voz", { texto: oido }); }
-    catch (e) { r = { error: e.message }; }
-    J.pensando = false;
-    if (r.error) { pintar(); if (g === V.gen) estado("error", `Uh, ${r.error}. Tocá ✓ y probá de nuevo.`); return; }
-    if (r.id_user) { if (porU("c" + r.id_user)) J.msgs.splice(J.msgs.indexOf(mio), 1); else renombrar(mio, "c" + r.id_user); }
-    const acc = r.acciones || [];
-    const mm = r.id_resp && porU("c" + r.id_resp) ? porU("c" + r.id_resp) : agregar({ u: r.id_resp ? "c" + r.id_resp : uid(), rol: "assistant", texto: r.texto || "Listo.", acciones: acc, para: yo() });
-    J.ultChat = Math.max(J.ultChat, r.id_resp || 0); guardar(); pintar(); abajo();
-    autoAcciones(mm);
-    if (g !== V.gen) return;
-    if (r.audio) await decir64(r.audio, g); else if (!J.ctx.demo) estado("error", "No llegó la voz; te dejé la respuesta escrita.");
-    if (g === V.gen && V.estado !== "off" && V.estado !== "error") escuchar();
-  }
-  async function decir64(b64, g) {
-    try {
-      if (V.ctx.state === "suspended") await V.ctx.resume();
-      const bin = atob(b64), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
-      const buf = await V.ctx.decodeAudioData(u.buffer);
-      if (g !== V.gen) return;
-      const src = V.ctx.createBufferSource(); src.buffer = buf;
-      const an = V.ctx.createAnalyser(); an.fftSize = 512; an.smoothingTimeConstant = 0.6; src.connect(an); an.connect(V.ctx.destination);
-      V.fuente = src; V.analSal = an; estado("habla");
-      await new Promise((ok) => { src.onended = ok; src.start(); });
-    } catch (e) { estado("error", `No pude reproducir la voz (${e.message || e}).`); }
-    V.fuente = null; V.analSal = null;
-  }
-  function callar() { const f = V.fuente; if (f) { V.fuente = null; V.analSal = null; try { f.stop(); } catch {} f.onended?.(); } }
-  // ---- barritas tipo Wispr ----
-  const frec = new Uint8Array(256), tiempo = new Uint8Array(512);
-  function medir(an) { if (!an) return 0; an.getByteTimeDomainData(tiempo); let s = 0; for (let i = 0; i < tiempo.length; i++) { const x = (tiempo[i] - 128) / 128; s += x * x; } return Math.sqrt(s / tiempo.length); }
-  let ult = performance.now();
-  function dibujar() {
-    const cv = $("#jv-pill-cv"); if (!cv || V.estado === "off") return;
-    const ahora = performance.now(), dt = Math.min(0.1, (ahora - ult) / 1000); ult = ahora;
-    const an = V.estado === "habla" ? V.analSal : (V.estado === "escucha" || V.estado === "oye") ? V.anal : null;
-    V.nivel = medir(an); detectar(dt);
-    const N = V.barras.length;
-    if (an) an.getByteFrequencyData(frec);
-    for (let i = 0; i < N; i++) {
-      // el centro más alto (como Wispr); cada barra toma una banda de la voz
-      const centro = 1 - Math.abs(i - (N - 1) / 2) / ((N - 1) / 2);
-      const banda = an ? frec[2 + Math.floor((Math.abs(i - (N - 1) / 2) / ((N - 1) / 2)) * 60)] / 255 : 0;
-      const meta = an ? Math.min(1, (banda * 0.7 + V.nivel * 4) * (0.45 + centro * 0.75)) : 0;
-      V.barras[i] += (meta - V.barras[i]) * (meta > V.barras[i] ? 0.5 : 0.15);
-    }
-    const dpr = Math.min(2, devicePixelRatio || 1), W = cv.clientWidth, H = cv.clientHeight;
-    if (cv.width !== Math.round(W * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
-    const c = cv.getContext("2d"); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
-    const paso = W / N, ancho = Math.max(2, Math.min(3, paso * 0.4)), t = ahora / 1000;
-    c.fillStyle = V.estado === "habla" ? "#8fd3ff" : V.estado === "error" ? "#ff8a92" : "#ffffff";
-    for (let i = 0; i < N; i++) {
-      let h = ancho + V.barras[i] * (H - ancho);
-      if (V.estado === "piensa" || V.estado === "oir") h = ancho + (Math.sin(t * 6 - i * 0.55) * 0.5 + 0.5) * H * 0.28; // olita mientras piensa
-      const x = paso * i + paso / 2 - ancho / 2, y = (H - h) / 2;
-      c.globalAlpha = V.estado === "piensa" || V.estado === "oir" ? 0.75 : 0.95;
-      c.beginPath(); c.roundRect ? c.roundRect(x, y, ancho, h, ancho / 2) : c.rect(x, y, ancho, h); c.fill();
-    }
-    c.globalAlpha = 1;
-    V.raf = requestAnimationFrame(dibujar);
-  }
-  async function demoVoz(t) { await new Promise((ok) => setTimeout(ok, 900)); return /selecc/i.test(t) ? { texto: "Listo, te las marco.", acciones: [{ tipo: "seleccionar", titulo: "🎯 Marcar de nuevo", nivel: "campana", periodo: "3d" }] } : { texto: "Bro, en la demo no tengo datos reales, pero así te hablaría.", acciones: [] }; }
-  return { abrir: () => (V.estado === "off" ? prender() : apagar()), cerrar: apagar, activo: () => V.estado !== "off" };
-})();
 // (04/11) acciones que se hacen solas apenas llega la respuesta (hoy: seleccionar en el Dashboard)
 function autoAcciones(m) {
   const a = (m?.acciones || []).find((x) => x.tipo === "seleccionar"); if (!a || m.autoHecho) return;
@@ -753,7 +572,7 @@ function autoAcciones(m) {
 }
 async function seleccionarEnDash(a) {
   if (!J.ctx.seleccionarVarias) return;
-  if (movil()) { Voz.cerrar(); cerrar(); } // en el celular el chat tapa todo: se cierra para ver cómo marca
+  if (movil()) cerrar(); // en el celular el chat tapa todo: se cierra para ver cómo marca
   const r = await J.ctx.seleccionarVarias(a).catch((e) => ({ error: e.message }));
   if (r?.error) decir(`Uh, no pude marcarlas: ${r.error}.`);
 }
