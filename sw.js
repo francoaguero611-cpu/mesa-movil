@@ -1,10 +1,10 @@
 /* Service worker — Dashboard Lorenzo */
-const VERSION = "dash-v120";
+const VERSION = "dash-v121";
 const SHELL = ["./", "index.html", "styles.css?v=58", "app.js?v=109", "glass.css?v=10", "liquid.js?v=2", "demo.js?v=37", "manifest.webmanifest", "avisos.css?v=1", "avisos.js?v=2",
   "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png", "icons/apple-touch-icon.png"];
 // Cazador (antes Buscador de ofertas): se guarda aparte y sin trabar la instalación si algún archivo falta en el hosting.
 // buscador.html quedó como redirección a ./#cazador (links viejos).
-const EXTRA = ["buscador.html", "buscador.css?v=6", "buscador.js?v=10", "workspace.css?v=2", "workspace.js?v=2", "creativos.css?v=9", "creativos.js?v=9", "taller.css?v=6", "taller.js?v=7", "atc.css?v=4", "atc.js?v=3", "reportes.css?v=10", "reportes.js?v=9", "jarvis.css?v=7", "jarvis.js?v=8"];
+const EXTRA = ["buscador.html", "buscador.css?v=6", "buscador.js?v=10", "workspace.css?v=2", "workspace.js?v=2", "creativos.css?v=9", "creativos.js?v=9", "taller.css?v=6", "taller.js?v=7", "atc.css?v=4", "atc.js?v=3", "reportes.css?v=10", "reportes.js?v=9", "jarvis.css?v=8", "jarvis.js?v=9"];
 const API_HOST = "tppcpnfzcxxusdhrlmdx.supabase.co";
 const API_CACHE = "dash-api";
 
