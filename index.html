@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Dashboard Lorenzo</title>
 <meta name="description" content="Facturación, ROAS y campañas de Meta por oferta y mercado">
 <meta name="theme-color" content="#050607">
@@ -23,6 +23,17 @@
 <script>
   // Tema antes de pintar, para que no parpadee.
   try { var t = localStorage.getItem("dash_tema"); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+</script>
+<style>html { touch-action: pan-x pan-y; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }</style>
+<script>
+  // Sin zoom con los dedos ni con doble toque (la app se usa como app, no como página).
+  (function () {
+    var no = function (e) { e.preventDefault(); };
+    document.addEventListener("gesturestart", no, { passive: false });
+    document.addEventListener("gesturechange", no, { passive: false });
+    document.addEventListener("gestureend", no, { passive: false });
+    document.addEventListener("touchmove", function (e) { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
+  })();
 </script>
 </head>
 <body>
