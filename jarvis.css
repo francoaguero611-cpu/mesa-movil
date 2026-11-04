@@ -216,3 +216,11 @@ html .jv-m.despega { transition: transform .3s cubic-bezier(.5,0,.75,0), opacity
 html.jv-transicion #main { animation: jv-main-entra .75s var(--suave) both; }
 @keyframes jv-main-entra { from { opacity: .3; transform: translateX(-36px); filter: blur(6px); } }
 @media (prefers-reduced-motion: reduce) { html.jv-transicion #main, html .jv-volver { animation: none; } }
+
+/* (03/11) chat compartido: los mensajes del otro (Franco / Lorenzo) a la izquierda con su nombre */
+html .jv-m.otro { align-self: flex-start; background: linear-gradient(160deg, rgba(143,155,255,.22), rgba(110,120,230,.14)); border: 1px solid rgba(143,155,255,.32); border-bottom-left-radius: 6px; color: var(--tinta); transform-origin: bottom left; animation-name: jv-entra-izq; animation-timing-function: var(--resorte); animation-duration: .42s; }
+html .jv-quien { font: 700 12px var(--f-texto); color: #b7beff; margin-bottom: -4px; }
+html .jv-para { font-size: 11.5px; color: var(--mut); margin-bottom: -4px; }
+html .jv-m.otro .jv-citado { border-left-color: #b7beff; }
+html .jv-m.pensando small { margin-left: 6px; font-size: 12px; color: var(--mut); align-self: center; }
+html .jv-m.pensando { align-items: center; }

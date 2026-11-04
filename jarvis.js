@@ -19,8 +19,10 @@ const NF0 = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }), NF2 = 
 const movil = () => matchMedia("(max-width: 720px)").matches;
 const quieto = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const uid = () => Math.random().toString(36).slice(2, 10);
-const J = { ctx: {}, msgs: [], abierto: false, pensando: false, timer: null, ultFeed: 0, primera: true, cita: null };
-const K = () => `jv_chat_${J.ctx.usuario?.() || "x"}`;
+const J = { ctx: {}, msgs: [], abierto: false, pensando: false, timer: null, ultFeed: 0, primera: true, cita: null, ultChat: 0, ultLectura: 0, otroPensando: null };
+const K = () => `jv_chat_${J.ctx.usuario?.() || "x"}`, KC = () => `jv_ultchat_${J.ctx.usuario?.() || "x"}`;
+const NOMBRE = { lorenzo: "Lorenzo", franco: "Franco" };
+const yo = () => J.ctx.usuario?.() || "";
 const porU = (u) => J.msgs.find((m) => m.u === u);
 const tocado = (m) => { m.v = (m.v || 0) + 1; };
 
@@ -45,10 +47,11 @@ function cargarMsgs() {
   try { J.msgs = JSON.parse(ls.get(K(), "[]")) || []; } catch { J.msgs = []; }
   for (const m of J.msgs) m.u ||= uid();
   J.ultFeed = Math.max(0, ...J.msgs.map((m) => (m.feed && m.feed < 1e12 ? m.feed : 0)));
+  J.ultChat = Number(ls.get(KC(), "0")) || 0;
 }
 function guardar() { J.msgs = J.msgs.slice(-150); ls.set(K(), JSON.stringify(J.msgs)); }
-const sinLeer = () => J.msgs.filter((m) => m.rol === "aviso" && !m.leido);
-function marcarVisto() { let n = 0; for (const m of J.msgs) if (m.rol === "aviso" && !m.leido) { m.leido = true; n++; } if (n) { guardar(); pintar(); } pintarFab(); }
+const sinLeer = () => J.msgs.filter((m) => (m.rol === "aviso" || m.ajeno) && !m.leido);
+function marcarVisto() { let n = 0; for (const m of J.msgs) if ((m.rol === "aviso" || m.ajeno) && !m.leido) { m.leido = true; n++; } if (n) { guardar(); pintar(); } pintarFab(); }
 function agregar(m) { m.u ||= uid(); m.t ||= new Date().toISOString(); J.msgs.push(m); return m; }
 
 // ---------- avisos ----------
@@ -79,6 +82,43 @@ function vivoNuevo(lista, clave, texto, acciones = []) {
   const k = "jv_vivo_" + clave; if (Date.now() - Number(ls.get(k, "0")) < 6 * 3600e3) return;
   ls.set(k, String(Date.now()));
   lista.push({ u: uid(), rol: "aviso", texto, acciones, t: new Date().toISOString(), urgente: true });
+}
+
+// ---------- chat compartido con Franco / Lorenzo (asistente-wa ?accion=app_chat_leer) ----------
+// Cada mensaje del chat lleva u = "c<id>" (así no se repite). Los del otro y las respuestas que le da Jarvis cuentan como no leídos.
+function insertarOrdenado(m) {
+  const t = Date.parse(m.t); let i = J.msgs.length;
+  while (i > 0 && Date.parse(J.msgs[i - 1].t || 0) > t) i--;
+  J.msgs.splice(i, 0, m);
+}
+// ¿Jarvis le está contestando al otro? (el último mensaje del chat es suyo, sin respuesta, de hace menos de 2 min)
+function calcOtro() {
+  const uc = [...J.msgs].reverse().find((m) => String(m.u).startsWith("c") || m.temp);
+  J.otroPensando = uc && uc.rol === "user" && uc.de && uc.de !== yo() && Date.now() - Date.parse(uc.t) < 120e3 ? NOMBRE[uc.de] || uc.de : null;
+}
+function renombrar(m, u) { const el = $(`#jv-msgs > [data-u="${m.u}"]`); if (el) el.dataset.u = u; m.u = u; delete m.temp; }
+async function traerChat() {
+  if (J.ctx.demo || J.trayendo) return; J.trayendo = true; J.ultLectura = Date.now();
+  try {
+    const d = await pedir(BASE + `asistente-wa?accion=app_chat_leer&desde=${J.ultChat}`);
+    const primera = !J.ultChat; let nuevos = 0, ajenos = 0;
+    for (const f of d.filas || []) {
+      const u = "c" + f.id, mio = f.quien === yo();
+      if (f.rol === "assistant" && mio && J.pensando) break; // mi respuesta llega por el envío; se lee en la próxima vuelta
+      J.ultChat = Math.max(J.ultChat, f.id);
+      if (porU(u)) continue;
+      if (f.rol === "user" && mio) { const tmp = J.msgs.find((m) => m.temp && m.texto === f.texto); if (tmp) { renombrar(tmp, u); continue; } }
+      const acc = (f.acciones || []).map((a) => a.tipo === "mostrar_campana" ? { ...a, tipo: "ver_campana", titulo: "📈 Ver antes y después" } : a);
+      insertarOrdenado({ u, rol: f.rol, texto: f.texto, acciones: acc, t: f.t, de: f.rol === "user" ? f.quien : undefined, para: f.rol === "assistant" ? f.quien : undefined,
+        cita: f.cita || undefined, citaId: f.cita_id || undefined, ajeno: !mio, leido: mio || primera || J.abierto });
+      nuevos++; if (!mio) ajenos++;
+    }
+    ls.set(KC(), String(J.ultChat));
+    // ¿Jarvis le está contestando al otro? (su último mensaje todavía sin respuesta, hace menos de 2 min)
+    const antes = J.otroPensando; calcOtro();
+    if (nuevos || antes !== J.otroPensando) { if (nuevos) guardar(); pintar(); if (J.abierto) abajo(); }
+    if (ajenos && !primera) sonar(false);
+  } catch { /* sin conexión: la próxima */ } finally { J.trayendo = false; }
 }
 
 // ---------- sonido (WebAudio, sin archivos) ----------
@@ -155,15 +195,15 @@ function pintarFab() {
   fab.setAttribute("aria-label", n ? `Jarvis: ${n} aviso${n > 1 ? "s" : ""} nuevo${n > 1 ? "s" : ""}` : "Abrir Jarvis");
 }
 const RAPIDAS = ["¿Cómo venimos hoy?", "¿Qué campaña surfeo?", "Mostrame el antes y después de lo que surfeé", "¿Cuánta plata hay en Whop?", "¿Cuáles son los winners?"];
-const claseMsg = (m) => m.rol === "user" ? "jv-m yo" : m.rol === "card" ? "jv-m card" : `jv-m el${m.rol === "aviso" ? " aviso" : ""}${m.urgente ? " urgente" : ""}${m.rol === "aviso" && !m.leido ? " nuevo" : ""}${m.abierta && m.card ? " expandida" : ""}`;
+const claseMsg = (m) => m.rol === "user" ? (m.de && m.de !== yo() ? `jv-m otro${!m.leido ? " nuevo" : ""}` : "jv-m yo") : m.rol === "card" ? "jv-m card" : `jv-m el${m.rol === "aviso" ? " aviso" : ""}${m.urgente ? " urgente" : ""}${(m.rol === "aviso" || m.ajeno) && !m.leido ? " nuevo" : ""}${m.abierta && m.card ? " expandida" : ""}`;
 const ocultarAcc = (a) => /#(workspace|taller)/.test(a.url || "") || a.sec === "workspace";
 function htmlMsg(m) {
-  if (m.rol === "user") return `${m.cita ? `<button type="button" class="jv-citado" data-ir="${esc(m.citaU || "")}"><small>Jarvis</small>${esc(m.cita)}</button>` : ""}<p>${esc(m.texto)}</p>`;
+  if (m.rol === "user") return `${m.de && m.de !== yo() ? `<small class="jv-quien">${esc(NOMBRE[m.de] || m.de)}</small>` : ""}${m.cita ? `<button type="button" class="jv-citado" data-ir="${esc(m.citaU || "")}"><small>Jarvis</small>${esc(m.cita)}</button>` : ""}<p>${esc(m.texto)}</p>${m.de && m.de !== yo() ? `<time>${m.t ? hora(m.t) : ""}</time>` : ""}`;
   // (03/11, Lorenzo) «Ver antes y después» se abre ADENTRO de la misma burbuja; la flechita de arriba a la izquierda la vuelve a cerrar
   if (m.abierta && m.card) return `<button type="button" class="jv-volver" data-volver="${m.u}" aria-label="Volver al mensaje">${FLECHA_VOLVER}</button><p class="jv-orig">${md(m.texto)}</p><div class="jv-card-host"></div>`;
   const acc = (m.acciones || []).map((a, k) => ocultarAcc(a) || a.tipo === "mostrar_campana" ? "" : `<button type="button" class="jv-b${a.tipo === "nada" || a.tipo === "cancelar" ? " suave" : ""}${a.tipo === "confirmar" ? " fuerte" : ""}" data-mu="${m.u}" data-a="${k}" ${m.usado ? "disabled" : ""}>${esc(a.titulo)}</button>`).join("");
   return `<button type="button" class="jv-resp" data-resp="${m.u}" aria-label="Responder a este mensaje">${FLECHA_RESP}</button>
-    <p>${md(m.texto)}</p>${acc ? `<div class="jv-acc">${acc}</div>` : ""}<time>${m.t ? hora(m.t) : ""}</time>`;
+    ${m.para && m.para !== yo() ? `<small class="jv-para">Respondiéndole a ${esc(NOMBRE[m.para] || m.para)}</small>` : ""}<p>${md(m.texto)}</p>${acc ? `<div class="jv-acc">${acc}</div>` : ""}<time>${m.t ? hora(m.t) : ""}</time>`;
 }
 // Dibuja solo lo nuevo o lo que cambió (cada mensaje tiene su u y su versión v)
 function pintar() {
@@ -180,7 +220,8 @@ function pintar() {
       if (!el) {
         el = document.createElement("div"); el.dataset.u = m.u; el.className = claseMsg(m);
         if (m.rol === "card") montarCard(el, m); else { el.innerHTML = htmlMsg(m); el.dataset.v = String(m.v || 0); montarHost(el, m); }
-        box.insertBefore(el, pens);
+        const sig = J.msgs.slice(J.msgs.indexOf(m) + 1).map((x) => box.querySelector(`:scope > [data-u="${x.u}"]`)).find(Boolean);
+        box.insertBefore(el, sig || pens);
       } else {
         const cl = claseMsg(m) + (el.classList.contains("destello") ? " destello" : "");
         if (el.className !== cl) el.className = cl;
@@ -192,8 +233,10 @@ function pintar() {
       }
     }
     for (const el of [...box.querySelectorAll(":scope > [data-u]")]) if (!vivos.has(el.dataset.u)) el.remove();
-    if (J.pensando && !pens) { pens = document.createElement("div"); pens.className = "jv-m el pensando"; pens.setAttribute("aria-label", "Jarvis está escribiendo"); pens.innerHTML = "<span></span><span></span><span></span>"; box.append(pens); }
-    if (!J.pensando && pens) pens.remove();
+    const escribe = J.pensando || J.otroPensando;
+    if (escribe && !pens) { pens = document.createElement("div"); pens.className = "jv-m el pensando"; box.append(pens); }
+    if (escribe && pens) { const tx = J.pensando ? "" : `<small>le está contestando a ${esc(J.otroPensando)}</small>`; if (pens.dataset.tx !== tx) { pens.dataset.tx = tx; pens.innerHTML = `<span></span><span></span><span></span>${tx}`; } pens.setAttribute("aria-label", J.pensando ? "Jarvis está escribiendo" : `Jarvis le está contestando a ${J.otroPensando}`); }
+    if (!escribe && pens) pens.remove();
   }
   const rp = $("#jv-rapidas"); if (rp) rp.innerHTML = J.pensando ? "" : RAPIDAS.map((q) => `<button type="button" data-q="${esc(q)}">${esc(q)}</button>`).join("");
 }
@@ -271,19 +314,17 @@ function deslizarParaResponder(box) {
 // ---------- charla con Claude ----------
 async function preguntar(t) {
   const cita = J.cita; soltarCita();
-  agregar({ rol: "user", texto: t, cita: cita?.texto, citaU: cita?.u, citaId: cita?.id }); guardar();
-  J.pensando = true; pintar(); abajo();
-  const hist = J.msgs.slice(-14).map((m) => ({
-    rol: m.rol === "user" ? "user" : "assistant",
-    texto: m.rol === "card" ? `[Te mostré la tarjeta del antes y después de la campaña ${m.nombre || ""} (id ${m.id})]`
-      : m.rol === "user" && m.cita ? `(Respondiendo a: «${m.cita}»${m.citaId ? ` [campaña id ${m.citaId}]` : ""}) ${m.texto}` : m.texto,
-  }));
+  const mio = agregar({ rol: "user", texto: t, de: yo(), temp: true, cita: cita?.texto, citaU: cita?.u, citaId: cita?.id }); guardar();
+  J.pensando = true; calcOtro(); pintar(); abajo();
   let r;
-  try { r = J.ctx.demo ? await demoResp(t) : await pedir(BASE + "asistente-wa?accion=app_chat", { mensajes: hist }); }
+  try { r = J.ctx.demo ? await demoResp(t) : await pedir(BASE + "asistente-wa?accion=app_chat", { texto: t, cita: cita?.texto, citaId: cita?.id }); }
   catch (e) { r = { texto: `Uh, no te pude contestar (${e.message}). Probá de nuevo en un toque.`, acciones: [] }; }
   J.pensando = false;
+  if (r.id_user && mio.temp) { if (porU("c" + r.id_user)) J.msgs.splice(J.msgs.indexOf(mio), 1); else renombrar(mio, "c" + r.id_user); }
   const acc = r.acciones || [];
-  const mm = agregar({ rol: "assistant", texto: r.texto || "Listo.", acciones: acc });
+  if (r.id_resp && porU("c" + r.id_resp)) { guardar(); pintar(); abajo(); return; }
+  const mm = agregar({ u: r.id_resp ? "c" + r.id_resp : uid(), rol: "assistant", texto: r.texto || "Listo.", acciones: acc, para: yo() });
+  calcOtro();
   const ms = acc.filter((a) => a.tipo === "mostrar_campana" && a.id).slice(0, 3);
   if (ms[0]) { mm.card = { u: mm.u, id: String(ms[0].id), nombre: ms[0].nombre || "" }; mm.abierta = true; }
   for (const a of ms.slice(1)) agregar({ rol: "card", id: String(a.id), nombre: a.nombre || "" });
@@ -476,7 +517,10 @@ function iniciar(ctx) {
   traerAvisos();
   clearInterval(J.timer);
   J.timer = setInterval(() => { if (!document.hidden) traerAvisos(); }, 60e3);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) traerAvisos(); });
+  traerChat();
+  clearInterval(J.timerChat); // el chat compartido: cada 4 s con el chat abierto, cada 20 s cerrado
+  J.timerChat = setInterval(() => { if (!document.hidden && (J.abierto || Date.now() - J.ultLectura > 20e3)) traerChat(); }, 4e3);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) { traerAvisos(); traerChat(); } });
 }
 
 // ---------- demo ----------
