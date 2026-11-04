@@ -257,15 +257,15 @@ html .jv-mic { flex: none; width: 44px; height: 44px; border-radius: 999px; bord
 html .jv-mic:hover { background: rgba(124,200,255,.2); }
 html .jv-mic:active { transform: scale(.92); }
 html.jv-voz-on .jv-form, html.jv-voz-on .jv-rapidas { display: none; }
-html .jv-pill { position: relative; display: flex; align-items: center; gap: 12px; margin: 10px 12px calc(30px + env(safe-area-inset-bottom)); padding: 7px; border-radius: 999px;
+html .jv-pill { position: relative; display: flex; align-items: center; gap: 8px; width: clamp(150px, 36%, 190px); margin: 12px auto calc(30px + env(safe-area-inset-bottom)); padding: 5px; border-radius: 999px; /* (04/11) chiquita y centrada, ~1/3 del chat */
   background: #0b0d12; border: 1px solid rgba(255,255,255,.1); box-shadow: 0 12px 30px -12px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.06);
   opacity: 0; transform: translateY(8px) scale(.96); transition: opacity .22s ease, transform .35s cubic-bezier(.22,1,.36,1); }
 html .jv-pill.visible { opacity: 1; transform: none; }
-html .jv-pill canvas { flex: 1; min-width: 0; height: 34px; display: block; }
-html .jv-pill-x, html .jv-pill-ok { flex: none; width: 40px; height: 40px; border-radius: 999px; border: 0; cursor: pointer; display: grid; place-items: center; font: 700 16px var(--f-texto); transition: transform .15s var(--resorte), background .15s; }
+html .jv-pill canvas { flex: 1; min-width: 0; height: 22px; display: block; }
+html .jv-pill-x, html .jv-pill-ok { flex: none; width: 30px; height: 30px; border-radius: 999px; border: 0; cursor: pointer; display: grid; place-items: center; font: 700 13px var(--f-texto); transition: transform .15s var(--resorte), background .15s; }
 html .jv-pill-x { background: #4a4d55; color: #fff; }
 html .jv-pill-ok { background: #fff; color: #0b0d12; }
 html .jv-pill-x:active, html .jv-pill-ok:active { transform: scale(.9); }
-html .jv-pill-est { position: absolute; left: 0; right: 0; top: calc(100% + 6px); text-align: center; font-size: 12px; opacity: .7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html .jv-pill-est { position: absolute; left: 50%; width: 260px; margin-left: -130px; top: calc(100% + 6px); text-align: center; font-size: 12px; opacity: .7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 html .jv-pill[data-estado="error"] .jv-pill-est { color: #ff8a92; opacity: 1; white-space: normal; }
 html .jv-pill[data-estado="habla"] { box-shadow: 0 12px 30px -12px rgba(0,0,0,.8), 0 0 0 1px rgba(143,211,255,.35), 0 0 24px -6px rgba(143,211,255,.45); }

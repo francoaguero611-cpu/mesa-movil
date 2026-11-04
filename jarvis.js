@@ -574,14 +574,14 @@ function iniciar(ctx) {
 // Micrófono → WAV 16 kHz → «oir» (Gemini transcribe, ~2,5 s) → respuesta + voz (ElevenLabs «Tomás»). Corta solo con ~1 s de silencio.
 // Mientras Jarvis habla se suelta el micrófono (si no, el Mac/iPhone baja o desvía el sonido y no se escucha).
 const Voz = (() => {
-  const V = { estado: "off", nivel: 0, suave: 0, ctx: null, mic: null, anal: null, buf: [], habla: 0, silencio: 0, fuente: null, analSal: null, raf: 0, gen: 0, barras: new Array(15).fill(0) };
+  const V = { estado: "off", nivel: 0, suave: 0, ctx: null, mic: null, anal: null, buf: [], habla: 0, silencio: 0, fuente: null, analSal: null, raf: 0, gen: 0, barras: new Array(11).fill(0) };
   const ESTX = { escucha: "Te escucho…", oye: "Te escucho…", oir: "Transcribiendo…", piensa: "Pensando…", habla: "Hablando… (✓ para cortarlo)", error: "" };
   function montar() {
     if ($("#jv-pill")) return;
     const d = document.createElement("div"); d.id = "jv-pill"; d.className = "jv-pill"; d.hidden = true;
     d.innerHTML = `<button type="button" class="jv-pill-x" id="jv-pill-x" aria-label="Salir del modo voz">✕</button>
       <canvas id="jv-pill-cv" aria-hidden="true"></canvas>
-      <button type="button" class="jv-pill-ok" id="jv-pill-ok" aria-label="Listo, mandalo"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button type="button" class="jv-pill-ok" id="jv-pill-ok" aria-label="Listo, mandalo"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <small class="jv-pill-est" id="jv-pill-est" aria-live="polite"></small>`;
     $("#jv-form").before(d);
     $("#jv-pill-x").onclick = apagar;
@@ -701,7 +701,7 @@ const Voz = (() => {
     const dpr = Math.min(2, devicePixelRatio || 1), W = cv.clientWidth, H = cv.clientHeight;
     if (cv.width !== Math.round(W * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
     const c = cv.getContext("2d"); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
-    const paso = W / N, ancho = Math.max(2.5, Math.min(4, paso * 0.42)), t = ahora / 1000;
+    const paso = W / N, ancho = Math.max(2, Math.min(3, paso * 0.4)), t = ahora / 1000;
     c.fillStyle = V.estado === "habla" ? "#8fd3ff" : V.estado === "error" ? "#ff8a92" : "#ffffff";
     for (let i = 0; i < N; i++) {
       let h = ancho + V.barras[i] * (H - ancho);
