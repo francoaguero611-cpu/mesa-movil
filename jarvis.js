@@ -203,6 +203,7 @@ const RAPIDAS = ["📋 Resumen de hoy", "¿Cómo venimos hoy?", "¿Qué campaña
 const claseMsg = (m) => m.rol === "user" ? (m.de && m.de !== yo() ? `jv-m otro${!m.leido ? " nuevo" : ""}` : "jv-m yo") : m.rol === "card" ? "jv-m card" : `jv-m el${m.rol === "aviso" ? " aviso" : ""}${m.urgente ? " urgente" : ""}${m.verde ? " verde" : ""}${(m.rol === "aviso" || m.ajeno) && !m.leido ? " nuevo" : ""}${m.abierta && m.card ? " expandida" : ""}`;
 const ocultarAcc = (a) => /#(workspace|taller)/.test(a.url || "") || a.sec === "workspace";
 function htmlMsg(m) {
+  if (m.rol === "user" && m.escuchando) return `${m.texto ? `<p>${esc(m.texto)}</p>` : ""}<span class="jv-puntos" aria-label="Te estoy escuchando"><span></span><span></span><span></span></span>`;
   if (m.rol === "user") return `${m.de && m.de !== yo() ? `<small class="jv-quien">${esc(NOMBRE[m.de] || m.de)}</small>` : ""}${m.cita ? `<button type="button" class="jv-citado" data-ir="${esc(m.citaU || "")}"><small>Jarvis</small>${esc(m.cita)}</button>` : ""}<p>${esc(m.texto)}</p>${m.de && m.de !== yo() ? `<time>${m.t ? hora(m.t) : ""}</time>` : ""}`;
   // (03/11, Lorenzo) «Ver antes y después» se abre ADENTRO de la misma burbuja; la flechita de arriba a la izquierda la vuelve a cerrar
   if (m.abierta && m.card) return `<button type="button" class="jv-volver" data-volver="${m.u}" aria-label="Volver al mensaje">${FLECHA_VOLVER}</button><p class="jv-orig">${md(m.texto)}</p><div class="jv-card-host"></div>`;
@@ -600,7 +601,8 @@ const Voz = (() => {
     await escuchar();
   }
   function apagar() {
-    V.gen++; callar(); soltarMic(); cancelAnimationFrame(V.raf); V.estado = "off";
+    V.gen++; callar(); pararRec(); soltarMic();
+    if (V.mio?.escuchando && J.msgs.includes(V.mio)) { J.msgs.splice(J.msgs.indexOf(V.mio), 1); pintar(); } cancelAnimationFrame(V.raf); V.estado = "off";
     document.documentElement.classList.remove("jv-voz-on");
     const d = $("#jv-pill"); if (d) { d.classList.remove("visible"); d.hidden = true; }
     $("#jv-in")?.focus({ preventScroll: true });
@@ -618,8 +620,35 @@ const Voz = (() => {
       }
     } catch { estado("error", "Necesito permiso para el micrófono"); return; }
     if (V.estado === "off") return;
-    V.buf = []; V.habla = 0; V.silencio = 0; V.desde = performance.now();
-    estado("escucha");
+    V.buf = []; V.habla = 0; V.silencio = 0; V.desde = performance.now(); V.mio = null;
+    estado("escucha"); arrancarRec();
+  }
+  // (04/11) transcripción EN VIVO con el reconocimiento del navegador (Chrome/Safari): las palabras aparecen mientras hablás
+  // y se manda apenas te callás. Si el navegador no lo tiene o falla, queda la grabación → Gemini como antes.
+  const REC = window.SpeechRecognition || window.webkitSpeechRecognition;
+  function arrancarRec() {
+    V.recFin = ""; V.recVivo = ""; V.rec = null;
+    if (!REC || V.sinRec) return;
+    try {
+      const r = new REC(); r.lang = "es-AR"; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
+      r.onresult = (ev) => {
+        let fin = "", vivo = "";
+        for (let i = 0; i < ev.results.length; i++) { const t = ev.results[i][0].transcript; ev.results[i].isFinal ? (fin += t) : (vivo += t); }
+        V.recFin = fin; V.recVivo = vivo; V.ultVoz = performance.now();
+        if (V.estado === "escucha" && (fin + vivo).trim()) estado("oye");
+        burbuja((fin + vivo).trim());
+      };
+      r.onerror = (e) => { if (e.error === "not-allowed" || e.error === "service-not-allowed" || e.error === "audio-capture") V.sinRec = true; };
+      r.onend = () => { V.recListo?.(); if (V.rec === r && (V.estado === "escucha" || V.estado === "oye")) { try { r.start(); } catch {} } }; // Chrome lo corta solo a veces: se reengancha
+      r.start(); V.rec = r;
+    } catch { V.rec = null; }
+  }
+  function pararRec() { const r = V.rec; V.rec = null; if (!r) return Promise.resolve(); return new Promise((ok) => { V.recListo = () => { V.recListo = null; ok(); }; try { r.stop(); } catch { ok(); } setTimeout(() => { V.recListo = null; ok(); }, 700); }); }
+  // tu burbuja: aparece con los puntitos apenas empezás a hablar y se va llenando con lo que vas diciendo
+  function burbuja(texto) {
+    if (!V.mio || !J.msgs.includes(V.mio)) { V.mio = agregar({ rol: "user", texto: "", de: yo(), temp: true, voz: true, escuchando: true }); }
+    if (texto != null && V.mio.texto !== texto) { V.mio.texto = texto; tocado(V.mio); }
+    pintar(); abajo();
   }
   function soltarMic() { if (!V.mic) return; try { V.mic.pr.disconnect(); V.mic.src.disconnect(); V.mic.st.getTracks().forEach((t) => t.stop()); } catch {} V.mic = null; V.anal = null; }
   function wav() {
@@ -634,8 +663,8 @@ const Voz = (() => {
   }
   function detectar(dt) {
     if (V.estado !== "escucha" && V.estado !== "oye") return;
-    if (V.nivel > 0.03) { V.habla += dt; V.silencio = 0; if (V.habla > 0.15 && V.estado === "escucha") estado("oye"); }
-    else if (V.estado === "oye") { V.silencio += dt; if (V.silencio > 1.0) cortar(); }
+    if (V.nivel > 0.03) { V.habla += dt; V.silencio = 0; if (V.habla > 0.15 && V.estado === "escucha") { estado("oye"); burbuja(); } }
+    else if (V.estado === "oye") { V.silencio += dt; if (V.silencio > 0.8) cortar(); } // 0,8 s callado = terminaste
     else if (V.buf.length > 4) V.buf.splice(0, V.buf.length - 4);
     if (V.estado === "oye" && performance.now() - V.desde > 30e3) cortar();
   }
@@ -643,14 +672,15 @@ const Voz = (() => {
   async function cortar() {
     if (V.estado !== "oye") return;
     const audio = wav(); V.buf = []; const g = ++V.gen;
-    soltarMic(); estado("oir");
-    const mio = agregar({ rol: "user", texto: "…", de: yo(), temp: true, voz: true }); pintar(); abajo();
-    let oido = "";
-    try { oido = J.ctx.demo ? "¿Cómo venimos hoy?" : (await pedir(BASE + "asistente-wa?accion=app_voz", { fase: "oir", audio, mime: "audio/wav" })).oido || ""; }
+    estado("oir"); burbuja();
+    await pararRec(); soltarMic();
+    const mio = V.mio;
+    let oido = (V.recFin + " " + V.recVivo).replace(/\s+/g, " ").trim(); // lo del navegador, si hubo: no hace falta esperar a Gemini
+    try { if (!oido) oido = J.ctx.demo ? "¿Cómo venimos hoy?" : (await pedir(BASE + "asistente-wa?accion=app_voz", { fase: "oir", audio, mime: "audio/wav" })).oido || ""; }
     catch (e) { J.msgs.splice(J.msgs.indexOf(mio), 1); pintar(); if (g === V.gen) estado("error", `No te pude escuchar (${e.message}). Tocá ✓ y probá de nuevo.`); return; }
     if (g !== V.gen) { J.msgs.splice(J.msgs.indexOf(mio), 1); pintar(); return; }
     if (!oido.trim()) { J.msgs.splice(J.msgs.indexOf(mio), 1); pintar(); escuchar(); return; }
-    mio.texto = oido; tocado(mio); guardar(); pintar(); abajo();
+    mio.texto = oido; delete mio.escuchando; tocado(mio); guardar(); pintar(); abajo();
     estado("piensa"); J.pensando = true; pintar(); abajo();
     let r;
     try { r = J.ctx.demo ? await demoVoz(oido) : await pedir(BASE + "asistente-wa?accion=app_voz", { texto: oido }); }

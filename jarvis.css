@@ -269,3 +269,9 @@ html .jv-pill-x:active, html .jv-pill-ok:active { transform: scale(.9); }
 html .jv-pill-est { position: absolute; left: 50%; width: 260px; margin-left: -130px; top: calc(100% + 6px); text-align: center; font-size: 12px; opacity: .7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 html .jv-pill[data-estado="error"] .jv-pill-est { color: #ff8a92; opacity: 1; white-space: normal; }
 html .jv-pill[data-estado="habla"] { box-shadow: 0 12px 30px -12px rgba(0,0,0,.8), 0 0 0 1px rgba(143,211,255,.35), 0 0 24px -6px rgba(143,211,255,.45); }
+/* (04/11) mientras hablás: tu burbuja con tres puntitos que saltan (como los de Jarvis) y lo que vas diciendo */
+html .jv-m.yo .jv-puntos { display: inline-flex; gap: 4px; align-items: center; padding: 4px 2px 2px; }
+html .jv-m.yo p + .jv-puntos { padding-top: 6px; }
+html .jv-m.yo .jv-puntos span { width: 6px; height: 6px; border-radius: 99px; background: currentColor; opacity: .85; animation: jv-punto 1s ease-in-out infinite; }
+html .jv-m.yo .jv-puntos span:nth-child(2) { animation-delay: .15s; } html .jv-m.yo .jv-puntos span:nth-child(3) { animation-delay: .3s; }
+@media (prefers-reduced-motion: reduce) { html .jv-m.yo .jv-puntos span { animation-duration: 2s; } }
