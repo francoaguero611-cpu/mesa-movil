@@ -191,3 +191,28 @@ html .jv-sk.w60 { width: 60%; height: 14px; } html .jv-sk.w40 { width: 40%; heig
   html .jv-fab.alerta .jv-anillo { animation-duration: 3s; }
 }
 html .jv-rapidas:has(+ .jv-cita.visible) { display: none; }
+
+/* (03/11) tarjeta abierta ADENTRO de la burbuja del aviso; ← la vuelve a cerrar */
+html .jv-m.el.expandida { max-width: 100%; width: 100%; padding: 0; gap: 0; overflow: hidden; background: linear-gradient(165deg, rgba(124,200,255,.10), rgba(10,18,30,.5)); border-color: rgba(124,200,255,.22); border-radius: 20px; border-bottom-left-radius: 8px; }
+html .jv-m.el.expandida.urgente { border-color: rgba(255,90,100,.45); }
+html .jv-volver { position: absolute; top: 9px; left: 9px; z-index: 2; width: 30px; height: 30px; border-radius: 999px; border: 1px solid var(--g-borde-luz); background: rgba(10,18,30,.85); color: var(--tinta);
+  display: grid; place-items: center; cursor: pointer; animation: jv-aparece .35s .1s var(--resorte) both; transition: background .15s, transform .15s var(--resorte); }
+html .jv-volver:hover { background: rgba(124,200,255,.18); transform: translateX(-2px); }
+@keyframes jv-aparece { from { opacity: 0; transform: scale(.5) rotate(-30deg); } }
+html .jv-orig { margin: 0; padding: 12px 14px 0 48px; font-size: 13px; line-height: 1.35; color: var(--mut); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+html .jv-orig b { color: var(--tinta-2); }
+html .jv-card-host { min-width: 0; }
+html .jv-3h { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; font-size: 12.5px; color: var(--mut); }
+html .jv-3h > span { font-weight: 700; color: var(--celeste); text-transform: uppercase; font-size: 11.5px; letter-spacing: .5px; }
+html .jv-3h i { font-style: normal; } html .jv-3h b { color: var(--tinta); font-variant-numeric: tabular-nums; } html .jv-3h b.v { color: var(--pos); } html .jv-3h b.r { color: var(--rojo); }
+html .jv-3h em { font-style: normal; color: var(--ambar); font-size: 11.5px; }
+html .jv-tabla tbody th { line-height: 1.15; } html .jv-tabla tbody th b { display: block; font-weight: 600; color: var(--tinta); } html .jv-tabla tbody th small { color: var(--mut); font-size: 11px; }
+html .jv-tabla tr.sube th b { color: #8ef6d4; } html .jv-tabla tr.baja th b { color: #ffa3ab; }
+html .jv-tabla tr.ahora > * { background: rgba(124,200,255,.06); } html .jv-tabla tr.ahora th { background: #13233a; }
+html .jv-tabla tr.recien > * { background: rgba(111,242,200,.07); } html .jv-tabla tr.recien th { background: #12302c; } html .jv-tabla tr.recien td { text-align: left; color: var(--tinta-2); white-space: normal; }
+/* «Ver campaña»: el chat se va hacia la derecha y el Dashboard entra deslizándose */
+html .jv-panel.al-dash { opacity: 0 !important; transform: translateX(46%) scale(.94) !important; transition: opacity .3s ease, transform .34s cubic-bezier(.5,0,.75,0) !important; }
+html .jv-m.despega { transition: transform .3s cubic-bezier(.5,0,.75,0), opacity .3s; transform: translateX(30px) scale(.97); opacity: .6; }
+html.jv-transicion #main { animation: jv-main-entra .75s var(--suave) both; }
+@keyframes jv-main-entra { from { opacity: .3; transform: translateX(-36px); filter: blur(6px); } }
+@media (prefers-reduced-motion: reduce) { html.jv-transicion #main, html .jv-volver { animation: none; } }

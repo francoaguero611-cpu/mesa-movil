@@ -3522,11 +3522,11 @@ function cargarJarvis() {
   if (jvCarga) return jvCarga;
   const css = new Promise((ok) => {
     if ($('link[href^="jarvis.css"]')) return ok();
-    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "jarvis.css?v=6";
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "jarvis.css?v=7";
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "jarvis.js?v=6";
+    const sc = document.createElement("script"); sc.src = "jarvis.js?v=8";
     sc.onload = () => window.Jarvis ? ok() : mal(new Error("Jarvis no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar Jarvis. ¿Hay conexión?")); };
     document.head.appendChild(sc);
@@ -3545,6 +3545,16 @@ async function campanaJarvis(id) {
   const d = await dashPara("hoy");
   return (d?.campanas || []).find((c) => String(c.id) === String(id)) || null;
 }
+// (03/11, Lorenzo) «Ver campaña» desde Jarvis: al Dashboard, la campaña seleccionada y resaltada, sin pop-up. Si Meta todavía
+// devuelve el presupuesto viejo (cupo / caché), queda el que Jarvis acaba de poner.
+async function seleccionarCampanaJarvis(id, pres) {
+  const it = { n: "campana", id: String(id) };
+  await mostrarEnTabla(prepararEvento({ t: "surf", items: [it] }, [it]).then((r) => {
+    const c = pres != null ? campanaPorId(String(id)) : null;
+    if (c && c.tipo_presupuesto !== "ABO" && Math.abs((c.presupuesto || 0) - pres) > 0.5) c.presupuesto = pres;
+    return r;
+  }));
+}
 // (03/11, Lorenzo) Jarvis ya no es una sección: es el botón redondo de abajo a la derecha con el chat. Arranca al entrar.
 async function iniciarJarvis() {
   if (window.Jarvis?.__listo) return;
@@ -3558,6 +3568,7 @@ async function iniciarJarvis() {
     verCampana: (id) => abrirCampanaReloj(String(id)),
     verCampanas: (ids) => { const its = ids.map((id) => ({ n: "campana", id: String(id) })); mostrarEnTabla(prepararEvento({ t: "surf", items: its }, its)).then(() => abrirVariosReloj(ids.map(String))); },
     seccion: (sec) => irASeccion(sec),
+    seleccionar: seleccionarCampanaJarvis,
   });
 }
 
