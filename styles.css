@@ -1465,3 +1465,40 @@ html .dialogo.cmp-dlg { width: min(1180px, 100%); }
   .cmp-ctrl select.campo { max-width: 46vw; }
   .cmp-tabla-caja { max-height: 58dvh; }
 }
+/* (05/11, Lorenzo) Comparar días a pantalla completa + flechita para abrir + selección para apagar/prender */
+html .velo:has(.cmp-dlg) { padding: 12px; place-items: stretch; }
+html .dialogo.cmp-dlg { width: 100%; max-width: none; height: calc(100dvh - 24px); max-height: none; display: flex; flex-direction: column; overflow: hidden; padding: 18px 20px 14px; border-radius: 24px; }
+html .dialogo.cmp-dlg > .cmp { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+html .dialogo.cmp-dlg .cmp-tabla-caja { flex: 1 1 auto; min-height: 140px; max-height: none; }
+html .dialogo.cmp-dlg .cmp-nota { flex: 0 0 auto; }
+.cmp-det-caja { max-width: calc(100vw - 80px); }
+.cmp-tabla .cmp-nom { min-width: 280px; max-width: 420px; }
+.cmp-nom-in { display: flex; align-items: center; gap: 8px; }
+.cmp-txt { min-width: 0; }
+.cmp-tg { flex: 0 0 auto; display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; border-radius: 9px; border: 1px solid var(--g-borde); background: rgba(124,200,255,.06); color: var(--tinta-2); cursor: pointer; transition: transform .18s ease, background .15s ease; }
+.cmp-tg svg { transform: rotate(-90deg); transition: transform .18s ease; }
+.cmp-tg[aria-expanded="true"] svg { transform: none; }
+.cmp-tg:hover, .cmp-tg[aria-expanded="true"] { background: rgba(124,200,255,.16); color: var(--tinta); }
+.cmp-tg:focus-visible { outline: 2px solid var(--foco); outline-offset: 1px; }
+.cmp-chk { flex: 0 0 auto; width: 18px; height: 18px; border-radius: 6px; border: 1.5px solid var(--g-borde-luz, rgba(200,225,255,.35)); display: inline-grid; place-items: center; }
+.cmp-fila.sel .cmp-chk { background: var(--celeste, #7cc8ff); border-color: var(--celeste, #7cc8ff); }
+.cmp-fila.sel .cmp-chk::after { content: ""; width: 9px; height: 5px; border: solid #06121e; border-width: 0 0 2.2px 2.2px; transform: translateY(-1px) rotate(-45deg); }
+.cmp-fila.sel td, .cmp-fila.sel th { background-color: rgba(124,200,255,.10); }
+.cmp-fila.sel th.cmp-nom { background: #10233a; box-shadow: inset 3px 0 0 var(--celeste, #7cc8ff); }
+.cmp-sinv { white-space: nowrap; }
+.cmp-barra { flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 10px; padding: 10px 12px; border-radius: 18px; border: 1px solid var(--g-borde-luz, rgba(200,225,255,.3)); background: rgba(18,34,54,.92); box-shadow: var(--g-sombra); }
+.cmp-barra .sp { flex: 1 1 auto; }
+.cmp-b-tx { display: flex; flex-direction: column; line-height: 1.25; }
+.cmp-b-tx small { color: var(--mut); font-size: 12px; }
+@media (max-width: 760px) {
+  html .velo:has(.cmp-dlg) { padding: 0; }
+  html .dialogo.cmp-dlg { height: 100dvh; border-radius: 0; padding: 12px 12px calc(10px + env(safe-area-inset-bottom)); }
+  html .dialogo.cmp-dlg::before { display: none; }
+  .cmp-tabla .cmp-nom { min-width: 190px; max-width: 220px; }
+  .cmp-nom-in { gap: 6px; }
+  .cmp-barra .btn { flex: 1 1 auto; min-height: 42px; }
+  .cmp-det-caja { max-width: calc(100vw - 30px); }
+}
+html .dialogo.cmp-dlg .cmp-tabla .cmp-nom { width: 30%; min-width: 260px; max-width: none; }
+html .dialogo.cmp-dlg .cmp-barra { padding-right: 64px; }
+@media (max-width: 760px) { html .dialogo.cmp-dlg .cmp-tabla .cmp-nom { width: auto; min-width: 190px; max-width: 220px; } html .dialogo.cmp-dlg .cmp-barra { padding-right: 12px; margin-bottom: 56px; } }

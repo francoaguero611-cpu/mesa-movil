@@ -3258,7 +3258,7 @@ async function seleccionarMalos() {
 // ganancia de Codicia). Cada día es el «dash» de ese día (hoy / ayer / r:d:d); el Total suma los días elegidos.
 const CMP_METS = [["gasto", "Gasto"], ["ventas", "Ventas"], ["roas", "ROAS"], ["ganancia", "Ganancia"], ["cpm", "CPM"]];
 const CMP_DSEM = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-const CMP = { crit: ls.get("cmp_crit", "") === "real" ? "real" : "dash", met: "roas", dias: null, soloMalas: true, grupo: "todas", cuenta: "", abierta: null, gastoMin: 15, st: "", umbral: (() => { const n = parseFloat(ls.get("cmp_umbral", "")); return n > 0 ? n : 1.3; })() };
+const CMP = { crit: ls.get("cmp_crit", "") === "real" ? "real" : "dash", met: "roas", dias: null, soloMalas: true, grupo: "todas", cuenta: "", abierta: null, sel: new Set(), conf: null, enviando: false, gastoMin: 15, st: "", umbral: (() => { const n = parseFloat(ls.get("cmp_umbral", "")); return n > 0 ? n : 1.3; })() };
 const isoMenos = (iso, n) => new Date(Date.parse(iso + "T12:00:00Z") - n * 86400e3).toISOString().slice(0, 10);
 const cmpPer = (iso) => { const h = isoAR(new Date()); return iso === h ? "hoy" : iso === isoMenos(h, 1) ? "ayer" : `r:${iso}:${iso}`; };
 const cmpDiaTx = (iso) => `${CMP_DSEM[new Date(iso + "T12:00:00Z").getUTCDay()]} ${dm(iso)}`;
@@ -3297,6 +3297,9 @@ function cmpCelda(x, m) {
   if (!x || !(x.gasto > 0)) return `<td class="cmp-vacia">—</td>`;
   const poco = x.gasto < CMP.gastoMin ? " cmp-poco" : "";
   const roas = x.roas ?? (x.gasto ? (x.facturacion || 0) / x.gasto : null);
+  // (05/11) ROAS 0 = gastó y no vendió nada (ni el pixel ni Impultienda): se dice así en vez de «0,00».
+  const sinV = !(+x.ventas > 0) && !(+x.facturacion > 0);
+  if (m === "roas" && sinV) return `<td class="num${poco}" title="Gastó US$ ${NF2.format(+x.gasto || 0)} y no tuvo ninguna venta ese día (ni en el pixel de Meta ni en Impultienda)"><span class="roas rojo num cmp-sinv">0 · sin ventas</span></td>`;
   const v = m === "roas" ? `<span class="roas ${roas < CMP.umbral ? "rojo" : colorRoas(roas)} num">${roasTx(roas)}</span>`
     : m === "ganancia" ? `<span class="${signo(x.ganancia)}">${usdG(x.ganancia)}</span>`
     : m === "ventas" ? entN(x.ventas)
@@ -3307,8 +3310,8 @@ function cmpCelda(x, m) {
 async function compararDias() {
   const h = isoAR(new Date());
   if (!CMP.dias) CMP.dias = [isoMenos(h, 2), isoMenos(h, 1), h];
-  CMP.grupo = S.grupoClave || "todas"; CMP.cuenta = S.cuenta || ""; CMP.abierta = null;
-  abrirModal(`<div class="cmp" id="cmp"></div>`, { ancho: true });
+  CMP.grupo = S.grupoClave || "todas"; CMP.cuenta = S.cuenta || ""; CMP.abierta = null; CMP.sel = new Set(); CMP.conf = null;
+  abrirModal(`<div class="cmp" id="cmp"></div>`, { ancho: true, bloqueado: () => CMP.enviando });
   modalActual.dlg.classList.add("cmp-dlg");
   pintarCmp(); cargarCmp();
 }
@@ -3341,10 +3344,31 @@ function pintarCmp() {
       </tbody></table>
       <div class="cmp-det-pie"><span class="mut">${esc(f.cuenta || "")}${prendido(f.estado) ? "" : " · apagada"}</span><button type="button" class="btn chico" data-cmp-ver="${esc(f.id)}">Ver en el Dashboard</button></div>
     </div></td></tr>`;
-  const filas = fs.map((f) => `<tr class="cmp-fila${f.mala ? " mala" : ""}${CMP.abierta === f.id ? " abierta" : ""}" data-cmp-id="${esc(f.id)}" tabindex="0" aria-expanded="${CMP.abierta === f.id}">
-      <th scope="row" class="cmp-nom"><span class="cmp-n">${esc(f.nombre)}</span><span class="cmp-c">${esc(f.cuenta || "")}</span></th>
-      ${cols.map((k) => cmpCelda(k === "tot" ? f.tot : f.d[k], CMP.met)).join("")}</tr>${CMP.abierta === f.id ? det(f) : ""}`).join("");
+  // (05/11, Lorenzo) flechita a la izquierda = abrir el detalle; tocar la fila = seleccionar (para apagar/prender desde acá).
+  for (const id of [...CMP.sel]) if (!todas.some((f) => f.id === id)) CMP.sel.delete(id);
+  const filas = fs.map((f) => { const ab = CMP.abierta === f.id, se = CMP.sel.has(f.id); return `<tr class="cmp-fila${f.mala ? " mala" : ""}${ab ? " abierta" : ""}${se ? " sel" : ""}" data-cmp-id="${esc(f.id)}" tabindex="0" aria-selected="${se}">
+      <th scope="row" class="cmp-nom"><div class="cmp-nom-in">
+        <button type="button" class="cmp-tg" data-cmp-tg="${esc(f.id)}" aria-expanded="${ab}" aria-label="${ab ? "Cerrar" : "Ver"} el detalle de ${esc(f.nombre)}"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <span class="cmp-chk" aria-hidden="true"></span>
+        <span class="cmp-txt"><span class="cmp-n">${dotEstado(f.estado)} ${esc(f.nombre)}</span><span class="cmp-c">${esc(f.cuenta || "")}${prendido(f.estado) ? "" : " · apagada"}</span></span>
+      </div></th>
+      ${cols.map((k) => cmpCelda(k === "tot" ? f.tot : f.d[k], CMP.met)).join("")}</tr>${ab ? det(f) : ""}`; }).join("");
   const cargando = CMP.dias.some((iso) => !S.datos[cmpPer(iso)]);
+  const caja0 = $(".cmp-tabla-caja", raiz), scr = caja0 ? [caja0.scrollTop, caja0.scrollLeft] : null;
+  const selF = todas.filter((f) => CMP.sel.has(f.id));
+  const nOn = selF.filter((f) => prendido(f.estado)).length;
+  const barraSel = !selF.length ? "" : `<div class="cmp-barra" role="region" aria-label="Campañas seleccionadas">
+      ${CMP.conf ? `<span class="cmp-b-tx"><b>¿${CMP.conf === "PAUSED" ? "Apagar" : "Prender"} ${plural(selF.length, "campana")} en Meta?</b>${dryOn() || DEMO ? " <small>(modo prueba: Meta no se toca)</small>" : ""}</span>
+        <span class="sp"></span><button type="button" class="btn chico" id="cmp-b-no"${CMP.enviando ? " disabled" : ""}>Cancelar</button>
+        <button type="button" class="btn chico ${CMP.conf === "PAUSED" ? "peligro" : "pri"}${CMP.enviando ? " cargando" : ""}" id="cmp-b-si" data-foco${CMP.enviando ? " disabled" : ""}>${CMP.enviando ? `<span class="gira">↻</span> ${CMP.conf === "PAUSED" ? "Apagando" : "Prendiendo"}…` : CMP.conf === "PAUSED" ? "Sí, apagar" : "Sí, prender"}</button>`
+      : `<span class="cmp-b-tx"><b>${selF.length} seleccionada${selF.length === 1 ? "" : "s"}</b><small>${nOn} prendida${nOn === 1 ? "" : "s"} · ${selF.length - nOn} apagada${selF.length - nOn === 1 ? "" : "s"}</small></span>
+        <button type="button" class="btn chico" id="cmp-b-limpiar">limpiar</button>
+        <button type="button" class="btn chico" id="cmp-b-todas" title="Seleccionar todas las que se ven">todas (${fs.length})</button>
+        <span class="sp"></span>
+        <button type="button" class="btn chico" id="cmp-b-tablero" title="Cerrar y verlas tildadas en el Dashboard (presupuesto, escala, etc.)">Ver en el tablero</button>
+        ${nOn < selF.length ? `<button type="button" class="btn chico" id="cmp-b-on">Prender</button>` : ""}
+        ${nOn ? `<button type="button" class="btn chico peligro" id="cmp-b-off">Apagar${nOn < selF.length ? ` (${nOn})` : ""}</button>` : ""}`}
+    </div>`;
   raiz.innerHTML = `
     <div class="cmp-cab"><h2>Comparar días</h2><button type="button" class="btn chico" id="cmp-x" aria-label="Cerrar">✕</button></div>
     <div class="cmp-dias" role="group" aria-label="Días">${ult7.map((iso) => `<button type="button" class="btn chico" data-cmp-dia="${iso}" aria-pressed="${CMP.dias.includes(iso)}">${esc(cmpDiaTx(iso))}${iso === h ? "*" : ""}</button>`).join("")}</div>
@@ -3360,8 +3384,44 @@ function pintarCmp() {
     ${CMP.st ? `<div class="bh-cargando"><span class="cargador"></span>${esc(CMP.st)}</div>` : ""}
     ${cargando && !fs.length ? "" : fs.length ? `<div class="cmp-tabla-caja"><table class="cmp-tabla num"><thead><tr><th scope="col" class="cmp-nom">Campaña <small>(${fs.length})</small></th>${th}</tr></thead><tbody>${filas}</tbody></table></div>`
       : `<p class="mut cmp-nada">${CMP.soloMalas ? `Ninguna campaña con ROAS menor a ${roasTx(CMP.umbral)} en estos días.` : "No hay campañas con gasto en estos días."}</p>`}
-    <p class="mut cmp-nota">${CMP.crit === "real" ? "Solo las ventas que registró Impultienda (con bumps y post-venta), sin el pixel de Meta." : "Mismos números que el Dashboard (ventas reales con bumps y post-venta)."} Mala = ROAS menor a ${roasTx(CMP.umbral)} un día con US$ ${CMP.gastoMin} o más de gasto, o en el total. Las celdas claritas gastaron menos de US$ ${CMP.gastoMin}.${CMP.dias.includes(h) ? " * Hoy todavía está en curso." : ""} Tocá una campaña para ver todo.</p>`;
+    <p class="mut cmp-nota">${CMP.crit === "real" ? "Solo las ventas que registró Impultienda (con bumps y post-venta), sin el pixel de Meta." : "Mismos números que el Dashboard (ventas reales con bumps y post-venta)."} Mala = ROAS menor a ${roasTx(CMP.umbral)} un día con US$ ${CMP.gastoMin} o más de gasto, o en el total. Las celdas claritas gastaron menos de US$ ${CMP.gastoMin}.${CMP.dias.includes(h) ? " * Hoy todavía está en curso." : ""} «0 · sin ventas» = gastó y no tuvo ninguna venta ese día. La flechita abre el detalle; tocá la fila para seleccionarla.</p>
+    ${barraSel}`;
+  if (scr) { const c = $(".cmp-tabla-caja", raiz); if (c) { c.scrollTop = scr[0]; c.scrollLeft = scr[1]; } }
   $("#cmp-x", raiz).onclick = () => modalActual?.cerrar();
+  // --- selección y apagar/prender desde el modal ---
+  const itemsSel = (soloEst) => selF.filter((f) => soloEst === "PAUSED" ? !["PAUSED", "ARCHIVED", "DELETED"].includes(f.estado) : soloEst === "ACTIVE" ? !prendido(f.estado) : true)
+    .map((f) => ({ id: f.id, act: f.act, nivel: "campana", nombre: f.nombre, estado: f.estado }));
+  const bq = (id) => $(id, raiz);
+  if (bq("#cmp-b-limpiar")) bq("#cmp-b-limpiar").onclick = () => { CMP.sel.clear(); pintarCmp(); };
+  if (bq("#cmp-b-todas")) bq("#cmp-b-todas").onclick = () => { fs.forEach((f) => CMP.sel.add(f.id)); pintarCmp(); };
+  if (bq("#cmp-b-off")) bq("#cmp-b-off").onclick = () => { CMP.conf = "PAUSED"; pintarCmp(); bq("#cmp-b-si")?.focus(); };
+  if (bq("#cmp-b-on")) bq("#cmp-b-on").onclick = () => { CMP.conf = "ACTIVE"; pintarCmp(); bq("#cmp-b-si")?.focus(); };
+  if (bq("#cmp-b-no")) bq("#cmp-b-no").onclick = () => { CMP.conf = null; pintarCmp(); };
+  if (bq("#cmp-b-si")) bq("#cmp-b-si").onclick = async () => {
+    if (CMP.enviando) return;
+    const est = CMP.conf, its = itemsSel(est); if (!its.length) { CMP.conf = null; return pintarCmp(); }
+    CMP.enviando = true; pintarCmp();
+    const previa = new Map(S.sel); // aplicarEstado limpia la selección del tablero: se la devuelvo
+    try { await aplicarEstado(est, its); }
+    finally {
+      for (const [k, v] of previa) if (!S.sel.has(k)) S.sel.set(k, v);
+      pintarBarra();
+      CMP.enviando = false; CMP.conf = null;
+      for (const it of its) { const e = S.datos[cmpPer(CMP.dias[CMP.dias.length - 1])]?.campanas?.find((c) => c.id === it.id)?.estado; if (e === est) CMP.sel.delete(it.id); }
+      pintarCmp();
+    }
+  };
+  if (bq("#cmp-b-tablero")) bq("#cmp-b-tablero").onclick = () => {
+    const its = selF.slice(); modalActual?.cerrar();
+    if (!irAlDash()) return;
+    S.grupoClave = "todas"; ajustarIdx(); S.cuenta = ""; ls.set("dash_cuenta", ""); S.buscar = ""; const i = $("#f-buscar"); if (i) i.value = "";
+    S.sel.clear();
+    for (const f of its) { const c = campanaPorId(f.id) || f; S.sel.set("campana:" + f.id, { id: f.id, act: c.act || f.act, nivel: "campana", nombre: c.nombre || f.nombre, estado: c.estado || f.estado, camp: undefined, cj: undefined }); }
+    S.soloSel = true;
+    pintarTodo(); pintarSoloSel(); pintarBarra();
+    const fuera = its.filter((f) => !campanaPorId(f.id)).length;
+    toast(`${its.length} campaña${its.length === 1 ? "" : "s"} tildada${its.length === 1 ? "" : "s"} en el tablero.${fuera ? ` ${fuera} no gastó en el período que estás mirando: cambiá el período para verla.` : ""} Usá la barra de abajo.`, "ok", 6000);
+  };
   $$("[data-cmp-dia]", raiz).forEach((b) => b.onclick = () => {
     const iso = b.dataset.cmpDia, s = new Set(CMP.dias);
     if (s.has(iso)) { if (s.size === 1) return; s.delete(iso); } else s.add(iso);
@@ -3374,8 +3434,17 @@ function pintarCmp() {
   $("#cmp-malas", raiz).onclick = () => { CMP.soloMalas = !CMP.soloMalas; pintarCmp(); };
   $("#cmp-umb", raiz).onchange = (e) => { const n = parseFloat(e.target.value); if (n > 0) { CMP.umbral = n; ls.set("cmp_umbral", String(n)); } pintarCmp(); };
   $("#cmp-act", raiz).onclick = () => cargarCmp(true);
-  const abrir = (tr) => { const id = tr.dataset.cmpId; CMP.abierta = CMP.abierta === id ? null : id; pintarCmp(); $(`[data-cmp-id="${CSS.escape(id)}"]`, raiz)?.focus({ preventScroll: true }); };
-  $$("[data-cmp-id]", raiz).forEach((tr) => { tr.onclick = () => abrir(tr); tr.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); abrir(tr); } }; });
+  const abrir = (id) => { CMP.abierta = CMP.abierta === id ? null : id; pintarCmp(); $(`[data-cmp-tg="${CSS.escape(id)}"]`, raiz)?.focus({ preventScroll: true }); };
+  const tildar = (id) => { if (CMP.enviando) return; CMP.sel.has(id) ? CMP.sel.delete(id) : CMP.sel.add(id); CMP.conf = null; pintarCmp(); $(`[data-cmp-id="${CSS.escape(id)}"]`, raiz)?.focus({ preventScroll: true }); };
+  $$("[data-cmp-tg]", raiz).forEach((b) => b.onclick = (e) => { e.stopPropagation(); abrir(b.dataset.cmpTg); });
+  $$("[data-cmp-id]", raiz).forEach((tr) => {
+    tr.onclick = (e) => { if (e.target.closest("button, a")) return; if (String(window.getSelection?.() || "").length > 2) return; tildar(tr.dataset.cmpId); };
+    tr.onkeydown = (e) => {
+      if (e.target !== tr) return;
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tildar(tr.dataset.cmpId); }
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") { const ab = CMP.abierta === tr.dataset.cmpId; if (ab !== (e.key === "ArrowRight")) { e.preventDefault(); abrir(tr.dataset.cmpId); $(`[data-cmp-id="${CSS.escape(tr.dataset.cmpId)}"]`, raiz)?.focus({ preventScroll: true }); } }
+    };
+  });
   $$("[data-cmp-ver]", raiz).forEach((b) => b.onclick = (e) => {
     e.stopPropagation();
     const f = todas.find((x) => x.id === b.dataset.cmpVer); if (!f) return;
