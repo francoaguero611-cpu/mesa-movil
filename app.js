@@ -548,7 +548,14 @@ async function cargarAcciones(forzar = false) {
   pintarAccBarra(); pintarTabla();
   let visto = null; try { visto = sessionStorage.getItem("dash_acc_visto"); } catch {}
   const n = (ACC.data?.acciones || []).length;
-  if (n && !visto && S.vista === "dash" && !eventoAbierto && !modalActual) { try { sessionStorage.setItem("dash_acc_visto", "1"); } catch {} abrirAcciones(); }
+  if (n && !visto && S.vista === "dash" && !eventoAbierto && !modalActual) {
+    try { sessionStorage.setItem("dash_acc_visto", "1"); } catch {}
+    // (06/11, Lorenzo) un solo pop-up al entrar: las acciones van como un renglón del pop-up de avisos (botón «Ver acciones»)
+    const urg = (ACC.data?.acciones || []).filter((a) => /matar|techo/.test(a.tipo)).length;
+    const item = { id: "acc:sesion", tipo: urg ? "error" : "info", titulo: `${n} acci${n === 1 ? "ón" : "ones"} a realizar${urg ? ` (${urg} urgente${urg === 1 ? "" : "s"})` : ""}`, texto: "Sugerencias del manual de la CBO. Nada se aplica solo.", accion: { tipo: "fn", t: "Ver acciones", fn: abrirAcciones } };
+    const alPop = (k = 0) => window.AvisosPop ? window.AvisosPop.sumar([item]) : k < 40 ? setTimeout(() => alPop(k + 1), 150) : abrirAcciones();
+    alPop();
+  }
 }
 // (24/10 b, Lorenzo) lo que se hace afuera (Ads Manager) también saca la acción: el servidor lee estado, presupuesto y cambios de hoy
 // en vivo (caché 5 min); acá se vuelve a pedir cada 5 min y al volver a la app.
@@ -842,12 +849,19 @@ function avisarPagosNuevos() {
   ls.set("dash_pagos_vistos", JSON.stringify(Object.fromEntries(xs.map((c) => [c.act, c.estado]))));
   // la primera vez solo avisa lo de las últimas 24 h (no lo viejo)
   const mostrar = primera ? nuevas.filter((c) => c.desde && Date.now() - Date.parse(c.desde) < 864e5) : nuevas;
-  if (mostrar.length && !eventoAbierto && !modalActual) mostrarPagos(mostrar);
+  if (!mostrar.length) return;
+  // (06/11, Lorenzo) va al MISMO pop-up que los demás avisos (uno solo al entrar), no a una ventana aparte
+  const alPop = (xs, n = 0) => window.AvisosPop ? window.AvisosPop.sumar(xs) : n < 40 ? setTimeout(() => alPop(xs, n + 1), 150) : (!eventoAbierto && !modalActual && mostrarPagos(mostrar));
+  return alPop(mostrar.map((c) => ({ id: `pago:${c.act}:${c.estado}`, tipo: "saldo", titulo: `Pago rechazado: ${c.nombre}`,
+    texto: `${c.estado === 9 ? "Período de gracia, todavía gasta" : "Anuncios frenados"} · debe ${String(c.moneda || "USD").toUpperCase() === "USD" ? `US$ ${NF2.format(c.deuda)}` : `${NF2.format(c.deuda)} ${c.moneda}`}${c.portafolio ? ` · ${c.portafolio}` : ""}`,
+    accion: c.link ? { tipo: "link", u: c.link, t: "Pagar" } : null })));
 }
 // push «💳 Pago rechazado» (cuentas-umbral → ev.sec = "pagos", ev.pg = [{a, n, p, e, d, m, t, s, l}])
 function mostrarEventoPagos(ev) {
   const xs = (ev.pg || []).map((x) => ({ act: x.a, nombre: x.n, portafolio: x.p, estado: x.e, estado_txt: x.e === 9 ? "Período de gracia: todavía gasta" : "Pago necesario: anuncios frenados", deuda: x.d, moneda: x.m, tarjeta: x.t, desde: x.s, link: x.l }));
   try { const v = JSON.parse(ls.get("dash_pagos_vistos") || "{}"); for (const c of xs) v[c.act] = c.estado; ls.set("dash_pagos_vistos", JSON.stringify(v)); } catch {}
+  if (window.AvisosPop) return window.AvisosPop.sumar(xs.map((c) => ({ id: `pago:${c.act}:${c.estado}`, tipo: "saldo", titulo: `Pago rechazado: ${c.nombre}`,
+    texto: `${c.estado_txt} · debe ${plataPago(c.deuda, c.moneda).replace(/&amp;/g, "&")}${c.portafolio ? ` · ${c.portafolio}` : ""}`, accion: c.link ? { tipo: "link", u: c.link, t: "Pagar" } : null }))); // (06/11) mismo pop-up único
   mostrarPagos(xs, ev.titulo);
 }
 let umbResize = null;

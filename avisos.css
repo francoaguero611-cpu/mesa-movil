@@ -39,3 +39,15 @@
 @keyframes av-fade { from { opacity: 0; } }
 @keyframes av-sube { from { transform: translateY(14px) scale(.98); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .av-btn.hay svg, .av-pop, .av-pop-fondo { animation: none; } }
+/* (06/11) un solo pop-up con todos los avisos juntos */
+.av-pop.multi { width: min(480px, 100%); text-align: left; max-height: calc(100dvh - 32px); display: flex; flex-direction: column; }
+.av-pop.multi .av-pop-ico, .av-pop.multi h3 { text-align: center; }
+.av-pop-lista { list-style: none; margin: 10px 0 0; padding: 0; overflow-y: auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+.av-pop-lista li { display: flex; gap: 10px; align-items: flex-start; background: #161a1f; border: 1px solid #262b33; border-radius: 12px; padding: 10px 12px; }
+.av-pop-lista li.t-saldo, .av-pop-lista li.t-error { border-color: rgba(255,92,92,.55); }
+.av-pop-lista li b { display: block; font-size: 13.5px; line-height: 1.35; }
+.av-pop-lista li span:not(.av-ico):not(.av-pop-n) { display: block; color: #a7b0ba; font-size: 12.5px; line-height: 1.45; margin-top: 2px; }
+.av-pop-lista .av-acc .av-b { padding: 6px 10px; font-size: 12.5px; }
+.av-pop-n { display: inline-block; font-size: 11.5px; font-weight: 700; color: #07080a; background: #ff9f43; border-radius: 99px; padding: 1px 7px; margin-left: 4px; vertical-align: 1px; }
+.av-pop .av-b.cerrar { background: #e6e8eb; color: #07080a; border-color: #e6e8eb; min-width: 140px; }
+.av-pop.multi .av-pop-acc { flex-shrink: 0; }

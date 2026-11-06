@@ -10,7 +10,7 @@ const $ = (s, r = document) => r.querySelector(s);
 const escA = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const lsA = { get(k, d = null) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
 const ICO = { listo: "✅", correccion: "✎", oferta: "🎉", error: "⚠", saldo: "💳", campana: "🚀", pausa: "⏸", info: "•" };
-const A = { lista: [], ult: 0, yo: null, abierto: false, timer: null, vistos: new Set(JSON.parse(lsA.get("av_popup_vistos", "[]") || "[]")), cola: [] };
+const A = { lista: [], ult: 0, yo: null, abierto: false, timer: null, pop: [], vistos: new Set(JSON.parse(lsA.get("av_popup_vistos", "[]") || "[]")), cola: [] };
 const demo = new URLSearchParams(location.search).get("demo") === "1";
 
 async function ws(accion, q = "", body = null) {
@@ -80,6 +80,7 @@ function botonAccion(a) {
   const x = a.accion || {};
   if (x.tipo === "link") return `<button type="button" class="av-b" data-av="ir">${escA(x.t || "Abrir")} ↗</button>`;
   if (x.tipo === "prender") return `<button type="button" class="av-b ok" data-av="prender">▶ Prender campaña</button>`;
+  if (x.tipo === "fn") return `<button type="button" class="av-b" data-av="fn">${escA(x.t || "Ver")}</button>`; // (06/11) lo arma el Dashboard (p. ej. «Ver acciones»)
   if (x.tipo === "abrir") return ""; // (03/11) el Workspace salió del menú: sin «Ver en Workspace»
   return "";
 }
@@ -88,7 +89,8 @@ function botonAccion(a) {
 async function leer(ids) {
   for (const a of A.lista) if (!ids || ids.includes(a.id)) a.leida = true;
   pintarBoton(); if (A.abierto) pintarLista();
-  if (!demo) ws("avisos_leer", "", ids ? { ids } : {}).catch(() => {});
+  const nums = ids && ids.filter((x) => typeof x === "number"); // los «pago:…» del Dashboard no son avisos del servidor
+  if (!demo && (!ids || nums.length)) ws("avisos_leer", "", ids ? { ids: nums } : {}).catch(() => {});
 }
 function verItem(id) {
   abrirPanel(false); cerrarPopup();
@@ -98,6 +100,7 @@ function verItem(id) {
 }
 async function ejecutar(a, btn) {
   const x = a.accion || {}, que = btn.dataset.av;
+  if (que === "fn") { cerrarPopup(); try { x.fn?.(); } catch {} return; }
   if (que === "ir") { window.open(x.u, "_blank", "noopener"); leer([a.id]); return; }
   if (que === "ver") { leer([a.id]); verItem(x.item || a.item_id); return; }
   if (que === "prender") {
@@ -110,33 +113,65 @@ async function ejecutar(a, btn) {
       if (!res?.ok) throw new Error(res?.error || "Meta no la prendió");
       if (x.item) ws("taller_meta", "", { id: x.item, meta: { estado: r.dry ? "PAUSED" : "ACTIVE" }, log: r.dry ? "Prender (simulado: modo prueba activo)" : "▶ Campaña prendida desde el aviso" }).catch(() => {});
       typeof toast === "function" && toast(r.dry ? "Modo prueba: no se prendió de verdad." : "Campaña prendida ▶");
-      leer([a.id]); cerrarPopup();
+      leer([a.id]); sacarDelPop(a);
     } catch (e) { btn.disabled = false; btn.dataset.seguro = ""; btn.textContent = "▶ Prender campaña"; typeof toast === "function" && toast(`No se pudo prender: ${e.message}`, "error", 8000); }
   }
 }
 
 // ---------- pop-up en el medio ----------
+// (06/11, Lorenzo) UN SOLO pop-up: todo lo pendiente se junta en una lista (los repetidos van con «×N»). Si llega otro aviso
+// con el pop-up abierto, se suma a esa misma lista. «Cerrar» (o tocar afuera / Esc) cierra todo de una.
 function siguientePopup() {
-  if ($("#av-pop")) return;
-  const a = A.cola.shift(); if (!a) return;
-  A.vistos.add(a.id); lsA.set("av_popup_vistos", JSON.stringify([...A.vistos].slice(-200)));
-  document.body.insertAdjacentHTML("beforeend", `<div class="av-pop-fondo" id="av-pop"><div class="av-pop t-${escA(a.tipo)}" role="alertdialog" aria-modal="true" aria-labelledby="av-pop-t" data-id="${a.id}">
-    <div class="av-pop-ico">${ICO[a.tipo] || "•"}</div>
-    <h3 id="av-pop-t">${escA(a.titulo)}</h3>${a.texto ? `<p>${escA(a.texto)}</p>` : ""}
-    <div class="av-pop-acc">${botonAccion(a)}<button type="button" class="av-b tenue" data-av="cerrar">Después</button></div></div></div>`);
-  const f = $("#av-pop");
-  f.onclick = (e) => {
-    if (e.target === f) return cerrarPopup(a);
-    const b = e.target.closest("[data-av]"); if (!b) return;
-    if (b.dataset.av === "cerrar") return cerrarPopup(a);
-    ejecutar(a, b).then?.(() => {});
-  };
-  setTimeout(() => $(".av-pop .av-b", f)?.focus(), 30);
+  const vistos = new Set((A.pop || []).map((x) => x.id));
+  const nuevos = A.cola.splice(0).filter((a) => !vistos.has(a.id) && (vistos.add(a.id), true)); // sin repetir el mismo id
+  if (!nuevos.length) return;
+  for (const a of nuevos) A.vistos.add(a.id);
+  lsA.set("av_popup_vistos", JSON.stringify([...A.vistos].slice(-200)));
+  A.pop = [...(A.pop || []), ...nuevos];
+  pintarPopup();
 }
-function cerrarPopup(a) {
+function gruposPop() {
+  const m = new Map();
+  for (const a of (A.pop || []).slice().reverse()) { // el más nuevo primero
+    const k = `${a.tipo}|${a.titulo}|${a.texto || ""}`;
+    const g = m.get(k); if (g) g.n++; else m.set(k, { a, n: 1 });
+  }
+  return [...m.values()];
+}
+function pintarPopup() {
+  const gs = gruposPop(); if (!gs.length) return cerrarPopup();
+  const grave = gs.some((g) => g.a.tipo === "saldo" || g.a.tipo === "error");
+  const tipo = grave ? "saldo" : gs[0].a.tipo;
+  const uno = gs.length === 1;
+  const cab = uno ? `<div class="av-pop-ico">${ICO[gs[0].a.tipo] || "•"}</div><h3 id="av-pop-t">${escA(gs[0].a.titulo)}${gs[0].n > 1 ? ` <span class="av-pop-n">×${gs[0].n}</span>` : ""}</h3>${gs[0].a.texto ? `<p>${escA(gs[0].a.texto)}</p>` : ""}`
+    : `<div class="av-pop-ico">${grave ? "💳" : "•"}</div><h3 id="av-pop-t">${gs.length} avisos</h3>
+       <ul class="av-pop-lista">${gs.map((g) => `<li class="t-${escA(g.a.tipo)}" data-id="${g.a.id}"><span class="av-ico">${ICO[g.a.tipo] || "•"}</span><div><b>${escA(g.a.titulo)}${g.n > 1 ? ` <span class="av-pop-n">×${g.n}</span>` : ""}</b>${g.a.texto ? `<span>${escA(g.a.texto)}</span>` : ""}${g.a.accion && botonAccion(g.a) ? `<div class="av-acc">${botonAccion(g.a)}</div>` : ""}</div></li>`).join("")}</ul>`;
+  const html = `<div class="av-pop t-${escA(tipo)}${uno ? "" : " multi"}" role="alertdialog" aria-modal="true" aria-labelledby="av-pop-t" data-id="${gs[0].a.id}">${cab}
+    <div class="av-pop-acc">${uno ? botonAccion(gs[0].a) : ""}<button type="button" class="av-b ${uno && botonAccion(gs[0].a) ? "tenue" : "cerrar"}" data-av="cerrar">Cerrar</button></div></div>`;
+  let f = $("#av-pop");
+  if (f) f.innerHTML = html;
+  else { document.body.insertAdjacentHTML("beforeend", `<div class="av-pop-fondo" id="av-pop">${html}</div>`); f = $("#av-pop"); setTimeout(() => $(".av-pop [data-av='cerrar']", f)?.focus(), 30); }
+  f.onclick = (e) => {
+    if (e.target === f) return cerrarPopup();
+    const b = e.target.closest("[data-av]"); if (!b) return;
+    if (b.dataset.av === "cerrar") return cerrarPopup();
+    const id = Number(b.closest("[data-id]")?.dataset.id);
+    const a = (A.pop || []).find((x) => x.id === id) || gs[0].a;
+    ejecutar(a, b);
+  };
+}
+// (06/11) otros pop-ups de la app (pagos rechazados) entran a ESTE mismo: window.AvisosPop.sumar([{id, tipo, titulo, texto, accion}])
+window.AvisosPop = { sumar(xs) { const ya = new Set((A.pop || []).map((x) => x.id)); for (const x of xs || []) if (!ya.has(x.id)) A.cola.push(x); siguientePopup(); } };
+function sacarDelPop(a) { // resuelto uno (p. ej. campaña prendida): sale él y sus repetidos; si no queda nada, se cierra
+  const k = `${a.tipo}|${a.titulo}|${a.texto || ""}`;
+  A.pop = (A.pop || []).filter((x) => `${x.tipo}|${x.titulo}|${x.texto || ""}` !== k);
+  if (A.pop.length) pintarPopup(); else cerrarPopup();
+}
+function cerrarPopup() {
   $("#av-pop")?.remove();
-  if (a && a.tipo !== "saldo" && a.tipo !== "campana") leer([a.id]); // saldo y campaña quedan en la campanita hasta resolverlos
-  setTimeout(siguientePopup, 300);
+  const ids = (A.pop || []).filter((a) => a.tipo !== "saldo" && a.tipo !== "campana").map((a) => a.id); // saldo y campaña quedan en la campanita hasta resolverlos
+  A.pop = [];
+  if (ids.length) leer(ids);
 }
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("#av-pop")) cerrarPopup(); });
 
