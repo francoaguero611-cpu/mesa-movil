@@ -437,3 +437,6 @@ html body .mesa-fila1 .met { cursor: crosshair; }
 .ms-ether .hace { font: 400 11px var(--f-mono); color: var(--mut-2); padding-left: 10px; border-left: 1px solid var(--linea); }
 .ms-ether .hace:empty { display: none; }
 @media (max-width: 720px) { .ms-ether .hace { display: none; } }
+/* la flechita del menú no se ve encima de ventanas ni del chat */
+html body:has(.dialogo) .ms-plegar, html body:has(.av-pop) .ms-plegar { display: none; }
+.ms-plegar { z-index: 30 !important; }

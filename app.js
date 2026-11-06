@@ -3324,7 +3324,7 @@ async function seleccionarMalos() {
 // ganancia de Codicia). Cada día es el «dash» de ese día (hoy / ayer / r:d:d); el Total suma los días elegidos.
 const CMP_METS = [["gasto", "Gasto"], ["ventas", "Ventas"], ["roas", "ROAS"], ["ganancia", "Ganancia"], ["cpm", "CPM"]];
 const CMP_DSEM = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-const CMP = { crit: ls.get("cmp_crit", "") === "real" ? "real" : "dash", met: "roas", dias: null, soloMalas: true, grupo: "todas", cuenta: "", abierta: null, sel: new Set(), conf: null, enviando: false, gastoMin: 15, st: "", umbral: (() => { const n = parseFloat(ls.get("cmp_umbral", "")); return n > 0 ? n : 1.3; })() };
+const CMP = { archivadas: false, crit: ls.get("cmp_crit", "") === "real" ? "real" : "dash", met: "roas", dias: null, soloMalas: true, grupo: "todas", cuenta: "", abierta: null, sel: new Set(), conf: null, enviando: false, gastoMin: 15, st: "", umbral: (() => { const n = parseFloat(ls.get("cmp_umbral", "")); return n > 0 ? n : 1.3; })() };
 const isoMenos = (iso, n) => new Date(Date.parse(iso + "T12:00:00Z") - n * 86400e3).toISOString().slice(0, 10);
 const cmpPer = (iso) => { const h = isoAR(new Date()); return iso === h ? "hoy" : iso === isoMenos(h, 1) ? "ayer" : `r:${iso}:${iso}`; };
 const cmpDiaTx = (iso) => `${CMP_DSEM[new Date(iso + "T12:00:00Z").getUTCDay()]} ${dm(iso)}`;
@@ -3340,6 +3340,16 @@ function cmpReal(c) {
   const fr = +c.facturacion_real || 0, f = +c.facturacion || 0, g = +c.gasto || 0;
   const ratio = f ? ((+c.ganancia || 0) + g) / f : 0.9;
   return { ...c, ventas: +c.ventas_real || 0, facturacion: fr, roas: g ? fr / g : null, ganancia: fr * ratio - g };
+}
+function cmpArchivada(f) {
+  const c = campanaPorId(f.id), est = c?.estado ?? f.estado;
+  if (!prendido(est)) return true;
+  const d = UB.data; if (!d) return false;
+  if ((d.rechazadas || []).some((r) => r.act === f.act)) return true;          // pago rechazado (frenada o en gracia)
+  const al_dia = new Set((d.cuentas || []).map((x) => String(x.act).replace(/^act_/, "")));
+  // inhabilitada u otro estado que no es «activa»; solo si la lista de cuentas al día corresponde a estas campañas (si no, no se adivina)
+  const cruza = (S.datos[S.periodo]?.campanas || []).some((c) => al_dia.has(String(c.act).replace(/^act_/, "")));
+  return cruza && !al_dia.has(String(f.act).replace(/^act_/, ""));
 }
 function cmpFilas() {
   const por = new Map();
@@ -3380,6 +3390,8 @@ async function compararDias() {
   abrirModal(`<div class="cmp" id="cmp"></div>`, { ancho: true, bloqueado: () => CMP.enviando });
   modalActual.dlg.classList.add("cmp-dlg");
   pintarCmp(); cargarCmp();
+  if (!UB.data && !DEMO) apiUmb("ver").then((d) => { UB.data = d; UB.whop = d.whop; UB.ultVer = Date.now(); pintarCmp(); }).catch(() => {});
+  else if (DEMO && !UB.data) { UB.data = DEMO_UMB(); pintarCmp(); }
 }
 async function cargarCmp(forzar = false) {
   const falta = CMP.dias.map(cmpPer).filter((p) => forzar || !S.datos[p]);
@@ -3400,6 +3412,8 @@ function pintarCmp() {
   for (const iso of CMP.dias) for (const g of S.datos[cmpPer(iso)]?.grupos || []) if (g.clave !== "todas") gruposM.set(g.clave, g.etiqueta);
   const cuentasM = new Map(todas.map((f) => [f.act, f.cuenta || f.act]));
   let fs = todas.filter((f) => (CMP.grupo === "todas" || f.grupo === CMP.grupo) && (!CMP.cuenta || f.act === CMP.cuenta));
+  const nArch = fs.filter(cmpArchivada).length, nPrend = fs.length - nArch;
+  fs = fs.filter((f) => cmpArchivada(f) === CMP.archivadas);
   const nMalas = fs.filter((f) => f.mala).length;
   if (CMP.soloMalas) fs = fs.filter((f) => f.mala);
   const cols = [...CMP.dias, "tot"];
@@ -3442,6 +3456,7 @@ function pintarCmp() {
       <div class="periodos cmp-mets" role="group" aria-label="Métrica">${CMP_METS.map(([m, t]) => `<button type="button" class="btn chico" data-cmp-met="${m}" aria-pressed="${CMP.met === m}">${t}</button>`).join("")}</div>
       <select class="campo" id="cmp-grupo" aria-label="Oferta"><option value="todas">Todas las ofertas</option>${[...gruposM].map(([k, t]) => `<option value="${esc(k)}"${k === CMP.grupo ? " selected" : ""}>${esc(t)}</option>`).join("")}</select>
       <select class="campo" id="cmp-cuenta" aria-label="Cuenta"><option value="">Todas las cuentas</option>${[...cuentasM].sort((a, b) => a[1].localeCompare(b[1])).map(([k, t]) => `<option value="${esc(k)}"${k === CMP.cuenta ? " selected" : ""}>${esc(t)}</option>`).join("")}</select>
+      <div class="periodos cmp-arch" role="group" aria-label="Qué campañas">${[[false, `Prendidas (${nPrend})`], [true, `Archivadas (${nArch})`]].map(([k, t]) => `<button type="button" class="btn chico" data-cmp-arch="${k}" aria-pressed="${CMP.archivadas === k}" title="${k ? "Apagadas y las de cuentas con pago rechazado o inhabilitadas" : "Solo las prendidas en cuentas al día"}">${t}</button>`).join("")}</div>
       <button type="button" class="toggle-chico" role="switch" id="cmp-malas" aria-checked="${CMP.soloMalas}"><span class="mini" aria-hidden="true"></span>solo las malas (${nMalas})</button>
       <div class="periodos cmp-crit" role="group" aria-label="Ventas">${[["dash", "Como el Dashboard"], ["real", "Solo registradas"]].map(([k, t]) => `<button type="button" class="btn chico" data-cmp-crit="${k}" aria-pressed="${CMP.crit === k}" title="${k === "dash" ? "Por anuncio, el mayor entre lo que marca Meta y lo que registró Impultienda (igual que el Dashboard)" : "Solo las ventas que registró Impultienda para la campaña, sin el pixel de Meta"}">${t}</button>`).join("")}</div>
       <label class="cmp-umb">ROAS malo &lt; <input type="number" class="campo" id="cmp-umb" step="0.05" min="0.5" max="5" value="${CMP.umbral}"></label>
@@ -3498,6 +3513,7 @@ function pintarCmp() {
   $("#cmp-grupo", raiz).onchange = (e) => { CMP.grupo = e.target.value; pintarCmp(); };
   $("#cmp-cuenta", raiz).onchange = (e) => { CMP.cuenta = e.target.value; pintarCmp(); };
   $("#cmp-malas", raiz).onclick = () => { CMP.soloMalas = !CMP.soloMalas; pintarCmp(); };
+  $$("[data-cmp-arch]", raiz).forEach((b) => b.onclick = () => { CMP.archivadas = b.dataset.cmpArch === "true"; pintarCmp(); });
   $("#cmp-umb", raiz).onchange = (e) => { const n = parseFloat(e.target.value); if (n > 0) { CMP.umbral = n; ls.set("cmp_umbral", String(n)); } pintarCmp(); };
   $("#cmp-act", raiz).onclick = () => cargarCmp(true);
   const abrir = (id) => { CMP.abierta = CMP.abierta === id ? null : id; pintarCmp(); $(`[data-cmp-tg="${CSS.escape(id)}"]`, raiz)?.focus({ preventScroll: true }); };
