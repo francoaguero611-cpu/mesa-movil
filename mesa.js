@@ -159,13 +159,33 @@ document.addEventListener("mousedown", (e) => { if (e.shiftKey && e.target.close
 
 
 // ---------- (06/11 c) saldo EtherFi arriba (en lugar del de Whop) ----------
+let efSaldo = null, efHora = null, efPidiendo = false, efUlt = 0;
+async function leerEtherfi() {
+  if (efPidiendo || Date.now() - efUlt < 60e3 || typeof clave !== "function") return;
+  if (typeof DEMO !== "undefined" && DEMO) { efSaldo = 3407.17; efHora = new Date(); pintarEther(); return; }
+  if (!clave()) return;
+  efPidiendo = true; efUlt = Date.now();
+  try {
+    const r = await fetch("https://tppcpnfzcxxusdhrlmdx.supabase.co/functions/v1/etherfi-saldo", { headers: { "x-app-clave": clave() }, cache: "no-store" });
+    const j = await r.json(); if (r.ok && j && j.saldo != null) { efSaldo = j.saldo; efHora = new Date(j.leido_en || Date.now()); }
+  } catch { /* se reintenta en 1 min */ }
+  efPidiendo = false; pintarEther();
+}
+function pintarEther() {
+  const b = $(".ms-ether b"), h = $(".ms-ether .hace"); if (!b) return;
+  b.textContent = efSaldo == null ? "leyendo…" : "US$ " + efSaldo.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (h && efHora) { const m = Math.max(0, Math.round((Date.now() - efHora) / 60e3)); h.textContent = m < 1 ? "recién" : `hace ${m} min`; }
+}
 function etherfi() {
-  const arriba = $(".acciones-top"); if (!arriba || $(".ms-ether", arriba)) return;
-  const b = document.createElement("button");
-  b.type = "button"; b.className = "ms-ether"; b.title = "Saldo de la tarjeta EtherFi *0934";
-  b.innerHTML = `<span class="pt" aria-hidden="true"></span><span class="tx"><small>Saldo EtherFi *0934</small><b class="num">${window.MESA_ETHERFI ? "US$ " + window.MESA_ETHERFI : "falta conectar"}</b></span>`;
-  b.onclick = () => { if (typeof toast === "function") toast(window.MESA_ETHERFI ? "Saldo leído de la cuenta EtherFi" : "Para ver el saldo en vivo falta conectar la cuenta EtherFi (la dirección 0x de la app)."); };
-  arriba.prepend(b);
+  const arriba = $(".acciones-top"); if (!arriba) return;
+  if (!$(".ms-ether", arriba)) {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "ms-ether"; b.title = "Saldo de la tarjeta EtherFi *0934 (se lee de OP Mainnet cada minuto)";
+    b.innerHTML = `<span class="pt" aria-hidden="true"></span><span class="tx"><small>Saldo EtherFi *0934</small><b class="num">leyendo…</b></span><span class="hace"></span>`;
+    b.onclick = () => { efUlt = 0; leerEtherfi(); };
+    arriba.prepend(b);
+  }
+  pintarEther(); leerEtherfi();
 }
 
 // ---------- (06/11 c) fila de filtros en una línea: Cuenta · Oferta · Buscar · Comparar días · Solo seleccionadas · Ver apagadas · Columnas ----------
@@ -300,4 +320,5 @@ obs.observe(document.body, OPC);
 if ("ResizeObserver" in window) { const ro = new ResizeObserver(capas); const mirar = () => { const sc = $("#tabla-scroll"); if (sc && !sc.dataset.msRo) { sc.dataset.msRo = "1"; ro.observe(sc); } }; setInterval(mirar, 1500); }
 armarMenu(); encabezado(); etherfi(); filtros(); jarvis(); mirarIsla(); isla(); revelar();
 setInterval(cargarDias, 3000);
+setInterval(() => { try { leerEtherfi(); pintarEther(); } catch {} }, 20000);
 })();
