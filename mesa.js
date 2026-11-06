@@ -91,7 +91,9 @@ function isla() {
   if (!islaVisible) { islaVisible = true; entra = !quieto; }
   let c = $(".ms-n", b);
   if (!c) { c = document.createElement("span"); c.className = "ms-n num"; b.prepend(c); }
-  if (entra) {
+  if (entra && document.documentElement.classList.contains("ms-cel")) { // celular: panel que sube desde abajo
+    b.animate([{ transform: "translateY(calc(100% + 90px))", opacity: .4 }, { transform: "none", opacity: 1 }], { duration: 520, easing: "cubic-bezier(.16, 1, .3, 1)" });
+  } else if (entra) {
     const fin = getComputedStyle(b).maxWidth;
     b.animate([{ maxWidth: "60px", transform: "translateX(-50%) scale(.3)", opacity: 0 }, { offset: .32, maxWidth: "60px", transform: "translateX(-50%) scale(1)", opacity: 1 }, { maxWidth: fin === "none" ? "980px" : fin, transform: "translateX(-50%) scale(1)", opacity: 1 }],
       { duration: 950, easing: "cubic-bezier(.16, 1, .3, 1)" });

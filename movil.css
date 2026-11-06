@@ -1,0 +1,251 @@
+/* =====================================================================================================
+   MESA CELULAR (06/11, Lorenzo) — la versión de celular del diseño Mesa, pensada como app aparte.
+   Todo cuelga de html.ms-cel (lo pone movil.js en pantallas ≤ 760 px). Se carga después de mesa.css.
+   ===================================================================================================== */
+html.ms-cel { --tabs-h: 64px; --gut: 16px; }
+html.ms-cel body { padding-bottom: calc(var(--tabs-h) + env(safe-area-inset-bottom) + 24px); overscroll-behavior-y: none; -webkit-tap-highlight-color: transparent; }
+html.ms-cel body.mc-con-isla { padding-bottom: calc(var(--tabs-h) + env(safe-area-inset-bottom) + 210px); }
+html.ms-cel body #app { padding: 0 var(--gut); max-width: none; margin: 0; }
+html.ms-cel body #main { display: flex; flex-direction: column; }
+html.ms-cel .ms-sol { width: 150vmax; opacity: .7; }
+
+/* ---------- encabezado fijo arriba: logo + sección · avisos · actualizar · menú; saldo EtherFi debajo ---------- */
+html.ms-cel body .top { position: sticky; top: 0; z-index: 45; margin: 0 calc(var(--gut) * -1) 6px; padding: calc(env(safe-area-inset-top) + 10px) var(--gut) 10px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; grid-template-areas: "tit av ref menu" "eth eth eth eth"; align-items: center; gap: 10px 8px;
+  background: linear-gradient(180deg, rgba(9,9,11,.94) 60%, rgba(9,9,11,.78)); -webkit-backdrop-filter: blur(18px) saturate(1.3); backdrop-filter: blur(18px) saturate(1.3);
+  border-bottom: 1px solid var(--linea); }
+html.ms-cel body .top .acciones-top { display: contents; }
+html.ms-cel body .top .marca { grid-area: tit; display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: nowrap; }
+html.ms-cel .mc-logo { width: 34px; height: 34px; border-radius: 10px; flex: none; }
+html.ms-cel body .top .marca h1 { font-size: 21px; font-weight: 500; letter-spacing: -.5px; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.ms-cel body .top .marca h1::before { display: none; content: none; }
+html.ms-cel body .top .garabato, html.ms-cel body .top .hola { display: none; }
+html.ms-cel body .top .marca::before { display: none; }
+html.ms-cel body .top .badges { flex: none; }
+html.ms-cel body .top .badges .badge { font-size: 10px; padding: 2px 7px; }
+html.ms-cel body .top .av-wrap { grid-area: av; }
+html.ms-cel body .top #b-ref { grid-area: ref; }
+html.ms-cel body .top .menu-wrap { grid-area: menu; }
+html.ms-cel body .top .btn.icono, html.ms-cel body .top .av-wrap > button { width: 40px; height: 40px; min-width: 40px; min-height: 40px; padding: 0; }
+html.ms-cel body .top .whop-mini, html.ms-cel body .top #whop-barra { display: none; }
+html.ms-cel body .top .ms-ether { grid-area: eth; width: 100%; justify-content: flex-start; padding: 8px 12px; border-radius: 14px; }
+html.ms-cel body .top .ms-ether .tx { display: flex; align-items: baseline; justify-content: space-between; flex: 1; gap: 8px; }
+html.ms-cel body .top .ms-ether small { font-size: 12px; }
+html.ms-cel body .top .ms-ether b { font-size: 16px; }
+html.ms-cel body .top .menu { right: 0; left: auto; top: calc(100% + 6px); }
+/* el menú lateral y el slider de secciones no van: navega la barra de abajo */
+html.ms-cel body .secciones, html.ms-cel body #secciones { display: none !important; }
+html.ms-cel .ms-plegar { display: none !important; }
+
+/* ---------- arriba del Dashboard: última lectura, períodos y oferta ---------- */
+html.ms-cel body #main .controles { display: flex; flex-direction: column; align-items: stretch; gap: 12px; margin: 8px 0 10px; order: 0; }
+html.ms-cel body #main .sel-grupo-caja { order: 1; margin: 0 0 14px; }
+html.ms-cel body #main #avisos { order: 2; }
+html.ms-cel body #main .carr { order: 3; }
+html.ms-cel body #main .mesa-of { order: 4; }
+html.ms-cel body #main .seccion-camp { order: 5; }
+html.ms-cel body #main .seccion-prob { order: 6; }
+html.ms-cel .ms-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+html.ms-cel .ms-cab .vivo { margin: 0; order: 2; font-size: 12px; }
+html.ms-cel .ms-cab h3 { font-size: 26px; letter-spacing: -.7px; order: 1; }
+html.ms-cel .ms-cab h3 br { display: none; }
+html.ms-cel .ms-cab h3 b { margin-left: 6px; }
+html.ms-cel body #main .controles .hora { display: none; }
+html.ms-cel body .periodos { display: flex; flex-wrap: nowrap !important; width: 100%; overflow-x: auto; scrollbar-width: none; justify-content: space-between; }
+html.ms-cel body .periodos::-webkit-scrollbar { display: none; }
+html.ms-cel body .periodos .btn { flex: 1 0 auto; min-height: 38px; padding: 0 9px; font-size: 13px; white-space: nowrap; }
+html.ms-cel body .sel-grupo-caja { border-radius: 14px; }
+html.ms-cel body .sel-grupo { min-height: 46px; font-size: 15px; }
+
+/* ---------- métricas: Ganancia ocupa toda la fila; el resto de a dos ---------- */
+html.ms-cel body .carr { margin: 0; padding: 0; display: block; }
+html.ms-cel body .carr .etiqueta, html.ms-cel body .carr .flecha, html.ms-cel body .carr .pos { display: none !important; }
+html.ms-cel .mesa-fila1, html.ms-cel .mesa-fila2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px; }
+html.ms-cel .mesa-fila2 { margin-top: 10px; }
+html.ms-cel body .carr .met { padding: 14px 14px 12px; border-radius: 18px; min-height: 124px; gap: 4px; }
+html.ms-cel body .carr .met .lbl { font-size: 12px; }
+html.ms-cel body .carr .met .val { font-size: 25px !important; letter-spacing: -.8px; }
+html.ms-cel body .carr .met .val .mon { font-size: .48em; }
+html.ms-cel body .carr .mesa-fila1 .met.heroe { grid-column: 1 / -1; min-height: 176px; padding: 18px 18px 14px; border-radius: 22px; }
+html.ms-cel body .carr .mesa-fila1 .met.heroe .lbl { font-size: 13px; }
+html.ms-cel body .carr .mesa-fila1 .met.heroe .val { font-size: 46px !important; letter-spacing: -1.8px; }
+html.ms-cel body .carr .mesa-fila1 .met:nth-child(4) { grid-column: 1 / -1; min-height: 112px; }
+html.ms-cel body .carr .mesa-fila2 .met { min-height: 0; padding: 12px 14px; }
+html.ms-cel body .carr .mesa-fila2 .met .val { font-size: 22px !important; }
+html.ms-cel body .carr .mesa-fila2 .met.ancha .v-fila { justify-content: space-between; align-items: baseline; }
+html.ms-cel body .carr .mesa-fila2 .met .ms-tend { white-space: normal; font-size: 11.5px; }
+html.ms-cel .ms-graf { height: 42% !important; }
+html.ms-cel .heroe .ms-graf { height: 48% !important; }
+html.ms-cel .ms-tip { font-size: 11px; }
+/* secundarias de a dos */
+html.ms-cel body .carr .sec-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+html.ms-cel body .carr .sec-grid .met.met-chica { min-height: 0; padding: 11px 12px; }
+html.ms-cel body .carr .sec-grid .met.met-chica .val { font-size: 18px !important; }
+html.ms-cel body .carr .sec-fila { justify-content: center; margin-top: 12px; }
+
+/* ---------- por oferta: carrusel con el dedo, sin flechas ---------- */
+html.ms-cel .mesa-of { margin: 24px calc(var(--gut) * -1) 4px; }
+html.ms-cel .mesa-of-cab { padding: 0 var(--gut); }
+html.ms-cel .mesa-of-fl { display: none; }
+html.ms-cel .mesa-of-lista { gap: 10px; padding: 0 var(--gut) 4px; scroll-padding-left: var(--gut); }
+html.ms-cel .mesa-of-t { flex: 0 0 74%; padding: 14px 16px; }
+html.ms-cel .mesa-of-t .mo-v { font-size: 24px; }
+
+/* ---------- campañas: encabezado y filtros en tiras que se deslizan ---------- */
+html.ms-cel body .seccion-camp { margin-top: 26px; }
+html.ms-cel body .seccion-camp .cab-tabla { display: flex; flex-direction: column; align-items: stretch; gap: 10px; margin-bottom: 10px; }
+html.ms-cel body .seccion-camp .cab-tabla h2 { font-size: 22px; font-weight: 400; letter-spacing: -.5px; margin: 0; }
+html.ms-cel body .seccion-camp .cab-der { display: none; }
+html.ms-cel body .filtro-camp { display: flex !important; flex-wrap: nowrap !important; overflow-x: auto; gap: 8px; margin: 0 calc(var(--gut) * -1) 12px; padding: 0 var(--gut) 2px; scrollbar-width: none; align-items: center; }
+html.ms-cel body .filtro-camp::-webkit-scrollbar { display: none; }
+html.ms-cel body .filtro-camp > * { flex: none; }
+html.ms-cel body .filtro-camp .f-buscar { flex: 0 0 72%; min-height: 42px; border-radius: 12px; font-size: 15px; }
+html.ms-cel body .filtro-camp select, html.ms-cel body .filtro-camp .campo { min-height: 42px; max-width: 70vw; border-radius: 12px; font-size: 14px; }
+html.ms-cel body .filtro-camp .btn, html.ms-cel body .filtro-camp .toggle-chico { min-height: 42px; white-space: nowrap; border-radius: 12px; }
+
+/* ---------- campañas como tarjetas ---------- */
+html.ms-cel body .tabla-con-reloj, html.ms-cel body .tabla-caja, html.ms-cel body .tabla-scroll { display: block; overflow: visible !important; max-height: none !important; background: none !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; margin: 0; }
+html.ms-cel body .ms-capas { display: none !important; }
+html.ms-cel body table.camp { display: block; width: 100% !important; min-width: 0 !important; border-collapse: separate; }
+html.ms-cel body table.camp thead { display: none !important; }
+html.ms-cel body table.camp tbody, html.ms-cel body table.camp tfoot { display: flex; flex-direction: column; gap: 10px; }
+html.ms-cel body table.camp tfoot { margin-top: 16px; }
+html.ms-cel body table.camp tr.fila, html.ms-cel body table.camp tr.fila-total {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 10px; padding: 14px 14px 12px; position: relative;
+  border-radius: 18px; border: 1px solid var(--linea); background: linear-gradient(170deg, #18181c, #121215) !important; box-shadow: none; transition: border-color .25s, box-shadow .25s, transform .2s; }
+html.ms-cel body table.camp tr.fila:active { transform: scale(.985); }
+html.ms-cel body table.camp tr.fila td, html.ms-cel body table.camp tr.fila-total td {
+  display: block; position: static !important; padding: 0 !important; border: 0 !important; background: none !important; box-shadow: none !important; min-width: 0 !important; width: auto !important; max-width: none !important; height: auto; text-align: left !important; white-space: normal; }
+html.ms-cel body table.camp tr td.nom { grid-column: 1 / -1; }
+html.ms-cel body table.camp tr td.nom .nomwrap { display: flex; align-items: flex-start; gap: 8px; min-width: 0; padding: 0; }
+html.ms-cel body table.camp tr td.nom .txt { min-width: 0; flex: 1; }
+html.ms-cel body table.camp tr td.nom .n { font-size: 15px; font-weight: 500; line-height: 1.25; white-space: normal; overflow-wrap: anywhere; }
+html.ms-cel body table.camp tr td.nom .sub { font-size: 12px; color: var(--mut-2); white-space: normal; }
+html.ms-cel body table.camp tr td.nom .niv-tag { font-size: 9.5px; margin-bottom: 4px; display: inline-block; }
+html.ms-cel body table.camp tr td.nom .dot-esq { position: absolute !important; top: 16px; right: 14px; left: auto !important; }
+html.ms-cel body table.camp tr td.nom .tg { width: 32px; height: 32px; flex: none; border-radius: 10px; background: rgba(255,255,255,.05); border: 1px solid var(--linea-2); }
+html.ms-cel body table.camp tr td.num::before { content: attr(data-l); display: block; font: 400 11px var(--f-texto); color: var(--mut); margin-bottom: 3px; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.ms-cel body table.camp tr td.num { font-size: 15px; font-weight: 500; overflow-wrap: anywhere; }
+html.ms-cel body table.camp tr td.num .roas { font-size: 13px; }
+/* en la tarjeta van los 6 datos que más importan; el resto se ve en Comparar días o en la compu */
+html.ms-cel body table.camp tr td.num:not(.c-presupuesto):not(.c-roas):not(.c-ganancia):not(.c-gasto):not(.c-facturacion):not(.c-ventas):not(.c-que_hacer) { display: none !important; }
+html.ms-cel body table.camp tr td.c-que_hacer { grid-column: 1 / -1; padding-top: 10px !important; border-top: 1px solid var(--linea) !important; }
+html.ms-cel body table.camp tr td.c-que_hacer::before { display: none; }
+html.ms-cel body table.camp tr td.c-que_hacer:empty, html.ms-cel body table.camp tr td.c-que_hacer:has(> :empty:only-child) { display: none !important; }
+/* conjuntos y anuncios: corridos a la derecha con una línea que los cuelga de la campaña */
+html.ms-cel body table.camp tr.fila.nivel-1 { margin-left: 14px; border-radius: 16px; background: linear-gradient(170deg, #16161a, #111114) !important; }
+html.ms-cel body table.camp tr.fila.nivel-2 { margin-left: 28px; border-radius: 14px; background: #121215 !important; }
+html.ms-cel body table.camp tr.fila.nivel-1::before, html.ms-cel body table.camp tr.fila.nivel-2::before { content: ""; position: absolute; left: -9px; top: -10px; bottom: 50%; width: 8px; border-left: 1px solid var(--linea-2); border-bottom: 1px solid var(--linea-2); border-bottom-left-radius: 8px; }
+/* seleccionada: borde naranja con brillo */
+html.ms-cel body table.camp tr.fila.sel { border-color: rgba(255,120,70,.85); box-shadow: 0 0 0 1px rgba(255,107,61,.35), 0 0 22px -6px rgba(255,96,52,.55); background: linear-gradient(170deg, #201a18, #141213) !important; }
+html.ms-cel body table.camp tr.fila-total { background: rgba(255,255,255,.04) !important; border-color: transparent; }
+html.ms-cel body table.camp tr.fila-total td.nom .n { font-size: 14px; color: var(--tx-2); }
+html.ms-cel body table.camp tr.fila-info td, html.ms-cel body table.camp tr.fila-nube td { display: block; padding: 8px 4px !important; }
+html.ms-cel body table.camp tr.fila-info, html.ms-cel body table.camp tr.fila-nube { display: block; }
+
+/* ---------- isla = panel de acciones que sube desde abajo ---------- */
+html.ms-cel body .barra { left: 10px !important; right: 10px; bottom: calc(var(--tabs-h) + env(safe-area-inset-bottom) + 10px); width: auto; max-width: none !important; transform: none;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 18px 14px 14px; border-radius: 26px; overflow: visible; animation: none;
+  background: linear-gradient(180deg, rgba(32,32,38,.98), rgba(20,20,24,.99)); border: 1px solid var(--linea-2);
+  box-shadow: 0 -10px 40px -10px rgba(0,0,0,.9), 0 0 0 1px rgba(255,107,61,.12), inset 0 1px 0 rgba(255,255,255,.07); z-index: 46; }
+html.ms-cel body .barra::before { content: ""; position: absolute; top: 7px; left: 50%; width: 38px; height: 4px; margin-left: -19px; border-radius: 4px; background: rgba(255,255,255,.18); }
+html.ms-cel body .barra > * { animation: none !important; }
+html.ms-cel body .barra .ms-n { order: 1; width: 46px; height: 46px; font-size: 18px; }
+html.ms-cel body .barra .cuenta { order: 2; flex: 1; min-width: 0; flex-direction: column; align-items: flex-start; gap: 1px; font-size: 15px; padding-right: 110px; white-space: normal; }
+html.ms-cel body .barra .cuenta small { font-size: 12px; color: var(--mut); font-weight: 400; }
+html.ms-cel body .barra .sp { display: none; }
+html.ms-cel body .barra .acciones-sel { order: 3; flex: 1 0 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; overflow: visible; }
+html.ms-cel body .barra .acciones-sel .caps { display: contents; }
+html.ms-cel body .barra .acciones-sel .btn.chico { min-height: 48px; border-radius: 14px; font-size: 14.5px; justify-content: center; display: inline-flex; align-items: center; gap: 6px; }
+html.ms-cel body .barra .acciones-sel .btn.chico:only-of-type { grid-column: 1 / -1; }
+html.ms-cel body .barra #b-pres { grid-column: 1 / -1; background: var(--torna); color: #111114; border-color: transparent; font-weight: 600; }
+html.ms-cel body .barra .t-pc { display: none !important; } html.ms-cel body .barra .t-cel { display: inline !important; }
+html.ms-cel body .barra .grupo-sw { position: absolute; top: 20px; right: 14px; display: flex; align-items: center; gap: 8px; }
+html.ms-cel body .barra .grupo-sw .sw-lbl { font-size: 12.5px; color: var(--tx-2); }
+html.ms-cel body .barra #b-limpiar { order: 4; flex: 1 0 100%; min-height: 40px; background: transparent; border: 0; color: var(--mut); text-decoration: underline; text-underline-offset: 4px; font-size: 13.5px; }
+html.ms-cel body .toasts { bottom: calc(var(--tabs-h) + env(safe-area-inset-bottom) + 14px); }
+html.ms-cel body.mc-con-isla .toasts { bottom: calc(var(--tabs-h) + env(safe-area-inset-bottom) + 220px); }
+
+/* ---------- barra de pestañas ---------- */
+.mc-tabs { display: none; }
+html.ms-cel .mc-tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 57; display: grid; grid-template-columns: repeat(5, 1fr); align-items: center;
+  height: calc(var(--tabs-h) + env(safe-area-inset-bottom)); padding: 0 6px env(safe-area-inset-bottom);
+  background: linear-gradient(180deg, rgba(17,17,20,.86), rgba(11,11,13,.96)); -webkit-backdrop-filter: blur(20px) saturate(1.4); backdrop-filter: blur(20px) saturate(1.4); border-top: 1px solid var(--linea); }
+.mc-tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; height: 100%; background: none; border: 0; color: var(--mut-2); font: 500 11px var(--f-texto); cursor: pointer; position: relative; transition: color .25s; }
+.mc-tab svg { transition: transform .4s var(--sale); }
+.mc-tab[aria-current="page"] { color: var(--tx); }
+.mc-tab[aria-current="page"] svg { transform: translateY(-1px); }
+.mc-tab[aria-current="page"]::after { content: ""; position: absolute; top: 6px; width: 26px; height: 3px; border-radius: 3px; background: var(--torna); }
+.mc-tab:active svg { transform: scale(.88); }
+.mc-jarvis { justify-self: center; position: relative; width: 56px; height: 56px; margin-top: -26px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; background: none; }
+.mc-jv-orbe { position: absolute; inset: 0; border-radius: 50%; display: grid; place-items: center; color: #fff; background: var(--fuego);
+  box-shadow: 0 0 0 5px #0b0b0d, 0 0 26px -2px rgba(255,96,52,.75); animation: mcJv 3.2s ease-in-out infinite; transition: transform .3s var(--sale); }
+.mc-jarvis:active .mc-jv-orbe { transform: scale(.9); }
+.mc-jv-orbe svg path { fill: currentColor; stroke: none; }
+@keyframes mcJv { 50% { box-shadow: 0 0 0 5px #0b0b0d, 0 0 36px 2px rgba(255,96,52,.9); } }
+.mc-jv-badge { position: absolute; top: -2px; right: -2px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: #fff; color: #c2272d; font: 700 11px/20px var(--f-texto); text-align: center; z-index: 1; }
+html.ms-cel body .jv-fab { display: none !important; }
+html.ms-cel body .jv-panel { inset: 0 !important; width: auto !important; border-radius: 0 !important; border: 0 !important; z-index: 60; transform-origin: 50% 100% !important; transform: translateY(40%) scale(.9) !important; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+html.ms-cel body .jv-panel.visible { transform: none !important; }
+html.ms-cel body .jv-form textarea { font-size: 16px; }
+
+/* ---------- hoja «Más» ---------- */
+.mc-hoja-velo { position: fixed; inset: 0; z-index: 55; background: rgba(0,0,0,.5); opacity: 0; transition: opacity .3s; display: flex; align-items: flex-end; }
+.mc-hoja-velo.visible { opacity: 1; }
+.mc-hoja { width: 100%; padding: 12px 16px calc(var(--tabs-h) + env(safe-area-inset-bottom) + 14px); border-radius: 26px 26px 0 0; background: linear-gradient(180deg, #1d1d22, #131316); border-top: 1px solid var(--linea-2);
+  transform: translateY(100%); transition: transform .45s var(--sale); }
+.mc-hoja-velo.visible .mc-hoja { transform: none; }
+.mc-asa { display: block; width: 38px; height: 4px; border-radius: 4px; background: rgba(255,255,255,.2); margin: 0 auto 14px; }
+.mc-hoja h3 { margin: 0 0 12px 4px; font-size: 17px; font-weight: 500; }
+.mc-mas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mc-mas-b { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 14px; min-height: 104px; border-radius: 18px; border: 1px solid var(--linea); background: linear-gradient(170deg, #202026, #16161a); color: var(--tx); font: inherit; text-align: left; cursor: pointer; }
+.mc-mas-b svg { width: 24px; height: 24px; color: #d8d2f6; }
+.mc-mas-b b { font-size: 15px; font-weight: 500; }
+.mc-mas-b small { font-size: 12px; color: var(--mut); line-height: 1.3; }
+.mc-mas-b.act { border-color: rgba(216,210,246,.45); }
+.mc-mas-b:active { transform: scale(.97); }
+.mc-opciones { margin-top: 12px; width: 100%; min-height: 48px; border-radius: 14px; border: 1px solid var(--linea-2); background: transparent; color: var(--tx-2); font: 500 14.5px var(--f-texto); }
+
+/* ---------- ventanas = hojas que suben desde abajo ---------- */
+html.ms-cel body .velo { place-items: end stretch; padding: 0; z-index: 58; }
+html.ms-cel body .velo .dialogo { width: 100% !important; max-width: none !important; max-height: calc(100dvh - env(safe-area-inset-top) - 24px); overflow-y: auto; overscroll-behavior: contain;
+  border-radius: 26px 26px 0 0; margin: 0; padding: 26px 18px calc(env(safe-area-inset-bottom) + 18px); animation: mcHoja .45s var(--sale); position: relative; }
+html.ms-cel body .velo .dialogo::before { content: ""; position: absolute; top: 9px; left: 50%; width: 38px; height: 4px; margin-left: -19px; border-radius: 4px; background: rgba(255,255,255,.18); }
+html.ms-cel body .velo .dialogo .botones { position: sticky; bottom: calc(-18px - env(safe-area-inset-bottom)); margin: 16px -18px calc(-18px - env(safe-area-inset-bottom)); padding: 12px 18px calc(env(safe-area-inset-bottom) + 14px); background: linear-gradient(180deg, rgba(19,19,22,.85), #131316); display: flex; gap: 8px; flex-wrap: wrap; }
+html.ms-cel body .velo .dialogo .botones .btn { flex: 1 1 0; min-height: 48px; justify-content: center; }
+html.ms-cel body .velo .dialogo input, html.ms-cel body .velo .dialogo select, html.ms-cel body .velo .dialogo textarea { font-size: 16px; }
+@keyframes mcHoja { from { transform: translateY(100%); } }
+html.ms-cel body .velo .dialogo table { font-size: 12.5px; }
+html.ms-cel body .velo .dialogo .tabla-scroll, html.ms-cel body .velo .dialogo .cmp-scroll { overflow-x: auto; }
+
+/* ---------- avisos y otras secciones ---------- */
+html.ms-cel body .av-pop { left: 10px; right: 10px; width: auto; max-width: none; }
+html.ms-cel body .rp-tabla-caja, html.ms-cel body .ut-tabla, html.ms-cel body #sec-umb table { overflow-x: auto; display: block; }
+html.ms-cel body .umb-fila { flex-wrap: wrap; }
+
+@media (prefers-reduced-motion: reduce) { .mc-jv-orbe { animation: none; } .mc-hoja, html.ms-cel body .velo .dialogo { transition: none; animation: none; } }
+
+.mc-tab[data-mc="mas"] svg path { stroke-width: 3.4; }
+html.ms-cel body .periodos .btn svg { width: 14px; height: 14px; }
+html.ms-cel body .seccion-camp > #f-buscar { display: block; width: 100%; min-height: 46px; border-radius: 14px; font-size: 16px; margin-bottom: 10px; padding: 0 14px; }
+html.ms-cel body table.camp tr.fila.sel td, html.ms-cel body table.camp tr.fila.sel:hover td, html.ms-cel body table.camp tr.fila:hover td, html.ms-cel body table.camp tr.fila:focus-visible td { background: transparent !important; box-shadow: none !important; }
+html.ms-cel body .barra #b-limpiar::before, html.ms-cel body .barra #b-limpiar::after { display: none !important; }
+html.ms-cel body .barra .acciones-sel { display: flex; flex-wrap: wrap; }
+html.ms-cel body .barra .acciones-sel .btn.chico { flex: 1 1 calc(50% - 4px); }
+html.ms-cel body .barra #b-pres { flex-basis: 100%; }
+html.ms-cel body .barra #b-limpiar { box-shadow: none !important; }
+html.ms-cel body .filtro-camp select, html.ms-cel body .filtro-camp .campo { max-width: 48vw; }
+/* Comparar días en celular: la hoja entera se desliza (no una tablita chica adentro) y los controles van compactos */
+html.ms-cel body .velo .dialogo:has(.cmp) { display: block; height: calc(100dvh - env(safe-area-inset-top) - 24px); }
+html.ms-cel body .velo .dialogo .cmp { display: block; height: auto; }
+html.ms-cel body .velo .dialogo .cmp-tabla-caja { height: auto !important; max-height: none !important; overflow-y: visible; overflow-x: auto; margin: 12px calc(var(--gut) * -1 + 2px) 0; border-radius: 14px; }
+html.ms-cel body .velo .dialogo .cmp-dias { display: flex; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -18px; padding: 0 18px 2px; gap: 6px; }
+html.ms-cel body .velo .dialogo .cmp-dias::-webkit-scrollbar { display: none; }
+html.ms-cel body .velo .dialogo .cmp-dias > * { flex: none; }
+html.ms-cel body .velo .dialogo .cmp-ctrl { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+html.ms-cel body .velo .dialogo .cmp-ctrl select { flex: 1 1 40%; min-width: 0; min-height: 42px; }
+html.ms-cel body .velo .dialogo .cmp-ctrl .periodos { flex: 1 1 100%; overflow-x: auto; flex-wrap: nowrap; }
+html.ms-cel body .velo .dialogo .cmp-ctrl .periodos .btn { flex: 1 0 auto; white-space: nowrap; }
+html.ms-cel body .velo .dialogo .cmp-nota { font-size: 12px; }
+html.ms-cel body .velo .dialogo .cmp-dias { margin-bottom: 10px; }
+html.ms-cel body .umb-pct-afuera, html.ms-cel body .umb-pct { color: var(--tx-2) !important; }
