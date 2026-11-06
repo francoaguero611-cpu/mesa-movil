@@ -21,6 +21,19 @@
 <link rel="stylesheet" href="avisos.css?v=2">
 <link rel="stylesheet" href="glass.css?v=12">
 <link rel="stylesheet" href="pulido.css?v=1">
+<link rel="stylesheet" href="temas.css?v=5">
+<script>
+  // (06/11) Diseños para comparar: ?tema=terminal|neon|cabina|estudio|actual (queda guardado). Con ?tema aparece el selector abajo.
+  (function () {
+    try {
+      var q = new URLSearchParams(location.search).get("tema");
+      if (q) { localStorage.setItem("dash_diseno", q); localStorage.setItem("dash_disenos_ver", "1"); }
+      var t = localStorage.getItem("dash_diseno");
+      if (t && t !== "actual") document.documentElement.setAttribute("data-tema", t);
+    } catch (e) {}
+  })();
+</script>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600&family=Sora:wght@400;500;600;700;800&family=Rajdhani:wght@500;600;700&family=Orbitron:wght@600;700;800&family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet">
 <script>
   // Tema antes de pintar, para que no parpadee.
   try { var t = localStorage.getItem("dash_tema"); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
@@ -75,5 +88,6 @@
 <script src="avisos.js?v=3" defer></script>
 <script src="liquid.js?v=2" defer></script>
 <script src="pulido.js?v=2" defer></script>
+<script src="temas.js?v=1" defer></script>
 </body>
 </html>
