@@ -23,7 +23,7 @@ let lenis = null;
 function iniciarLenis() {
   if (quieto || !window.Lenis || matchMedia("(hover: none)").matches) return;
   try {
-    lenis = new Lenis({ duration: 1.15, easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), smoothWheel: true,
+    lenis = new Lenis({ lerp: 0.075, smoothWheel: true, wheelMultiplier: 1, // (06/11) modo continuo: con la rueda rápida no pega saltos (antes cada empujón reiniciaba la animación)
       prevent: (n) => !!(n.closest && n.closest(".jv-panel, .dialogo, .menu, .modal, .ad-ver, [data-lenis-prevent], textarea, select")) });
     window.MesaLenis = lenis;
     // (06/11) el encabezado flotante de la tabla se acomoda en el MISMO cuadro en que Lenis mueve la página (antes llegaba
