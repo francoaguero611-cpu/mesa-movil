@@ -197,7 +197,7 @@ function pintarFab() {
   const b = $(".jv-badge", fab); b.hidden = !n; b.textContent = n > 9 ? "9+" : String(n);
   fab.setAttribute("aria-label", n ? `Jarvis: ${n} aviso${n > 1 ? "s" : ""} nuevo${n > 1 ? "s" : ""}` : "Abrir Jarvis");
 }
-const RAPIDAS = ["📋 Resumen de hoy", "¿Cómo venimos hoy?", "¿Qué campaña surfeo?", "Mostrame el antes y después de lo que surfeé", "¿Cuánta plata hay en Whop?", "¿Cuáles son los winners?"];
+const RAPIDAS = ["📋 Resumen de hoy", "¿Cómo venimos hoy?", "¿Qué campaña surfeo?", "Mostrame el antes y después de lo que surfeé", "¿Cuánta plata hay en EtherFi?", "¿Cuáles son los winners?"];
 const claseMsg = (m) => m.rol === "user" ? (m.de && m.de !== yo() ? `jv-m otro${!m.leido ? " nuevo" : ""}` : "jv-m yo") : m.rol === "card" ? "jv-m card" : `jv-m el${m.rol === "aviso" ? " aviso" : ""}${m.urgente ? " urgente" : ""}${m.verde ? " verde" : ""}${(m.rol === "aviso" || m.ajeno) && !m.leido ? " nuevo" : ""}${m.abierta && m.card ? " expandida" : ""}`;
 const ocultarAcc = (a) => /#(workspace|taller)/.test(a.url || "") || a.sec === "workspace";
 function htmlMsg(m) {

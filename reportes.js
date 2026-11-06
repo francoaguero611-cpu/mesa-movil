@@ -1,5 +1,5 @@
 /* Reportes v2 (02/11 noche, Lorenzo): UNA página, compacta, todo a la vista.
-   Tarjetas: Saldo de Whop a cargar · Limpiador de anuncios (Optimizar) · Rechazos (winners primero) · Winners nuevos y
+   Tarjetas: Saldo de EtherFi a cargar · Limpiador de anuncios (Optimizar) · Rechazos (winners primero) · Winners nuevos y
    envejeciendo · Cuentas nuevas. Cada tarjeta muestra lo importante y «Ver todo» abre la lista completa.
    Lo de surfeos salió de acá: ahora vive en el Dashboard (columna «Última modificación» + flechita al lado del ROAS).
    Nada toca Meta sin un toque y una confirmación (apagar anuncios pasa por app-movil con ctx.estado).
@@ -35,7 +35,7 @@ const cargando = (t) => `<p class="vacio chico"><span class="cargador"></span>${
 
 // ---------- tarjetas ----------
 function cardSaldo() {
-  const u = R.umb, T = "Saldo de Whop";
+  const u = R.umb, T = "Saldo de EtherFi";
   if (!u) return card("saldo", T, cargando("Leyendo…"));
   if (u.__error) return card("saldo", T, `<p class="mut">No se pudo leer: ${esc(u.__error)}</p>`);
   const w = u.whop || {}, saldo = Number(w.saldo || 0), xs = (u.cuentas || []).filter((c) => String(c.moneda || "USD").toUpperCase() === "USD" && c.umbral > 0 && c.gasto_dia > 0);

@@ -712,20 +712,20 @@ function pintarWhop() {
   if (el.classList.contains("whop-mini")) { // (02/11) en el Dashboard: chiquito al costado; tocarlo abre Umbrales
     if (!w) { el.innerHTML = ""; return; }
     const viejoM = Date.now() - Date.parse(w.leido_en) > 10 * 60e3, mal = (d && d.necesita - w.saldo > 0) || (w.rechazos || []).length > 0;
-    el.innerHTML = `<button type="button" class="wm${mal ? " mal" : ""}${viejoM ? " viejo" : ""}" title="${viejoM ? "Dato viejo: " + esc(haceUmb(w.leido_en)) : "Ver umbrales y pagos"}"><i class="wm-dot" aria-hidden="true"></i>Saldo Whop <b class="num">${usd(w.saldo)}</b></button>`;
+    el.innerHTML = `<button type="button" class="wm${mal ? " mal" : ""}${viejoM ? " viejo" : ""}" title="${viejoM ? "Dato viejo: " + esc(haceUmb(w.leido_en)) : "Ver umbrales y pagos"}"><i class="wm-dot" aria-hidden="true"></i>Saldo EtherFi <b class="num">${usd(w.saldo)}</b></button>`;
     $("button", el).onclick = () => irASeccion("umbrales");
     return;
   }
-  if (!w) { el.innerHTML = UB.st === "error" ? "" : `<span class="wb-et">Saldo en Whop</span><span class="mut">leyendo…</span>`; return; }
+  if (!w) { el.innerHTML = UB.st === "error" ? "" : `<span class="wb-et">Saldo en EtherFi</span><span class="mut">leyendo…</span>`; return; }
   const viejo = Date.now() - Date.parse(w.leido_en) > 10 * 60e3;
   const falta = d ? d.necesita - w.saldo : 0;
   const nRech = (w.rechazos || []).length;
   const ant = el.dataset.saldo;
   el.classList.toggle("mal", falta > 0 || nRech > 0);
-  el.innerHTML = `<span class="wb-et">Saldo en Whop</span><b class="wb-saldo num">${usd(w.saldo)}</b>
+  el.innerHTML = `<span class="wb-et">Saldo en EtherFi</span><b class="wb-saldo num">${usd(w.saldo)}</b>
     <span class="wb-tx">${d ? (falta > 0 ? `<span class="neg">⚠ faltan ${usd0(Math.ceil(falta))} para cubrir los umbrales</span>` : `<span class="wb-ok">✓ cubre todos los umbrales</span>`) : ""}${nRech ? ` · <span class="neg">${nRech} cobro${nRech === 1 ? "" : "s"} rechazado${nRech === 1 ? "" : "s"} hoy</span>` : ""}</span>
     ${w.retenciones ? `<span class="wb-tx">🔒 retenido <b class="num">${usd0(Math.round(w.retenciones.chicas?.usd ?? 0))}</b></span>` : ""}
-    <span class="wb-hora mut${viejo ? " neg" : ""}">${viejo ? "⚠ dato viejo · abrí Whop en la Mac" : haceUmb(w.leido_en)}</span>`;
+    <span class="wb-hora mut${viejo ? " neg" : ""}">${viejo ? "⚠ dato viejo" : haceUmb(w.leido_en)}</span>`;
   if (ant && ant !== String(w.saldo)) { el.classList.remove("cambio"); void el.offsetWidth; el.classList.add("cambio"); }
   el.dataset.saldo = String(w.saldo);
 }
@@ -751,7 +751,7 @@ function tarjetasUmb(d) {
   // Saldo en Whop
   const falta = d && w ? d.necesita - w.saldo : 0, cubre = d && w && d.necesita > 0 ? Math.min(1, w.saldo / d.necesita) : 1;
   const tSaldo = w ? `<div class="ut ${falta > 0 ? "mal" : "bien"}">
-      <div class="ut-lbl">💳 Saldo en Whop</div>
+      <div class="ut-lbl">💳 Saldo en EtherFi *0934</div>
       <div class="ut-val num" data-cuenta="${w.saldo}" data-k="saldo">${usdC(w.saldo)}</div>
       <div class="ut-medidor" aria-hidden="true"><i style="--x:${cubre.toFixed(3)}"></i></div>
       <div class="ut-sub">${falta > 0 ? `⚠ faltan <b>${usdC(Math.ceil(falta))}</b> para los umbrales` : `✓ cubre los umbrales (${usdC(d?.necesita ?? 0)})`}</div>
@@ -773,18 +773,18 @@ function tarjetasUmb(d) {
   // Próximo cobro (06/11, Lorenzo): cuándo es el primer cobro que el saldo de Whop NO cubre y cuánto hay que cargar para ese
   let tProx = "";
   if (prox) {
-    const wh = xs.filter((c) => !c.tarjeta);           // las que cobran de Whop (Meta no muestra tarjeta para Whop)
+    const wh = xs.filter((c) => /0934/.test(c.tarjeta || "")); // (06/11) las que cobran de la EtherFi *0934 (ya no se usa Whop)
     let queda = w ? w.saldo : 0, falla = null;
     // mismo criterio que la tarjeta de Whop: si el saldo cubre lo que hace falta (necesita), alcanza
     if (w && d?.necesita > w.saldo) for (const c of wh) { queda -= c.umbral || 0; if (queda < 0) { falla = { c, cargar: Math.ceil(Math.min(-queda, d.necesita - w.saldo)) }; break; } }
     tProx = falla ? `<div class="ut prox ya">
         <div class="ut-lbl">⏱ Próximo cobro que no alcanza</div>
         <div class="ut-val">en ${tiempoUmb(falla.c.cobra_en_h).replace("~", "")}</div>
-        <div class="ut-sub">Cargá <b>${usdC(falla.cargar)}</b> en Whop antes de ese cobro (${esc(falla.c.nombre)} · ${usdC(falla.c.umbral)})</div>
+        <div class="ut-sub">Cargá <b>${usdC(falla.cargar)}</b> en EtherFi antes de ese cobro (${esc(falla.c.nombre)} · ${usdC(falla.c.umbral)})</div>
       </div>` : `<div class="ut prox">
         <div class="ut-lbl">⏱ Próximo cobro</div>
         <div class="ut-val">en ${tiempoUmb(prox.cobra_en_h).replace("~", "")}</div>
-        <div class="ut-sub">${esc(prox.nombre)} · ${usdC(prox.umbral)} · ${wh.length ? "el saldo alcanza para los próximos cobros" : "no cobra de Whop"}</div>
+        <div class="ut-sub">${esc(prox.nombre)} · ${usdC(prox.umbral)} · ${wh.length ? "el saldo alcanza para los próximos cobros" : "no cobra de EtherFi"}</div>
       </div>`;
   }
   return tSaldo || tRet || tProx ? `<div class="ut-fila">${tSaldo}${tRet}${tProx}</div>` : "";
@@ -3845,7 +3845,7 @@ function cargarJarvis() {
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "jarvis.js?v=17";
+    const sc = document.createElement("script"); sc.src = "jarvis.js?v=18";
     sc.onload = () => window.Jarvis ? ok() : mal(new Error("Jarvis no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar Jarvis. ¿Hay conexión?")); };
     document.head.appendChild(sc);
@@ -3954,7 +3954,7 @@ function cargarReportes() {
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "reportes.js?v=9";
+    const sc = document.createElement("script"); sc.src = "reportes.js?v=10";
     sc.onload = () => window.Reportes ? ok() : mal(new Error("Reportes no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar Reportes. ¿Hay conexión?")); };
     document.head.appendChild(sc);
