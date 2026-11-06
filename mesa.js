@@ -51,7 +51,7 @@ else sol.style.transform = "translate(-50%, -50%) translate3d(18vw, -6vh, 0) sca
 
 // ---------- 3) menú lateral agrupado ----------
 try { if (localStorage.getItem("ms_menu_chico") === "1") document.documentElement.classList.add("ms-menu-chico"); } catch {}
-const GRUPOS = { dash: "Resumen", reportes: "Campañas", cazador: "Producción", atc: "Ayuda" };
+const GRUPOS = { dash: "Resumen", umbrales: "Campañas", cazador: "Producción", atc: "Ayuda" };
 function armarMenu() {
   const n = $("#secciones"), pista = $("#sec-pista"); if (!n || !pista) return;
   const quien = (document.querySelector(".hola")?.textContent || "").replace(/^(hola|bienvenid[oa])[,!]?\s*/i, "").trim();

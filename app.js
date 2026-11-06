@@ -3677,8 +3677,7 @@ function eventoPendiente() {
 const SECCIONES = [
   { id: "dash", nombre: "Dashboard", raiz: "#carr", icono: "M4 20 C 9 19.6, 15 20.2, 20.5 19.8 M6.5 17 V11.5 M11.5 17 V6.5 M16.5 17 V9.5",
     montar: () => { try { history.replaceState(null, "", location.pathname + location.search); } catch {} montar(); window.scrollTo(0, 0); } },
-  { id: "reportes", nombre: "Reportes", raiz: "#rp", icono: "M5 4.5 C 9.5 4.3, 14 4.6, 18.8 4.4 L18.6 19.6 C 14 19.8, 9.5 19.5, 5.2 19.7 Z M8.3 15.5 L11 12.3 L13.2 14.2 L16 10 M8.4 8.2 H12.6",
-    montar: () => montarReportes() }, // (02/11) control de lo que hacemos: surfeos, campañas, cuentas, gastos, mínimos, escala, bot y umbrales
+  // (06/11, Lorenzo) Reportes ya no es una sección: lo muestra Jarvis cuando se le pide «resumen» (montarReportes queda por si vuelve)
   { id: "umbrales", nombre: "Umbrales", raiz: "#sec-umb", icono: "M4.5 15.5 C 4.6 10.8, 8 7.2, 12 7.1 C 16.1 7, 19.5 10.6, 19.5 15.4 M12 15.2 L15.4 10.6 M3.8 18.6 H20.2",
     montar: () => montarUmbrales() }, // (02/11) saldo de Whop, pagos rechazados y umbrales de cada cuenta (antes, al final del Dashboard)
   { id: "ranking", nombre: "Ranking", raiz: "#rk", icono: "M4.5 6 C 6 5.8, 7.4 5.9, 8.6 6 M4.5 12 C 6.5 11.8, 9 11.9, 11.6 12 M4.5 18 C 7.5 17.8, 11 17.9, 14.6 18 M15.5 8.5 L18.5 5.2 L21 8.4",
@@ -3841,11 +3840,11 @@ function cargarJarvis() {
   if (jvCarga) return jvCarga;
   const css = new Promise((ok) => {
     if ($('link[href^="jarvis.css"]')) return ok();
-    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "jarvis.css?v=14";
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "jarvis.css?v=15";
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "jarvis.js?v=18";
+    const sc = document.createElement("script"); sc.src = "jarvis.js?v=19";
     sc.onload = () => window.Jarvis ? ok() : mal(new Error("Jarvis no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar Jarvis. ¿Hay conexión?")); };
     document.head.appendChild(sc);
@@ -3939,6 +3938,10 @@ async function iniciarJarvis() {
     verCampanas: (ids) => { const its = ids.map((id) => ({ n: "campana", id: String(id) })); mostrarEnTabla(prepararEvento({ t: "surf", items: its }, its)).then(() => abrirVariosReloj(ids.map(String))); },
     seccion: (sec) => irASeccion(sec),
     seleccionar: seleccionarCampanaJarvis, seleccionarVarias: seleccionarJarvis,
+    // (06/11) para el reporte dentro del chat (antes sección Reportes)
+    abrirModal,
+    estado: async (items, estado) => { const r = await api("estado", { body: { estado, items }, escritura: true }); return r.resultados || []; },
+    configReporte: async () => { try { await cargarReportes(); window.Reportes.config(ctxReportes()); } catch (e) { toast(esc(e.message), "error"); } },
   });
 }
 
@@ -3954,7 +3957,7 @@ function cargarReportes() {
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "reportes.js?v=10";
+    const sc = document.createElement("script"); sc.src = "reportes.js?v=11";
     sc.onload = () => window.Reportes ? ok() : mal(new Error("Reportes no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar Reportes. ¿Hay conexión?")); };
     document.head.appendChild(sc);
@@ -3985,14 +3988,17 @@ async function montarReportes() {
     return;
   }
   if (S.vista !== "reportes" || !$("#rp")) return;
-  window.Reportes.montar($("#rp"), {
+  window.Reportes.montar($("#rp"), ctxReportes());
+}
+function ctxReportes() {
+  return {
     login: (msg) => login(msg), toast, abrirModal, demo: DEMO, prueba: dryOn(),
     usuario: () => usuarioActual()?.id || "",
     presupuesto: presupuestoReportes,
     estado: async (items, estado) => { const r = await api("estado", { body: { estado, items }, escritura: true }); return r.resultados || []; },
     quitarMinimo: async (items) => { const r = await api("quitar_minimo", { body: { items }, escritura: true }); return r.resultados || r; },
     recargarTechos: () => cargarTechos(true),
-  });
+  };
 }
 
 const TECHOS = new Map(); let techosT = 0;

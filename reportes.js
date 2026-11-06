@@ -184,5 +184,5 @@ function cargarTodo(forzar = false) {
   pintar();
   cargarUmb(); for (const k of ["limpiador", "rechazos", "winners", "nuevas"]) cargar(k, forzar);
 }
-window.Reportes = { montar(raiz, ctx) { R.raiz = raiz; R.ctx = ctx || {}; document.getElementById("rp-selbar")?.remove(); cargarTodo(false); } };
+window.Reportes = { config(ctx) { R.ctx = ctx || {}; verConfig(); }, montar(raiz, ctx) { R.raiz = raiz; R.ctx = ctx || {}; document.getElementById("rp-selbar")?.remove(); cargarTodo(false); } };
 })();

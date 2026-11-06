@@ -11,12 +11,12 @@
   const ico = (d, w = 22) => `<svg viewBox="0 0 24 24" width="${w}" height="${w}" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const I = {
     dash: "M4 20 C 9 19.6, 15 20.2, 20.5 19.8 M6.5 17 V11.5 M11.5 17 V6.5 M16.5 17 V9.5",
-    reportes: "M5 4.5 C 9.5 4.3, 14 4.6, 18.8 4.4 L18.6 19.6 C 14 19.8, 9.5 19.5, 5.2 19.7 Z M8.3 15.5 L11 12.3 L13.2 14.2 L16 10",
+    ranking: "M4.5 6 C 6 5.8, 7.4 5.9, 8.6 6 M4.5 12 C 6.5 11.8, 9 11.9, 11.6 12 M4.5 18 C 7.5 17.8, 11 17.9, 14.6 18 M15.5 8.5 L18.5 5.2 L21 8.4",
     umbrales: "M4.5 15.5 C 4.6 10.8, 8 7.2, 12 7.1 C 16.1 7, 19.5 10.6, 19.5 15.4 M12 15.2 L15.4 10.6 M3.8 18.6 H20.2",
     mas: "M5 12 h.01 M12 12 h.01 M19 12 h.01",
     estrella: "M12 3 C 12.6 8.4, 15.6 11.4, 21 12 C 15.6 12.6, 12.6 15.6, 12 21 C 11.4 15.6, 8.4 12.6, 3 12 C 8.4 11.4, 11.4 8.4, 12 3 Z",
   };
-  const MAS = [["ranking", "Ranking", "Los mejores anuncios"], ["cazador", "Cazador", "Ofertas de la Biblioteca"], ["creativos", "Creativos", "Carpetas de entregas"], ["atc", "ATC", "Comentarios, mails y reclamos"]];
+  const MAS = [["cazador", "Cazador", "Ofertas de la Biblioteca"], ["creativos", "Creativos", "Carpetas de entregas"], ["atc", "ATC", "Comentarios, mails y reclamos"]];
   const ETQ = { presupuesto: "Presupuesto", roas: "ROAS", ganancia: "Ganancia", gasto: "Gastado", facturacion: "Facturación", ventas: "Ventas", margen: "Margen", cpa: "CPA", ticket_promedio: "Ticket" };
 
   function irSec(sec) { const b = $(`#secciones [data-sec="${sec}"]`); if (b) b.click(); window.scrollTo({ top: 0 }); }
@@ -28,7 +28,7 @@
     const n = document.createElement("nav");
     n.className = "mc-tabs"; n.setAttribute("aria-label", "Secciones");
     const tab = (id, t, d) => `<button type="button" class="mc-tab" data-mc="${id}" aria-current="false">${ico(d)}<span>${t}</span></button>`;
-    n.innerHTML = `${tab("dash", "Inicio", I.dash)}${tab("reportes", "Reportes", I.reportes)}
+    n.innerHTML = `${tab("dash", "Inicio", I.dash)}${tab("ranking", "Ranking", I.ranking)}
       <button type="button" class="mc-jarvis" data-mc="jarvis" aria-label="Abrir Jarvis"><span class="mc-jv-orbe">${ico(I.estrella, 22)}</span><span class="mc-jv-badge" hidden></span></button>
       ${tab("umbrales", "Umbrales", I.umbrales)}${tab("mas", "Más", I.mas)}`;
     document.body.append(n);

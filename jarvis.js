@@ -202,6 +202,7 @@ const claseMsg = (m) => m.rol === "user" ? (m.de && m.de !== yo() ? `jv-m otro${
 const ocultarAcc = (a) => /#(workspace|taller)/.test(a.url || "") || a.sec === "workspace";
 function htmlMsg(m) {
   if (m.rol === "user") return `${m.de && m.de !== yo() ? `<small class="jv-quien">${esc(NOMBRE[m.de] || m.de)}</small>` : ""}${m.cita ? `<button type="button" class="jv-citado" data-ir="${esc(m.citaU || "")}"><small>Jarvis</small>${esc(m.cita)}</button>` : ""}<p>${esc(m.texto)}</p>${m.de && m.de !== yo() ? `<time>${m.t ? hora(m.t) : ""}</time>` : ""}`;
+  if (m.reporte) return `<button type="button" class="jv-resp" data-resp="${m.u}" aria-label="Responder a este mensaje">${FLECHA_RESP}</button><p>${md(m.texto)}</p>${htmlReporte(m)}<time>${m.t ? hora(m.t) : ""}</time>`;
   // (03/11, Lorenzo) «Ver antes y después» se abre ADENTRO de la misma burbuja; la flechita de arriba a la izquierda la vuelve a cerrar
   if (m.abierta && m.card) return `<button type="button" class="jv-volver" data-volver="${m.u}" aria-label="Volver al mensaje">${FLECHA_VOLVER}</button><p class="jv-orig">${md(m.texto)}</p><div class="jv-card-host"></div>`;
   const res = (m.acciones || []).find((a) => a.tipo === "resumen");
@@ -347,10 +348,210 @@ function deslizarParaResponder(box) {
   box.addEventListener("pointerup", fin); box.addEventListener("pointercancel", fin);
 }
 
+// =====================================================================================================================
+// ---------- (06/11, Lorenzo) REPORTE dentro del chat: lo que antes era la sección Reportes ----------
+// «Resumen» → burbuja con: saldo EtherFi · anuncios para apagar (adentro de conjuntos y campañas que van mal, con sus 3 días)
+// · rechazos · winners · cuentas nuevas. Cada anuncio se toca y abre una ventana con los 3 días del anuncio, su conjunto,
+// su campaña y los otros anuncios del conjunto. Apagar pasa por app-movil y SIEMPRE con «¿Seguro?».
+const REP = new Map(); // u del mensaje → datos (en memoria: si se recarga la página se vuelven a pedir)
+const usd0 = (n) => n == null || !Number.isFinite(Number(n)) ? "—" : "US$ " + NF0.format(Math.round(Number(n)));
+const roas2 = (n) => n == null ? "—" : NF2.format(Number(n));
+const cRoas = (r) => r == null ? "g" : r >= 2 ? "v" : r >= 1.22 ? "a" : "r";
+const cortoC = (n) => String(n || "").replace(/ Cuenta publicitaria( USD)?/i, "");
+const DSEM = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+const diaTx = (d, hoy) => { const f = new Date(d + "T12:00:00Z"); return `${DSEM[f.getUTCDay()]} ${f.getUTCDate()}/${f.getUTCMonth() + 1}${d === hoy ? " · hoy" : ""}`; };
+const esResumen = (t) => /\bresumen\b|\breporte/i.test(String(t || ""));
+const FL_RP = `<svg class="fl" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+async function cargarReporte(m) {
+  const st = REP.get(m.u) || {}; if (st.cargando) return;
+  st.cargando = true; REP.set(m.u, st);
+  const fin = (k, v) => { st[k] = v; tocado(m); pintar(); };
+  if (J.ctx.demo) { Object.assign(st, demoReporte()); st.cargando = false; tocado(m); pintar(); return; }
+  const rp = (q) => pedir(`${BASE}reportes?accion=resumen&${q}`).catch((e) => ({ __error: e.message }));
+  await Promise.all([
+    pedir(`${BASE}cuentas-umbral?accion=ver`).catch((e) => ({ __error: e.message })).then((v) => fin("umb", v)),
+    rp("tab=limpiador&periodo=3d").then((v) => fin("limp", v)),
+    rp("tab=rechazos").then((v) => fin("rech", v)),
+    rp("tab=winners").then((v) => fin("win", v)),
+    rp("tab=nuevas").then((v) => fin("nuevas", v)),
+  ]);
+  st.cargando = false;
+}
+const ultimoReporte = () => [...J.msgs].reverse().find((x) => x.reporte);
+// tres cuadraditos con el ROAS de cada día (para ver cómo vienen la campaña y el conjunto)
+const dias3 = (x) => (x?.dias || []).length ? `<span class="jv-rp-d3" aria-label="ROAS por día">${x.dias.map((d) => `<i class="${d.g > 0 ? cRoas(d.roas) : "g"}">${d.g > 0 ? roas2(d.roas) : "·"}</i>`).join("")}</span>` : "";
+
+function secSaldo(u) {
+  if (!u) return ["💳", "Saldo EtherFi…", `<p class="jv-rp-carga">Leyendo…</p>`];
+  if (u.__error) return ["💳", "Saldo EtherFi", `<p>No se pudo leer: ${esc(u.__error)}</p>`];
+  const w = u.whop || {}, saldo = Number(w.saldo || 0);
+  const xs = (u.cuentas || []).filter((c) => String(c.moneda || "USD").toUpperCase() === "USD" && c.umbral > 0 && c.gasto_dia > 0);
+  const cobros = (h) => xs.reduce((t, c) => t + Math.floor((Number(c.saldo || 0) + c.gasto_dia * h / 24) / c.umbral) * c.umbral, 0);
+  const H = [6, 12, 24].map((h) => ({ h, c: cobros(h), falta: Math.max(0, cobros(h) - saldo) })), f24 = H[2].falta;
+  const prox = xs.filter((c) => c.cobra_en_h != null).sort((a, b) => a.cobra_en_h - b.cobra_en_h).slice(0, 4);
+  const tit = f24 > 0 ? `Cargá <b>${usd0(Math.ceil(f24 / 10) * 10)}</b> en EtherFi para las próximas 24 h` : `EtherFi <b>${usd0(saldo)}</b>: alcanza para las próximas 24 h`;
+  return ["💳", tit, `<div class="jv-rp-mini">${H.map((x) => `<span><small>Próximas ${x.h} h</small><b>${usd0(x.c)}</b><i class="${x.falta > 0 ? "r" : "v"}">${x.falta > 0 ? `faltan ${usd0(x.falta)}` : "cubre"}</i></span>`).join("")}</div>
+    <p class="jv-rp-nota">Saldo ${usd0(saldo)}.</p>${prox.length ? `<ul class="jv-rp-lista">${prox.map((c) => `<li><span>${esc(cortoC(c.nombre))}</span><small>en ~${c.cobra_en_h < 1 ? "<1" : Math.round(c.cobra_en_h)} h</small><b>${usd0(c.umbral)}</b></li>`).join("")}</ul>` : ""}`, f24 > 0];
+}
+function secLimpiador(m, d) {
+  if (!d) return ["🧹", "Anuncios para apagar…", `<p class="jv-rp-carga">Revisando campañas…</p>`];
+  if (d.__error) return ["🧹", "Anuncios para apagar", `<p>${esc(d.__error)}</p>`];
+  const cands = d.campanas.flatMap((c) => c.conjuntos.flatMap((s) => s.ads.filter((a) => a.candidato)));
+  const n = cands.length, gasto = cands.reduce((t, a) => t + a.g, 0), hoy = d.dias?.[d.dias.length - 1];
+  if (!n) return ["🧹", "Nada para apagar ✓", `<p>Ninguna campaña con ROAS &lt; ${roas2(d.l_roas)} en 3 días tiene anuncios para apagar.</p>`];
+  const cab = (d.dias || []).length ? `<div class="jv-rp-dcab"><span></span><span class="jv-rp-d3">${d.dias.map((x) => `<i>${diaTx(x, hoy).split(" ")[0]}</i>`).join("")}</span><span></span></div>` : "";
+  const cuerpo = d.campanas.map((c, ci) => !c.candidatos ? "" : `<div class="jv-rp-camp">
+      <div class="jv-rp-f camp"><span class="nom">${esc(c.nombre)}<small>${esc(cortoC(c.cuenta || ""))} · 3 días ${usd0(c.g)}</small></span>${dias3(c)}<b class="jv-rp-r ${cRoas(c.roas)}">${roas2(c.roas)}</b></div>
+      ${c.conjuntos.map((s, si) => !s.ads.some((a) => a.candidato) ? "" : `<div class="jv-rp-f conj"><span class="nom">${esc(s.nombre)}<small>conjunto · ${usd0(s.g)}</small></span>${dias3(s)}<b class="jv-rp-r ${cRoas(s.roas)}">${roas2(s.roas)}</b></div>
+        ${s.ads.map((a, ai) => !a.candidato ? "" : `<button type="button" class="jv-rp-f ad" data-rad="${m.u}|${ci}|${si}|${ai}"><span class="nom">${esc(a.nombre)}<small>${usd0(a.g)} gastados · ${a.v} venta${a.v === 1 ? "" : "s"} · tocá para ver los 3 días</small></span>${dias3(a)}<b class="jv-rp-r ${cRoas(a.roas)}">${roas2(a.roas)}</b></button>`).join("")}`).join("")}
+    </div>`).join("");
+  const st = REP.get(m.u) || {};
+  return ["🧹", `<b>${n} anuncio${n === 1 ? "" : "s"} para apagar</b> · ${usd0(gasto)} gastados con ROAS &lt; ${roas2(d.l_roas)}`,
+    `${cab}${cuerpo}<p class="jv-rp-nota">Campaña con ROAS &lt; ${roas2(d.l_roas)} en 3 días → conjunto &lt; ${roas2(d.l_roas)} → anuncio &lt; ${roas2(d.l_roas)} con ${usd0(d.l_gasto)} o más gastados. Los cuadritos son el ROAS de cada día.</p>
+    <div class="jv-acc"><button type="button" class="jv-b fuerte" data-rp-off="${m.u}">${st.offSeguro ? `¿Seguro? Apagar ${n}` : `Apagar los ${n}`}</button></div>`, true];
+}
+function porNombreRp(xs) {
+  const mm = new Map();
+  for (const x of xs || []) { const e = mm.get(x.nombre) ?? { nombre: x.nombre, items: [], tot: { g: 0, v: 0, val: 0 }, prev: { g: 0, v: 0, val: 0 }, rec: { g: 0, v: 0, val: 0 } };
+    e.items.push(x); for (const p of ["tot", "prev", "rec"]) { e[p].g += x[p]?.g || 0; e[p].v += x[p]?.v || 0; e[p].val += x[p]?.val || 0; } mm.set(x.nombre, e); }
+  for (const e of mm.values()) for (const p of ["tot", "prev", "rec"]) e[p].roas = e[p].g ? e[p].val / e[p].g : null;
+  return [...mm.values()];
+}
+const lnk = (url, t) => url ? `<a href="${esc(url)}" target="_blank" rel="noopener" class="jv-rp-lk">${t}</a>` : "";
+function secRechazos(d) {
+  if (!d) return ["⛔", "Rechazos…", `<p class="jv-rp-carga">Buscando…</p>`];
+  if (d.__error) return ["⛔", "Rechazos", `<p>${esc(d.__error)}</p>`];
+  const w = (d.anuncios || []).filter((a) => a.winner), resto = (d.anuncios || []).filter((a) => !a.winner && a.m7?.v > 0);
+  const fila = (a) => `<li><span>${esc(a.nombre)}<small>${esc(cortoC(a.cuenta))} · ${a.estado === "DISAPPROVED" ? "rechazado" : "con problemas"}${a.motivos?.length ? " · " + esc(a.motivos.slice(0, 2).join(" · ")) : ""}</small></span><b class="jv-rp-r ${cRoas(a.m7?.roas)}">${roas2(a.m7?.roas)}</b>${lnk(a.link, "Ads")}${lnk(a.post, "Post")}</li>`;
+  return ["⛔", d.winners ? `<b>${d.winners} winner${d.winners === 1 ? "" : "s"} rechazado${d.winners === 1 ? "" : "s"}</b> · ${d.total} con problemas` : `Ningún winner rechazado · ${d.total} con problemas`,
+    `${w.length ? `<ul class="jv-rp-lista">${w.map(fila).join("")}</ul>` : ""}${resto.length ? `<p class="jv-rp-sub">Otros que vendieron en 7 días</p><ul class="jv-rp-lista">${resto.slice(0, 6).map(fila).join("")}</ul>` : ""}${!w.length && !resto.length ? "<p>Nada importante rechazado.</p>" : ""}`, d.winners > 0];
+}
+function secWinners(d) {
+  if (!d) return ["🏆", "Winners…", `<p class="jv-rp-carga">Buscando…</p>`];
+  if (d.__error) return ["🏆", "Winners", `<p>${esc(d.__error)}</p>`];
+  const N = porNombreRp(d.nuevos).sort((a, b) => (b.tot.val - b.tot.g) - (a.tot.val - a.tot.g)), E = porNombreRp(d.envejeciendo).sort((a, b) => b.prev.g - a.prev.g);
+  const fN = (e) => `<li><span>${esc(e.nombre)}<small>${e.tot.v} ventas · ${usd0(e.tot.g)} gastados</small></span><b class="jv-rp-r ${cRoas(e.tot.roas)}">${roas2(e.tot.roas)}</b>${lnk(e.items[0]?.ads?.[0]?.link, "Ads")}</li>`;
+  const fE = (e) => `<li><span>${esc(e.nombre)}<small>antes ${roas2(e.prev.roas)} → ayer + hoy ${roas2(e.rec.roas)} (${e.rec.v} v)</small></span><b class="jv-rp-r ${cRoas(e.rec.roas)}">${roas2(e.rec.roas)}</b>${lnk(e.items[0]?.ads?.[0]?.link, "Ads")}</li>`;
+  return ["🏆", `<b>${N.length} winner${N.length === 1 ? "" : "s"} nuevo${N.length === 1 ? "" : "s"}</b> · ${E.length} envejeciendo`,
+    `<p class="jv-rp-sub">Nuevos</p><ul class="jv-rp-lista">${N.slice(0, 6).map(fN).join("") || "<li><span>Ninguno nuevo.</span></li>"}</ul>
+     <p class="jv-rp-sub">Envejeciendo (pedí renos de estos)</p><ul class="jv-rp-lista">${E.slice(0, 6).map(fE).join("") || "<li><span>Ningún winner cayendo.</span></li>"}</ul>`, false];
+}
+function secNuevas(d) {
+  if (!d) return ["🆕", "Cuentas nuevas…", `<p class="jv-rp-carga">…</p>`];
+  if (d.__error) return ["🆕", "Cuentas nuevas", `<p>${esc(d.__error)}</p>`];
+  const xs = d.cuentas || [], mal = xs.filter((c) => c.mal);
+  return ["🆕", xs.length ? `Cuentas nuevas: <b>${mal.length} de ${xs.length} vienen mal</b>` : "Sin cuentas nuevas",
+    `<ul class="jv-rp-lista">${xs.slice(0, 8).map((c) => `<li><span>${esc(cortoC(c.cuenta))}<small>desde ${c.desde ? c.desde.slice(8, 10) + "/" + c.desde.slice(5, 7) : "—"} · ${c.campanas} camp.</small></span><b class="jv-rp-r ${cRoas(c.total?.roas)}">${roas2(c.total?.roas)}</b><b class="${(c.total?.gan ?? 0) >= 0 ? "v" : "r"}">${usd0(c.total?.gan)}</b></li>`).join("") || "<li><span>No hay cuentas nuevas.</span></li>"}</ul>`, mal.length > 0];
+}
+function htmlReporte(m) {
+  const st = REP.get(m.u);
+  if (!st) {
+    if (ultimoReporte() === m) setTimeout(() => cargarReporte(m), 0);
+    else return `<div class="jv-acc"><button type="button" class="jv-b" data-rp-rec="${m.u}">Ver este reporte de nuevo</button></div>`;
+  }
+  const d = st || {}, ab = new Set(m.repAb || ["limp"]);
+  const secs = [["saldo", secSaldo(d.umb)], ["limp", secLimpiador(m, d.limp)], ["rech", secRechazos(d.rech)], ["win", secWinners(d.win)], ["nuevas", secNuevas(d.nuevas)]];
+  return `<ol class="jv-res jv-rep">${secs.map(([k, [ico, tit, cuerpo, urg]]) => `<li class="${urg ? "urg" : ""}${ab.has(k) ? " abierto" : ""}"><button type="button" class="jv-res-t" data-rpt="${m.u}" data-rk="${k}" aria-expanded="${ab.has(k)}"><span class="ico">${ico}</span><span class="tx">${tit}</span>${FL_RP}</button><div class="jv-res-d"><div>${cuerpo}</div></div></li>`).join("")}</ol>
+    <div class="jv-acc"><button type="button" class="jv-b suave" data-rp-rec="${m.u}">↻ Actualizar</button>${J.ctx.configReporte ? `<button type="button" class="jv-b suave" data-rp-cfg>⚙ Umbrales del reporte</button>` : ""}</div>`;
+}
+
+// ventana con los 3 días: campaña, conjunto, este anuncio y los otros del conjunto
+function verAdReporte(u, ci, si, ai) {
+  const d = REP.get(u)?.limp, c = d?.campanas?.[ci], s = c?.conjuntos?.[si], a = s?.ads?.[ai];
+  if (!a || !J.ctx.abrirModal) return;
+  const hoy = d.dias?.[d.dias.length - 1];
+  let met = ls.get("jv_rp_met", "roas"), seguro = false;
+  const celda = (x) => {
+    if (!x || !(x.g > 0) && !(x.v > 0)) return `<span class="jv-rp-c vacio">—</span>`;
+    if (met === "gasto") return `<span class="jv-rp-c"><b>${usd0(x.g)}</b><small>ROAS ${roas2(x.roas)}</small></span>`;
+    if (met === "ventas") return `<span class="jv-rp-c"><b>${x.v}</b><small>${usd0(x.g)}</small></span>`;
+    if (met === "ganancia") return `<span class="jv-rp-c"><b class="${x.gan >= 0 ? "v" : "r"}">${usd0(x.gan)}</b><small>ROAS ${roas2(x.roas)}</small></span>`;
+    return `<span class="jv-rp-c"><b class="jv-rp-r ${cRoas(x.roas)}">${roas2(x.roas)}</b><small>${usd0(x.g)} · ${x.v} v</small></span>`;
+  };
+  const fila = (x, cls, lbl) => `<tr class="${cls}"><th><small>${lbl}</small><span>${esc(x.nombre)}</span></th>${(d.dias || []).map((dd) => `<td>${celda((x.dias || []).find((y) => y.d === dd))}</td>`).join("")}<td class="tot">${celda(x)}</td></tr>`;
+  const html = () => `<div class="jv-rp-modal"><h3>${esc(a.nombre)}</h3><p class="mut">${esc(cortoC(c.cuenta || ""))} · ${esc(c.nombre)} › ${esc(s.nombre)}</p>
+    <div class="periodos jv-rp-mets" role="group" aria-label="Qué mirar">${[["roas", "ROAS"], ["gasto", "Gasto"], ["ventas", "Ventas"], ["ganancia", "Ganancia"]].map(([k, t]) => `<button type="button" class="btn chico" data-met="${k}" aria-pressed="${met === k}">${t}</button>`).join("")}</div>
+    <div class="jv-rp-tw"><table class="jv-rp-t"><thead><tr><th></th>${(d.dias || []).map((dd) => `<th>${diaTx(dd, hoy)}</th>`).join("")}<th>3 días</th></tr></thead><tbody>
+      ${fila(c, "camp", "Campaña")}${fila(s, "conj", "Conjunto")}
+      ${s.ads.map((x) => fila(x, "ad" + (x.id === a.id ? " este" : ""), x.id === a.id ? "Este anuncio" : x.activo ? (x.candidato ? "Anuncio · también para apagar" : "Anuncio") : "Anuncio apagado")).join("")}
+    </tbody></table></div>
+    <p class="mut chico">Hoy todavía está en curso. Ventas reales (con bumps y post-venta), igual que el Dashboard.</p>
+    <div class="botones"><button type="button" class="btn" data-x>Cerrar</button>${a.link ? `<a class="btn" href="${esc(a.link)}" target="_blank" rel="noopener">Abrir en Ads</a>` : ""}${a.activo ? `<button type="button" class="btn peligro" data-off>${seguro ? "¿Seguro? Apagar" : "Apagar este anuncio"}</button>` : `<span class="mut">Ya está apagado</span>`}</div></div>`;
+  const mod = J.ctx.abrirModal(html(), { ancho: true });
+  const velo = mod.dlg.closest(".velo"); if (velo) velo.style.zIndex = "80"; // por encima del chat de Jarvis
+  const enlazar = () => {
+    mod.dlg.querySelector("[data-x]").onclick = mod.cerrar;
+    mod.dlg.querySelectorAll("[data-met]").forEach((b) => b.onclick = () => { met = b.dataset.met; ls.set("jv_rp_met", met); mod.set(html()); enlazar(); });
+    const off = mod.dlg.querySelector("[data-off]");
+    if (off) off.onclick = async () => {
+      if (!seguro) { seguro = true; off.textContent = "¿Seguro? Apagar"; return; }
+      off.disabled = true; off.textContent = "Apagando…";
+      try {
+        const r = await apagarAds([{ id: a.id, act: c.act, nivel: "anuncio", nombre: a.nombre }]);
+        if (r === 1) { a.activo = false; a.candidato = false; c.candidatos = Math.max(0, (c.candidatos || 1) - 1); const m = porU(u); if (m) { tocado(m); guardar(); pintar(); } mod.cerrar(); }
+        else { off.disabled = false; off.textContent = "Reintentar"; }
+      } catch (e) { J.ctx.toast?.(`No se pudo: ${esc(e.message)}`, "error", 9000); off.disabled = false; off.textContent = "Reintentar"; }
+    };
+  };
+  enlazar();
+}
+async function apagarAds(items) {
+  if (J.ctx.demo) { J.ctx.toast?.(`Demo: se apagarían ${items.length} anuncio${items.length === 1 ? "" : "s"} (no toca Meta).`, "ok", 6000); return items.length; }
+  if (!J.ctx.estado) throw new Error("falta la conexión con Meta");
+  const r = await J.ctx.estado(items, "PAUSED"); const ok = r.filter((x) => x.ok).length;
+  J.ctx.toast?.(`✓ Apagados ${ok} de ${items.length} anuncio${items.length === 1 ? "" : "s"}.`, ok === items.length ? "ok" : "error", 9000);
+  return ok;
+}
+function tocarReporte(e) {
+  const t = e.target.closest("[data-rpt]");
+  if (t) {
+    const m = porU(t.dataset.rpt), k = t.dataset.rk; if (!m) return true;
+    const ab = new Set(m.repAb || ["limp"]); ab.has(k) ? ab.delete(k) : ab.add(k); m.repAb = [...ab]; guardar();
+    const li = t.closest("li"); li.classList.toggle("abierto", ab.has(k)); t.setAttribute("aria-expanded", String(ab.has(k)));
+    if (ab.has(k)) setTimeout(() => li.scrollIntoView({ block: "nearest", behavior: quieto() ? "auto" : "smooth" }), 260);
+    return true;
+  }
+  const ad = e.target.closest("[data-rad]");
+  if (ad) { const [u, ci, si, ai] = ad.dataset.rad.split("|"); verAdReporte(u, +ci, +si, +ai); return true; }
+  const rec = e.target.closest("[data-rp-rec]");
+  if (rec) { const m = porU(rec.dataset.rpRec); if (m) { REP.delete(m.u); m.reporte = true; cargarReporte(m); tocado(m); pintar(); } return true; }
+  if (e.target.closest("[data-rp-cfg]")) { J.ctx.configReporte?.(); return true; }
+  const off = e.target.closest("[data-rp-off]");
+  if (off) {
+    const m = porU(off.dataset.rpOff), st = REP.get(off.dataset.rpOff), d = st?.limp; if (!m || !d) return true;
+    const items = d.campanas.flatMap((c) => c.conjuntos.flatMap((s) => s.ads.filter((a) => a.candidato).map((a) => ({ id: a.id, act: c.act, nivel: "anuncio", nombre: a.nombre }))));
+    if (!items.length) return true;
+    if (!st.offSeguro) { st.offSeguro = true; off.textContent = `¿Seguro? Apagar ${items.length}`; return true; }
+    st.offSeguro = false; off.disabled = true; off.textContent = "Apagando…";
+    apagarAds(items).then(() => { REP.delete(m.u); cargarReporte(m); }).catch((er) => { J.ctx.toast?.(`No se pudo: ${esc(er.message)}`, "error", 9000); off.disabled = false; off.textContent = "Reintentar"; });
+    return true;
+  }
+  return false;
+}
+function demoReporte() {
+  const h = new Date(), iso = (n) => new Date(h.getTime() - n * 86400e3 - 3 * 3600e3).toISOString().slice(0, 10), D = [iso(2), iso(1), iso(0)];
+  const dd = (xs) => xs.map(([g, v, val], i) => ({ d: D[i], g, v, val, roas: g > 0 ? +(val / g).toFixed(2) : null, gan: +(val * 0.9 - g).toFixed(2) }));
+  const tot = (ds) => { const g = ds.reduce((t, x) => t + x.g, 0), v = ds.reduce((t, x) => t + x.v, 0), val = ds.reduce((t, x) => t + x.val, 0); return { g, v, val, roas: g ? +(val / g).toFixed(2) : null, gan: +(val * 0.9 - g).toFixed(2), dias: ds }; };
+  const ad = (id, nombre, xs, cand, activo = true) => ({ id, nombre, activo, candidato: cand, link: "", ...tot(dd(xs)) });
+  const a1 = ad("d1", "28.10 Y11 Banda negra a la noche", [[17.8, 1, 62], [25.1, 1, 16], [49, 1, 16]], true), a2 = ad("d2", "26.10 RENO 3", [[12, 0, 0], [15, 0, 0], [11, 0, 0]], true), a3 = ad("d3", "AD 5 doctora", [[30, 3, 96], [28, 2, 70], [20, 1, 33]], false);
+  const sum = (ads) => { const ds = D.map((d) => { const xs = ads.map((a) => a.dias.find((y) => y.d === d)); const g = xs.reduce((t, x) => t + x.g, 0), v = xs.reduce((t, x) => t + x.v, 0), val = xs.reduce((t, x) => t + x.val, 0); return { d, g, v, val, roas: g ? +(val / g).toFixed(2) : null, gan: +(val * 0.9 - g).toFixed(2) }; }); return tot(ds); };
+  const s1 = { id: "s1", nombre: "1.11 Winners", malo: true, ...sum([a1, a2, a3]), ads: [a1, a2, a3] };
+  const c1 = { id: "c1", act: "1", nombre: "🇦🇷 29.10 CBO Yogur Bariátrico (AR)", cuenta: "AR y MX Cuenta publicitaria USD", candidatos: 2, ...sum([a1, a2, a3]), conjuntos: [s1] };
+  return {
+    umb: { whop: { saldo: 3182.83 }, cuentas: [{ nombre: "AR y MX Cuenta publicitaria USD", moneda: "USD", umbral: 750, gasto_dia: 900, saldo: 520, cobra_en_h: 6 }, { nombre: "BRASIL", moneda: "USD", umbral: 500, gasto_dia: 300, saldo: 100, cobra_en_h: 32 }] },
+    limp: { dias: D, l_roas: 1.3, l_gasto: 15, campanas: [c1] },
+    rech: { winners: 1, total: 6, anuncios: [{ nombre: "AD 1 Yogur (PID)", winner: true, cuenta: "BRASIL", estado: "DISAPPROVED", motivos: ["Salud y bienestar"], m7: { roas: 2.4, v: 12, g: 180 } }] },
+    win: { nuevos: [{ nombre: "Y7 Chef Fer", tot: { g: 120, v: 9, val: 310 }, prev: { g: 0, v: 0, val: 0 }, rec: { g: 0, v: 0, val: 0 }, ads: [] }], envejeciendo: [] },
+    nuevas: { cuentas: [{ cuenta: "CP33 Europa USD", desde: iso(4), campanas: 2, mal: false, total: { roas: 1.9, gan: 40 } }] },
+  };
+}
+
 // ---------- charla con Claude ----------
 async function preguntar(t) {
   const cita = J.cita; soltarCita();
   const mio = agregar({ rol: "user", texto: t, de: yo(), temp: true, cita: cita?.texto, citaU: cita?.u, citaId: cita?.id }); guardar();
+  if (esResumen(t)) agregar({ rol: "assistant", reporte: true, texto: "📊 **Reporte** · lo que antes estaba en Reportes. Tocá cada tema para abrirlo; cada anuncio abre sus 3 días." });
   J.pensando = true; calcOtro(); pintar(); abajo();
   let r;
   try { r = J.ctx.demo ? await demoResp(t) : await pedir(BASE + "asistente-wa?accion=app_chat", { texto: t, cita: cita?.texto, citaId: cita?.id }); }
@@ -376,6 +577,7 @@ async function tocar(e) {
   const r = e.target.closest("[data-resp]"); if (r) { citar(porU(r.dataset.resp)); return; }
   const ci = e.target.closest("[data-ir]"); if (ci) { irAMensaje(ci.dataset.ir); return; }
   const vo = e.target.closest("[data-volver]"); if (vo) { const m = porU(vo.dataset.volver); if (m) { m.abierta = false; tocado(m); guardar(); pintar(); } return; }
+  if (tocarReporte(e)) return;
   if (tocarResumen(e)) return;
   const b = e.target.closest("button[data-a]"); if (!b) return;
   const m = porU(b.dataset.mu), a = m?.acciones?.[Number(b.dataset.a)]; if (!a) return;
