@@ -223,23 +223,65 @@ async function cargarDias() {
 }
 function serieDe(clave, campo) {
   const hoy = isoAR(new Date()), xs = [];
-  for (let n = 7; n >= 1; n--) { const v = DIAS[isoMenos(hoy, n)]?.[clave]?.[campo]; if (v != null && isFinite(v)) xs.push(+v); }
+  for (let n = 7; n >= 1; n--) { const iso = isoMenos(hoy, n), v = DIAS[iso]?.[clave]?.[campo]; if (v != null && isFinite(v)) xs.push({ iso, v: +v }); }
   return xs.length >= 3 ? xs : null;
 }
+// curva suave que pasa por todos los puntos (Catmull-Rom → Bézier)
+function curva(P) {
+  let d = `M${P[0][0].toFixed(1)},${P[0][1].toFixed(1)}`;
+  for (let i = 0; i < P.length - 1; i++) {
+    const p0 = P[i - 1] || P[i], p1 = P[i], p2 = P[i + 1], p3 = P[i + 2] || p2;
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6], c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    d += ` C${c1[0].toFixed(1)},${c1[1].toFixed(1)} ${c2[0].toFixed(1)},${c2[1].toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+  }
+  return d;
+}
 window.MesaTend = (g, campo, valor, neutro) => {
-  const ys = serieDe(g.clave, campo); if (!ys) return "";
+  const se = serieDe(g.clave, campo); if (!se) return "";
+  const ys = se.map((x) => x.v);
   const ult = ys[ys.length - 1], prev = ys.slice(0, -1), prom = prev.reduce((a, b) => a + b, 0) / prev.length;
   const sube = ult >= prom, pct = prom ? Math.abs((ult - prom) / prom) * 100 : 0;
   if (neutro) return `<span class="ms-tend neutro num">${pct.toLocaleString("es-AR", { maximumFractionDigits: 1 })} % ${sube ? "más" : "menos"} que el promedio de la semana (ayer)</span>`;
   const w = 300, h = 80, min = Math.min(...ys), max = Math.max(...ys), rango = max - min || 1, n = ys.length;
   const x = (i) => (i / (n - 1)) * w, y = (v) => h - 6 - ((v - min) / rango) * (h - 26);
-  const pts = ys.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  const P = ys.map((v, i) => [x(i), y(v)]), d = curva(P);
   const id = "mg" + campo + Math.random().toString(36).slice(2, 6);
-  return `<svg class="ms-graf ${sube ? "sube" : "baja"}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-label="${sube ? "Viene subiendo" : "Viene bajando"} en los últimos 7 días" role="img">
+  const datos = encodeURIComponent(JSON.stringify({ c: campo, a: valor, p: se.map((s2, i) => [s2.iso, s2.v, +(P[i][1] / h).toFixed(4)]) }));
+  return `<svg class="ms-graf ${sube ? "sube" : "baja"}" data-ms="${datos}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-label="${sube ? "Viene subiendo" : "Viene bajando"} en los últimos 7 días" role="img">
     <defs><linearGradient id="${id}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="currentColor" stop-opacity=".34"/><stop offset="1" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs>
-    <polygon points="0,${h} ${pts} ${w},${h}" fill="url(#${id})"/>
-    <polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>`;
+    <path d="${d} L${w},${h} L0,${h} Z" fill="url(#${id})"/>
+    <path d="${d}" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>`;
 };
+// pasar el mouse por el gráfico: círculo en el punto + fecha, número de ese día y % contra ahora
+const DSEM = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+function fmtCampo(c, v) {
+  if (v == null || !isFinite(v)) return "—";
+  if (c === "roas") return v.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (c === "margen") return Math.round(v * 100).toLocaleString("es-AR") + " %";
+  return "US$ " + v.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+document.addEventListener("pointermove", (e) => {
+  const card = e.target.closest && e.target.closest(".mesa-fila1 .met");
+  $$(".mesa-fila1 .met.ms-hover").forEach((c) => { if (c !== card) { c.classList.remove("ms-hover"); } });
+  if (!card || e.pointerType === "touch") return;
+  const svg = $(".ms-graf", card); if (!svg) return;
+  let info; try { info = JSON.parse(decodeURIComponent(svg.dataset.ms)); } catch { return; }
+  const rc = card.getBoundingClientRect(), rs = svg.getBoundingClientRect(), n = info.p.length;
+  const rel = Math.max(0, Math.min(1, (e.clientX - rs.left) / rs.width)), i = Math.round(rel * (n - 1)), [iso, v, yN] = info.p[i];
+  let punto = $(".ms-punto", card), tip = $(".ms-tip", card), guia = $(".ms-guia", card);
+  if (!punto) { punto = document.createElement("span"); punto.className = "ms-punto"; guia = document.createElement("span"); guia.className = "ms-guia"; tip = document.createElement("span"); tip.className = "ms-tip"; card.append(guia, punto, tip); }
+  const px = rs.left - rc.left + (i / (n - 1)) * rs.width, py = rs.top - rc.top + yN * rs.height;
+  punto.style.left = px + "px"; punto.style.top = py + "px"; guia.style.left = px + "px"; guia.style.top = py + "px";
+  punto.style.color = getComputedStyle(svg).color;
+  const ahora = info.a, dif = v ? ((ahora - v) / Math.abs(v)) * 100 : null;
+  const f = new Date(iso + "T12:00:00Z"), fecha = `${DSEM[f.getUTCDay()]} ${f.getUTCDate()}/${f.getUTCMonth() + 1}`;
+  tip.innerHTML = `<small>${fecha}</small><b class="num">${fmtCampo(info.c, v)}</b>${dif == null || !isFinite(dif) ? "" : `<em class="num ${dif >= 0 ? "sube" : "baja"}">ahora ${dif >= 0 ? "+" : "−"}${Math.abs(dif).toLocaleString("es-AR", { maximumFractionDigits: 1 })} %</em>`}`;
+  const tw = tip.offsetWidth || 120;
+  tip.style.left = Math.max(8, Math.min(rc.width - tw - 8, px - tw / 2)) + "px";
+  tip.style.top = Math.max(6, py - (tip.offsetHeight || 54) - 12) + "px";
+  card.classList.add("ms-hover");
+}, { passive: true });
+document.addEventListener("pointerleave", () => $$(".mesa-fila1 .met.ms-hover").forEach((c) => c.classList.remove("ms-hover")), true);
 
 // ---------- (06/11 c) Jarvis: estrella en lugar del átomo ----------
 const ESTRELLA = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 2.8l2.1 6.1 6.1 2.1-6.1 2.1L12 19.2l-2.1-6.1L3.8 11l6.1-2.1z" fill="currentColor"/></svg>`;
