@@ -78,7 +78,7 @@ async function traerAvisos() {
   const tono = nuevos.some((x) => x.urgente) ? true : nuevos.every((x) => x.verde) ? "verde" : false;
   if (J.abierto) { marcarVisto(); pintar(); abajo(); sonar(tono); return; }
   pintar(); sonar(tono);
-  if (nuevos.some((x) => x.urgente)) abrir(); // urgente: se abre solo
+  // (06/11, Lorenzo) nunca se abre solo: al entrar se ve el Dashboard; lo urgente hace girar el anillo rojo y sonar, nada más
 }
 function vivoNuevo(lista, clave, texto, acciones = []) {
   const k = "jv_vivo_" + clave; if (Date.now() - Number(ls.get(k, "0")) < 6 * 3600e3) return;
