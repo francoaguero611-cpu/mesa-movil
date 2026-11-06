@@ -767,18 +767,26 @@ function tarjetasUmb(d) {
     tRet = `<div class="ut ret">
       <div class="ut-lbl">🔒 Retenido por Meta</div>
       <div class="ut-val num" data-cuenta="${r.chicas.usd}" data-k="ret">${usdC(r.chicas.usd)}</div>
-      <div class="ut-graf" role="img" aria-label="Lo que se libera en las próximas 48 horas">${slots.map(([a, b], i) => `<span style="--a:${Math.min(1, a / mx).toFixed(3)};--b:${Math.min(1 - Math.min(1, a / mx), b / mx).toFixed(3)};--i:${i}" title="${i ? `en ${i} h` : "esta hora"}: vuelve ${usdC(a)}${b ? ` · se cobra ${usdC(b)}` : ""}"></span>`).join("")}</div>
-      <div class="ut-eje" aria-hidden="true"><span>ahora</span><span>24 h</span><span>48 h</span></div>
-      <div class="ut-sub"><b>${NF0.format(r.chicas.n)}</b> retenciones de ~US$ 2 · vuelven ${usdC(vuelve24)} en 24 h</div>
-      ${r.grandes?.usd ? `<div class="ut-sub mut">Aparte: ${usdC(r.grandes.usd)} de gasto en anuncios ya cobrado, que Whop asienta en 1–2 días (no vuelve)</div>` : ""}
+      <div class="ut-sub">vuelven <b>${usdC(vuelve24)}</b> en las próximas 24 h</div>
     </div>`;
   }
-  // Próximo cobro
-  const tProx = prox ? `<div class="ut prox${prox.cobra_en_h < 2 ? " ya" : ""}">
-      <div class="ut-lbl">⏱ Próximo cobro</div>
-      <div class="ut-val">${tiempoUmb(prox.cobra_en_h).replace("~", "")}</div>
-      <div class="ut-sub"><b>${esc(prox.nombre)}</b> · ${usdC(prox.umbral)}${xs[1] ? ` · después ${esc(xs[1].nombre)} en ${tiempoUmb(xs[1].cobra_en_h)}` : ""}</div>
-    </div>` : "";
+  // Próximo cobro (06/11, Lorenzo): cuándo es el primer cobro que el saldo de Whop NO cubre y cuánto hay que cargar para ese
+  let tProx = "";
+  if (prox) {
+    const wh = xs.filter((c) => !c.tarjeta);           // las que cobran de Whop (Meta no muestra tarjeta para Whop)
+    let queda = w ? w.saldo : 0, falla = null;
+    // mismo criterio que la tarjeta de Whop: si el saldo cubre lo que hace falta (necesita), alcanza
+    if (w && d?.necesita > w.saldo) for (const c of wh) { queda -= c.umbral || 0; if (queda < 0) { falla = { c, cargar: Math.ceil(Math.min(-queda, d.necesita - w.saldo)) }; break; } }
+    tProx = falla ? `<div class="ut prox ya">
+        <div class="ut-lbl">⏱ Próximo cobro que no alcanza</div>
+        <div class="ut-val">en ${tiempoUmb(falla.c.cobra_en_h).replace("~", "")}</div>
+        <div class="ut-sub">Cargá <b>${usdC(falla.cargar)}</b> en Whop antes de ese cobro (${esc(falla.c.nombre)} · ${usdC(falla.c.umbral)})</div>
+      </div>` : `<div class="ut prox">
+        <div class="ut-lbl">⏱ Próximo cobro</div>
+        <div class="ut-val">en ${tiempoUmb(prox.cobra_en_h).replace("~", "")}</div>
+        <div class="ut-sub">${esc(prox.nombre)} · ${usdC(prox.umbral)} · ${wh.length ? "el saldo alcanza para los próximos cobros" : "no cobra de Whop"}</div>
+      </div>`;
+  }
   return tSaldo || tRet || tProx ? `<div class="ut-fila">${tSaldo}${tRet}${tProx}</div>` : "";
 }
 function filaUmb(c, maxU) {
@@ -828,7 +836,9 @@ function filaPago(c) {
 }
 function pagosHTML(xs) {
   if (!xs.length) return `<div class="pagos ok"><h3>Pagos rechazados</h3><p class="mut">Ninguna cuenta con pagos rechazados ✓</p></div>`;
-  return `<div class="pagos"><h3>Pagos rechazados <small class="mut">${xs.length}</small></h3><ul class="pagos-lista">${xs.map(filaPago).join("")}</ul></div>`;
+  // (06/11, Lorenzo) plegados de entrada: lo primero que se ve en Umbrales es lo que hay que entender
+  const tot = xs.reduce((a, c) => a + (String(c.moneda || "USD").toUpperCase() === "USD" ? +c.deuda || 0 : 0), 0);
+  return `<details class="pagos pagos-pleg"><summary><h3>Pagos rechazados <small class="mut">${xs.length} cuenta${xs.length === 1 ? "" : "s"}${tot ? ` · US$ ${NF2.format(tot)}` : ""}</small></h3></summary><ul class="pagos-lista">${xs.map(filaPago).join("")}</ul></details>`;
 }
 function mostrarPagos(xs, titulo) {
   if (!xs.length) return;
@@ -950,13 +960,15 @@ function secundariasHTML(g) {
     { g: 0, imp: 0, cl: 0, vis: 0, car: 0, pi: 0, v: 0, fi: 0, alc: 0, rw: 0, ri: 0, hw: 0, hi: 0 });
   const dv = (a, b) => b ? a / b : null, n = (x) => x == null ? "—" : ent(Math.round(x)), p = (x) => x == null ? "—" : pct(x), u = (x) => x == null ? "—" : usdG(x);
   const m0 = g.metricas || {};
-  const M = [["Visitas a la landing", n(T.vis), "cargaron la página"], ["Costo por visita", u(dv(T.g, T.vis)), "gasto ÷ visitas"], ["Conv. de la landing", p(dv(T.v, T.vis)), "ventas ÷ visitas"],
-    ["Carritos", n(T.car), "agregaron al carrito"], ["Costo por carrito", u(dv(T.g, T.car)), "gasto ÷ carritos"], ["Pagos iniciados", n(T.pi), "llegaron al checkout"],
-    ["Costo por pago iniciado", u(dv(T.g, T.pi)), "gasto ÷ pagos iniciados"], ["Conv. del checkout", p(dv(T.v, T.pi)), "ventas ÷ pagos iniciados"],
-    ["Ventas", m0.ventas != null ? ent(m0.ventas) : "—", "compras reales"], ["% Order bump", m0.pct_bump != null ? pct(m0.pct_bump) : "—", m0.con_bump != null ? `${ent(m0.con_bump)} de ${ent(m0.ventas_principales ?? m0.ventas)} ventas` : ""],
+  // (06/11, Lorenzo) por orden de importancia
+  const M = [["Ventas", m0.ventas != null ? ent(m0.ventas) : "—", "compras reales"], ["Costo por pago iniciado", u(dv(T.g, T.pi)), "gasto ÷ pagos iniciados"],
+    ["Conv. de la landing", p(dv(T.v, T.vis)), "ventas ÷ visitas"], ["Costo por carrito", u(dv(T.g, T.car)), "gasto ÷ carritos"],
+    ["% Order bump", m0.pct_bump != null ? pct(m0.pct_bump) : "—", m0.con_bump != null ? `${ent(m0.con_bump)} de ${ent(m0.ventas_principales ?? m0.ventas)} ventas` : ""],
     ["CTR", p(dv(T.cl, T.imp)), "clics ÷ impresiones"], ["CPM", u(T.imp ? (T.g / T.imp) * 1000 : null), "costo por mil"], ["CPC", u(dv(T.g, T.cl)), "costo por clic"],
-    ["Retención 3 s", p(T.hi ? T.hw / T.hi : null), "vieron los primeros 3 s"], ["Frecuencia", T.alc ? NF2.format(T.fi / T.alc) : "—", "veces que lo ve cada uno"], ["Impresiones", n(T.imp), "veces que se mostró"], ["Clics", n(T.cl), "en el enlace"],
-    ["Video completo", p(T.ri ? T.rw / T.ri : null), "ThruPlay ÷ impresiones"]];
+    ["Retención 3 s", p(T.hi ? T.hw / T.hi : null), "vieron los primeros 3 s"], ["Conv. del checkout", p(dv(T.v, T.pi)), "ventas ÷ pagos iniciados"],
+    ["Costo por visita", u(dv(T.g, T.vis)), "gasto ÷ visitas"], ["Pagos iniciados", n(T.pi), "llegaron al checkout"], ["Carritos", n(T.car), "agregaron al carrito"],
+    ["Visitas a la landing", n(T.vis), "cargaron la página"], ["Frecuencia", T.alc ? NF2.format(T.fi / T.alc) : "—", "veces que lo ve cada uno"], ["Impresiones", n(T.imp), "veces que se mostró"],
+    ["Clics", n(T.cl), "en el enlace"], ["Video completo", p(T.ri ? T.rw / T.ri : null), "ThruPlay ÷ impresiones"]];
   return `<div class="sec-grid">${M.map(([l, v, sub]) => `<div class="met met-chica boceto"><div class="lbl">${l}</div><div class="val num">${v}</div><div class="sub">${sub}</div></div>`).join("")}</div>`;
 }
 document.addEventListener("click", (e) => { const b = e.target.closest && e.target.closest("[data-sec]"); if (!b) return; S.secAbierto = !S.secAbierto; pintarCarrusel(); });
@@ -1193,6 +1205,7 @@ const COLS = [
   ["cpm", "CPM", (x) => usdG(x.cpm)],
   ["impresiones", "Impresiones", (x) => entN(x.impresiones)],
   ["frecuencia", "Frecuencia", (x) => dec2(x.frecuencia)],
+  ["que_hacer", "Qué hacer", (x, nivel) => accionesCelda(x, nivel)],   // (06/11, Lorenzo) diseño Mesa: fija a la derecha
 ];
 const COLS_EXTRA = ["costo_carrito", "pagos_iniciados", "carritos", "visitas", "clics", "cpc", "cpm", "impresiones", "frecuencia"];
 // (26/10) Presupuesto pasa a verse siempre: se saca de lo oculto que cada dispositivo tenía guardado

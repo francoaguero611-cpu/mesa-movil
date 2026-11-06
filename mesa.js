@@ -47,6 +47,7 @@ if (!quieto) requestAnimationFrame(cuadro);
 else sol.style.transform = "translate(-50%, -50%) translate3d(18vw, -6vh, 0) scale(.92)";
 
 // ---------- 3) menú lateral agrupado ----------
+try { if (localStorage.getItem("ms_menu_chico") === "1") document.documentElement.classList.add("ms-menu-chico"); } catch {}
 const GRUPOS = { dash: "Resumen", reportes: "Campañas", cazador: "Producción", atc: "Ayuda" };
 function armarMenu() {
   const n = $("#secciones"), pista = $("#sec-pista"); if (!n || !pista) return;
@@ -54,8 +55,13 @@ function armarMenu() {
   if (n.dataset.mesa) { const b = $(".ms-hola b", n); if (b && quien && b.textContent !== quien) b.textContent = quien; return; }
   n.dataset.mesa = "1";
   const cab = document.createElement("div");
-  cab.innerHTML = `<div class="ms-marca"><img src="icons/icon-192.png?v=27" alt=""><div><b>Mesa Leiva</b><small>Lorenzo y Franco</small></div></div><div class="ms-hola"><h2>Hola de nuevo,<br><b>${quien || "equipo"}</b></h2></div>`;
+  cab.innerHTML = `<div class="ms-hola"><h2>Hola de nuevo,<br><b>${quien || "equipo"}</b></h2></div>`;
   n.insertBefore(cab, pista);
+  const pl = document.createElement("button");
+  pl.type = "button"; pl.className = "ms-plegar"; pl.setAttribute("aria-label", "Achicar o agrandar el menú");
+  pl.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  pl.onclick = () => { const chico = !document.documentElement.classList.contains("ms-menu-chico"); document.documentElement.classList.toggle("ms-menu-chico", chico); try { localStorage.setItem("ms_menu_chico", chico ? "1" : "0"); } catch {} setTimeout(capas, 520); };
+  document.body.append(pl);
   for (const [id, t] of Object.entries(GRUPOS)) { const b = $(`[data-sec="${id}"]`, pista); if (b) { const g = document.createElement("div"); g.className = "ms-grupo"; g.textContent = t; pista.insertBefore(g, b); } }
 }
 
@@ -68,8 +74,8 @@ function capasYa() {
     let capa = $(".ms-capas", caja); if (!capa) { capa = document.createElement("div"); capa.className = "ms-capas"; capa.setAttribute("aria-hidden", "true"); caja.append(capa); }
     const rc = caja.getBoundingClientRect(), rs = sc.getBoundingClientRect(), antes = new Set($$("i", capa).map((x) => x.dataset.k));
     const filas = $$("tbody tr.fila.sel", sc);
-    const html = filas.map((tr) => { const r = tr.getBoundingClientRect(), k = tr.dataset.k || "";
-      return `<i data-k="${k.replace(/"/g, "")}" class="${antes.has(k) ? "ya" : ""}" style="top:${(r.top - rc.top).toFixed(1)}px;height:${r.height.toFixed(1)}px;left:${(rs.left - rc.left + 2).toFixed(1)}px;width:${(rs.width - 4).toFixed(1)}px"></i>`; }).join("");
+    const html = filas.map((tr) => { const r = tr.getBoundingClientRect(), k = tr.dataset.k || "", bt = parseFloat(getComputedStyle(tr.cells[0] || tr).borderTopWidth) || 0;
+      return `<i data-k="${k.replace(/"/g, "")}" class="${antes.has(k) ? "ya" : ""}" style="top:${(r.top - rc.top + bt).toFixed(1)}px;height:${(r.height - bt).toFixed(1)}px;left:${(rs.left - rc.left + 2).toFixed(1)}px;width:${(rs.width - 4).toFixed(1)}px"></i>`; }).join("");
     if (capa.innerHTML !== html) capa.innerHTML = html;
   }
 }
@@ -81,9 +87,17 @@ function isla() {
   const b = $("#barra"); if (!b) return;
   if (b.hidden) { islaVisible = false; islaN = 0; return; }
   const tx = $(".cuenta", b)?.textContent || "", n = +((tx.match(/\d+/) || ["0"])[0]);
-  if (!islaVisible) { islaVisible = true; b.classList.add("ms-nueva"); setTimeout(() => b.classList.remove("ms-nueva"), 1300); }
+  let entra = false;
+  if (!islaVisible) { islaVisible = true; entra = !quieto; }
   let c = $(".ms-n", b);
   if (!c) { c = document.createElement("span"); c.className = "ms-n num"; b.prepend(c); }
+  if (entra) {
+    const fin = getComputedStyle(b).maxWidth;
+    b.animate([{ maxWidth: "60px", transform: "translateX(-50%) scale(.3)", opacity: 0 }, { offset: .32, maxWidth: "60px", transform: "translateX(-50%) scale(1)", opacity: 1 }, { maxWidth: fin === "none" ? "980px" : fin, transform: "translateX(-50%) scale(1)", opacity: 1 }],
+      { duration: 950, easing: "cubic-bezier(.16, 1, .3, 1)" });
+    [...b.children].filter((x) => x !== c).forEach((x, i) => x.animate([{ opacity: 0, transform: "translateX(-12px)", filter: "blur(4px)" }, { opacity: 1, transform: "none", filter: "none" }],
+      { duration: 600, delay: 380 + i * 40, easing: "cubic-bezier(.16, 1, .3, 1)", fill: "backwards" }));
+  }
   if (c.dataset.n === String(n)) return;
   const antes = islaN; islaN = n; c.dataset.n = String(n);
   if (!antes || antes === n || quieto) { c.innerHTML = `<span class="ms-rueda">${n}</span>`; return; }
@@ -143,14 +157,105 @@ document.addEventListener("click", (e) => {
 // ---------- 7) Shift + clic sin pintar texto ----------
 document.addEventListener("mousedown", (e) => { if (e.shiftKey && e.target.closest && e.target.closest("#tabla-scroll tr.fila")) e.preventDefault(); });
 
+
+// ---------- (06/11 c) saldo EtherFi arriba (en lugar del de Whop) ----------
+function etherfi() {
+  const arriba = $(".acciones-top"); if (!arriba || $(".ms-ether", arriba)) return;
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "ms-ether"; b.title = "Saldo de la tarjeta EtherFi *0934";
+  b.innerHTML = `<span class="pt" aria-hidden="true"></span><span class="tx"><small>Saldo EtherFi *0934</small><b class="num">${window.MESA_ETHERFI ? "US$ " + window.MESA_ETHERFI : "falta conectar"}</b></span>`;
+  b.onclick = () => { if (typeof toast === "function") toast(window.MESA_ETHERFI ? "Saldo leído de la cuenta EtherFi" : "Para ver el saldo en vivo falta conectar la cuenta EtherFi (la dirección 0x de la app)."); };
+  arriba.prepend(b);
+}
+
+// ---------- (06/11 c) fila de filtros en una línea: Cuenta · Oferta · Buscar · Comparar días · Solo seleccionadas · Ver apagadas · Columnas ----------
+function filtros() {
+  const f = $(".filtro-camp"); if (!f || f.dataset.ms) return;
+  f.dataset.ms = "1";
+  const sg = $("#sel-grupo"), cuenta = $("#f-cuenta");
+  if (sg) {
+    const lab = document.createElement("label"); lab.className = "sr"; lab.htmlFor = "ms-oferta"; lab.textContent = "Oferta";
+    const sel = document.createElement("select"); sel.id = "ms-oferta"; sel.className = "campo ms-oferta";
+    const copiar = () => { sel.innerHTML = sg.innerHTML; sel.value = sg.value; };
+    copiar(); new MutationObserver(copiar).observe(sg, { childList: true, subtree: true, attributes: true });
+    sel.onchange = () => { sg.value = sel.value; sg.dispatchEvent(new Event("change", { bubbles: true })); };
+    (cuenta ? cuenta.after.bind(cuenta) : f.append.bind(f))(lab, sel);
+  }
+  for (const id of ["b-cmp", "t-solosel", "t-apagadas", "b-cols"]) { const x = document.getElementById(id); if (x) f.append(x); }
+}
+
+// ---------- (06/11 c) métricas secundarias: se esconden con animación ----------
+let cerrandoSec = false;
+document.addEventListener("click", (e) => {
+  const b = e.target.closest && e.target.closest("[data-sec]"); if (!b || cerrandoSec || quieto || b.getAttribute("aria-expanded") !== "true") return;
+  const g = $(".carr .sec-grid"); if (!g) return;
+  e.stopImmediatePropagation(); e.preventDefault();
+  const h = g.getBoundingClientRect().height;
+  const an = g.animate([{ height: h + "px", opacity: 1, marginTop: getComputedStyle(g).marginTop }, { height: "0px", opacity: 0, marginTop: "0px" }], { duration: 520, easing: "cubic-bezier(.65, 0, .35, 1)", fill: "forwards" });
+  g.style.overflow = "hidden";
+  an.onfinish = () => { cerrandoSec = true; b.click(); cerrandoSec = false; };
+}, true);
+
+// ---------- (06/11 c) tendencias: gráfico de los últimos 7 días en las tarjetas de arriba ----------
+// Sale de los mismos datos por día que usa «Comparar días» (se guardan en este navegador para no volver a pedirlos).
+const DIAS = {};
+let diasPidiendo = false, diasListos = false;
+async function cargarDias() {
+  if (diasPidiendo || diasListos || typeof S === "undefined" || typeof api !== "function" || typeof cmpPer !== "function") return;
+  if (!S.datos || !Object.keys(S.datos).length) return;
+  diasPidiendo = true;
+  const hoy = isoAR(new Date());
+  for (let n = 7; n >= 1; n--) {
+    const iso = isoMenos(hoy, n), per = cmpPer(iso);
+    if (DIAS[iso]) continue;
+    let guard = null; try { guard = JSON.parse(localStorage.getItem("ms_dia_" + iso) || "null"); } catch {}
+    const viejo = guard && n === 1 && Date.now() - guard.t > 6 * 3600e3;   // ayer se vuelve a leer cada 6 h
+    if (guard && !viejo) { DIAS[iso] = guard.g; continue; }
+    try {
+      const d = S.datos[per] || await api("dash", { q: `&periodo=${per}` });
+      S.datos[per] ||= d;
+      const g = Object.fromEntries((d?.grupos || []).map((x) => [x.clave, { ganancia: x.metricas?.ganancia, facturacion: x.metricas?.facturacion, roas: x.metricas?.roas, margen: x.metricas?.margen, gasto: x.metricas?.gasto }]));
+      DIAS[iso] = g; try { localStorage.setItem("ms_dia_" + iso, JSON.stringify({ t: Date.now(), g })); } catch {}
+    } catch { /* sin ese día: el gráfico sale con los que haya */ }
+  }
+  diasPidiendo = false; diasListos = true;
+  try { pintarCarrusel(); } catch {}
+}
+function serieDe(clave, campo) {
+  const hoy = isoAR(new Date()), xs = [];
+  for (let n = 7; n >= 1; n--) { const v = DIAS[isoMenos(hoy, n)]?.[clave]?.[campo]; if (v != null && isFinite(v)) xs.push(+v); }
+  return xs.length >= 3 ? xs : null;
+}
+window.MesaTend = (g, campo, valor, neutro) => {
+  const ys = serieDe(g.clave, campo); if (!ys) return "";
+  const ult = ys[ys.length - 1], prev = ys.slice(0, -1), prom = prev.reduce((a, b) => a + b, 0) / prev.length;
+  const sube = ult >= prom, pct = prom ? Math.abs((ult - prom) / prom) * 100 : 0;
+  if (neutro) return `<span class="ms-tend neutro num">${pct.toLocaleString("es-AR", { maximumFractionDigits: 1 })} % ${sube ? "más" : "menos"} que el promedio de la semana (ayer)</span>`;
+  const w = 300, h = 80, min = Math.min(...ys), max = Math.max(...ys), rango = max - min || 1, n = ys.length;
+  const x = (i) => (i / (n - 1)) * w, y = (v) => h - 6 - ((v - min) / rango) * (h - 26);
+  const pts = ys.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  const id = "mg" + campo + Math.random().toString(36).slice(2, 6);
+  return `<svg class="ms-graf ${sube ? "sube" : "baja"}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-label="${sube ? "Viene subiendo" : "Viene bajando"} en los últimos 7 días" role="img">
+    <defs><linearGradient id="${id}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="currentColor" stop-opacity=".34"/><stop offset="1" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs>
+    <polygon points="0,${h} ${pts} ${w},${h}" fill="url(#${id})"/>
+    <polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>`;
+};
+
+// ---------- (06/11 c) Jarvis: estrella en lugar del átomo ----------
+const ESTRELLA = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 2.8l2.1 6.1 6.1 2.1-6.1 2.1L12 19.2l-2.1-6.1L3.8 11l6.1-2.1z" fill="currentColor"/></svg>`;
+function jarvis() {
+  $$(".jv-fab .jv-orbe, .jv-cab .jv-orbe").forEach((o) => { if (!o.dataset.ms) { o.dataset.ms = "1"; o.innerHTML = ESTRELLA; } });
+}
+
 // ---------- todo lo que depende de lo que la app repinta ----------
 let pend = false;
 const OPC = { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "hidden"] };
 const obs = new MutationObserver(() => { if (pend) return; pend = true; requestAnimationFrame(() => {
   pend = false; obs.disconnect();                       // lo que cambiamos acá no vuelve a disparar el observador
-  try { armarMenu(); encabezado(); mirarIsla(); isla(); revelar(); capasYa(); } catch { /* decorativo */ }
+  try { armarMenu(); encabezado(); etherfi(); filtros(); jarvis(); mirarIsla(); isla(); revelar(); capasYa(); cargarDias(); } catch { /* decorativo */ }
   obs.takeRecords(); obs.observe(document.body, OPC); }); });
 obs.observe(document.body, OPC);
 if ("ResizeObserver" in window) { const ro = new ResizeObserver(capas); const mirar = () => { const sc = $("#tabla-scroll"); if (sc && !sc.dataset.msRo) { sc.dataset.msRo = "1"; ro.observe(sc); } }; setInterval(mirar, 1500); }
-armarMenu(); encabezado(); mirarIsla(); isla(); revelar();
+armarMenu(); encabezado(); etherfi(); filtros(); jarvis(); mirarIsla(); isla(); revelar();
+setInterval(cargarDias, 3000);
 })();

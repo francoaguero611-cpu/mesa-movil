@@ -336,3 +336,86 @@ html body .av-pop p { color: var(--tx-2); }
 html body .av-b { background: #1d1d22; border: 1px solid var(--linea-2); border-radius: 999px; padding: 8px 14px; font-family: var(--f-texto); font-weight: 500; color: var(--tx); }
 html body .av-b.pri, html body .av-pop .av-b:first-child:not(.cerrar) { background: var(--fuego); color: #fff; border-color: transparent; }
 html body .av-pop-fondo { background: rgba(5,5,7,.6); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+
+/* =====================================================================================================
+   (06/11 c) Ronda 3 de Lorenzo
+   ===================================================================================================== */
+/* menú: sin el bloque de marca; se pliega a solo íconos con la flechita del medio */
+.ms-marca { display: none !important; }
+:root:root:root:root.ms-menu-chico { --rail: 76px; }
+@media (min-width: 1000px) {
+  html body .secciones { transition: width .5s var(--sale), padding .5s var(--sale); }
+  html body #app { transition: padding-left .5s var(--sale), margin-right .8s var(--sale); }
+  html.ms-menu-chico body .secciones, html.ms-menu-chico body .secciones:hover { padding: 22px 12px; overflow-x: hidden; }
+  html.ms-menu-chico body .ms-hola, html.ms-menu-chico body .ms-grupo { display: none; }
+  html.ms-menu-chico body .sec-pista .seccion { font-size: 0; justify-content: center; padding: 10px 0; gap: 0; }
+  html.ms-menu-chico body .sec-pista .seccion svg { width: 20px; height: 20px; flex: none; }
+  .ms-plegar { position: fixed; z-index: 40; top: 50%; left: calc(var(--rail) - 13px); width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; padding: 0; cursor: pointer;
+    border: 1px solid var(--linea-2); background: #18181d; color: var(--tx-2); box-shadow: 0 6px 16px -8px rgba(0,0,0,.9); transition: left .5s var(--sale), color .2s, background .2s; }
+  .ms-plegar:hover { color: var(--tx); background: #222228; }
+  .ms-plegar svg { transition: transform .5s var(--sale); }
+  html.ms-menu-chico .ms-plegar svg { transform: rotate(180deg); }
+}
+@media (max-width: 999px) { .ms-plegar { display: none; } }
+
+/* arriba: saldo EtherFi (el de Whop queda en Umbrales) */
+html body .acciones-top #whop-barra { display: none !important; }
+.ms-ether { display: flex; align-items: center; gap: 10px; border: 1px solid var(--linea-2); background: linear-gradient(170deg, #1a1a1f, #131316); border-radius: 14px; padding: 6px 14px 6px 12px; color: var(--tx); cursor: pointer; text-align: left; font: inherit; }
+.ms-ether .pt { width: 8px; height: 8px; border-radius: 50%; background: var(--bien); box-shadow: 0 0 0 4px rgba(143,227,191,.14); }
+.ms-ether small { display: block; font-size: 11px; color: var(--mut-2); }
+.ms-ether b { font-weight: 500; font-size: 14.5px; }
+
+/* filtros de campañas en una sola línea; fuera «Acciones» y «Lo que viene mal» */
+html body #acc-barra, html body #b-malos { display: none !important; }
+html body .cab-tabla { margin-bottom: 10px; }
+html body .filtro-camp { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+html body .filtro-camp .toggle-chico { font-size: 12.5px; }
+@media (min-width: 1200px) { html body .filtro-camp { flex-wrap: nowrap; } }
+html body .filtro-camp .f-buscar { flex: 1 1 130px; min-width: 110px; }
+html body .filtro-camp .f-cuenta { flex: 0 1 190px; min-width: 140px; }
+html body .filtro-camp .ms-oferta { flex: 0 1 180px; min-width: 130px; min-height: 40px; padding: 0 12px; }
+html body .filtro-camp .btn.chico, html body .filtro-camp .toggle-chico { white-space: nowrap; }
+
+/* «Qué hacer» fija a la derecha; sin el relojito por campaña (el historial está en la isla) */
+html body .riel-reloj { display: none !important; }
+html body .tabla-con-reloj { display: block; }
+html body .camp th.c-que_hacer, html body .camp td.c-que_hacer { position: sticky; right: 0; z-index: 2; text-align: right; min-width: 150px; box-shadow: -14px 0 16px -16px rgba(0,0,0,.9); }
+html body .camp th.c-que_hacer { z-index: 4; }
+html body .camp td.c-que_hacer .chip-ac { border-radius: 999px; font-family: var(--f-texto); font-weight: 500; }
+
+/* isla: interruptor centrado y con dos estados claros */
+html body .barra .switch { box-sizing: border-box; width: 66px; height: 32px; border-radius: 999px; background: #26262c; border: 1px solid var(--linea-2); box-shadow: none; }
+html body .barra .switch .perilla { top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #f1f1f3; box-shadow: 0 2px 6px rgba(0,0,0,.5); }
+html body .barra .switch[aria-checked="true"] { background: var(--torna); border-color: transparent; }
+html body .barra .switch[aria-checked="true"] .perilla { transform: translateX(34px); background: #111114; }
+html body .barra .switch[aria-checked="mixed"] .perilla { transform: translateX(17px); background: #8a8a94; }
+
+/* tendencias: gráfico que recorre el piso de las 4 tarjetas de arriba (verde si sube, rojo si baja) */
+html body .mesa-fila1 .met { position: relative; overflow: hidden; min-height: 172px; padding-bottom: 60px; justify-content: flex-start; }
+html body .mesa-fila1 .v-fila { position: static; }
+html body .mesa-fila1 .val { position: relative; z-index: 1; }
+.mesa-fila1 .ms-graf { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 50%; display: block; pointer-events: none; color: var(--bien); }
+.mesa-fila1 .ms-graf.baja { color: var(--mal); }
+.mesa-fila1 .heroe .ms-graf.sube { color: #0f6b47; } .mesa-fila1 .heroe .ms-graf.baja { color: #9b1c2c; }
+.mesa-fila2 .ms-tend { font-size: 11.5px; }
+
+/* Jarvis: estrella arriba, letra con aire, brillo naranja suave solo del lado izquierdo */
+html body .jv-fab { width: 44px; min-height: 140px; padding: 14px 0 16px; gap: 14px; justify-content: flex-start; border: 1px solid var(--linea-2); border-left: 1.5px solid rgba(255,120,70,.75); border-right: 0;
+  box-shadow: -10px 0 22px -14px rgba(255,96,52,.6), -8px 14px 26px -20px rgba(0,0,0,.9); animation: none; }
+html body .jv-fab.alerta { animation: none; border-left-color: #ff7a48; box-shadow: -12px 0 26px -12px rgba(255,96,52,.75), -8px 14px 26px -20px rgba(0,0,0,.9); }
+html body .jv-fab .jv-orbe { order: 1; width: 26px; height: 26px; }
+html body .jv-fab::after { order: 2; font-size: 13px; font-weight: 500; letter-spacing: 2.4px; }
+html body .jv-fab .jv-badge { order: 3; }
+/* se cierra con animación (vuelve a la tarjeta) */
+html body .jv-panel:not(.visible) { transition: transform .3s cubic-bezier(.7, 0, .3, 1), opacity .28s ease-in; }
+
+/* Umbrales: pagos rechazados plegados, filas más finas */
+html body .pagos-pleg > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+html body .pagos-pleg > summary::-webkit-details-marker { display: none; }
+html body .pagos-pleg > summary::before { content: ""; width: 8px; height: 8px; border-right: 2px solid var(--tx-2); border-bottom: 2px solid var(--tx-2); transform: rotate(-45deg); transition: transform .4s var(--sale); }
+html body .pagos-pleg[open] > summary::before { transform: rotate(45deg); }
+html body .pagos-pleg > summary h3 { margin: 0; }
+html body .pagos-pleg[open] .pagos-lista { animation: msBaja .6s var(--sale); }
+html body #sec-umb .umb { padding-top: 4px; padding-bottom: 4px; }
+html body #sec-umb .umb-barra { height: 22px !important; }
+html body #sec-umb .umb-lista { gap: 6px; }
