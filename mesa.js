@@ -26,6 +26,9 @@ function iniciarLenis() {
     lenis = new Lenis({ duration: 1.15, easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), smoothWheel: true,
       prevent: (n) => !!(n.closest && n.closest(".jv-panel, .dialogo, .menu, .modal, .ad-ver, [data-lenis-prevent], textarea, select")) });
     window.MesaLenis = lenis;
+    // (06/11) el encabezado flotante de la tabla se acomoda en el MISMO cuadro en que Lenis mueve la página (antes llegaba
+    // un cuadro tarde con el evento scroll y al deslizar rápido titilaba o se veía corrido)
+    lenis.on("scroll", () => { try { if (typeof ubicarCabFlotante === "function") ubicarCabFlotante(); } catch {} });
   } catch { lenis = null; }
 }
 if (!quieto) {
@@ -141,7 +144,7 @@ function revelar() {
     const k = "of" + (el.dataset.irOf || i); if (vistos.has(k) || el.classList.contains("ms-rv")) return; vistos.add(k);
     el.classList.add("ms-rv", i % 2 ? "der" : "izq"); el.style.setProperty("--ms-d", Math.min(i, 6) * 70 + "ms"); io.observe(el);
   });
-  $$(".seccion-camp, .rp-card, .atc-item, .umb-fila, .cr-carpeta").forEach((el, i) => {
+  $$(".rp-card, .atc-item, .umb-fila, .cr-carpeta").forEach((el, i) => {
     const k = (el.className.split(" ")[0] || "") + i; if (vistos.has(k) || el.classList.contains("ms-rv")) return; vistos.add(k);
     el.classList.add("ms-rv", "sube"); el.style.setProperty("--ms-d", Math.min(i, 6) * 50 + "ms"); io.observe(el);
   });
@@ -282,6 +285,20 @@ function fmtCampo(c, v) {
   if (c === "margen") return Math.round(v * 100).toLocaleString("es-AR") + " %";
   return "US$ " + v.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+// altura de la curva (0 arriba, 1 abajo) en una posición horizontal (0 a 1): se muestrea el trazo una vez por gráfico
+const MUESTRAS = new WeakMap();
+function yCurva(svg, rx) {
+  if (rx < 0 || rx > 1) return null;
+  let m = MUESTRAS.get(svg);
+  if (!m) {
+    const tr = svg.querySelector("path[fill='none']"); if (!tr || !tr.getTotalLength) return null;
+    const vb = svg.viewBox.baseVal, L = tr.getTotalLength(); m = [];
+    for (let k = 0; k <= 120; k++) { const pt = tr.getPointAtLength((L * k) / 120); m.push([pt.x / vb.width, pt.y / vb.height]); }
+    MUESTRAS.set(svg, m);
+  }
+  for (let k = 1; k < m.length; k++) if (m[k][0] >= rx) { const [x0, y0] = m[k - 1], [x1, y1] = m[k]; return x1 === x0 ? y1 : y0 + ((rx - x0) / (x1 - x0)) * (y1 - y0); }
+  return m[m.length - 1][1];
+}
 document.addEventListener("pointermove", (e) => {
   const card = e.target.closest && e.target.closest(".mesa-fila1 .met");
   $$(".mesa-fila1 .met.ms-hover").forEach((c) => { if (c !== card) { c.classList.remove("ms-hover"); } });
@@ -289,6 +306,9 @@ document.addEventListener("pointermove", (e) => {
   const svg = $(".ms-graf", card); if (!svg) return;
   let info; try { info = JSON.parse(decodeURIComponent(svg.dataset.ms)); } catch { return; }
   const rc = card.getBoundingClientRect(), rs = svg.getBoundingClientRect(), n = info.p.length;
+  // (06/11, Lorenzo) solo si el mouse está cerca de la línea (no en toda la tarjeta)
+  const yLinea = yCurva(svg, (e.clientX - rs.left) / rs.width);
+  if (yLinea == null || Math.abs(e.clientY - (rs.top + yLinea * rs.height)) > 16) { card.classList.remove("ms-hover"); return; }
   const rel = Math.max(0, Math.min(1, (e.clientX - rs.left) / rs.width)), i = Math.round(rel * (n - 1)), [iso, v, yN] = info.p[i];
   let punto = $(".ms-punto", card), tip = $(".ms-tip", card), guia = $(".ms-guia", card);
   if (!punto) { punto = document.createElement("span"); punto.className = "ms-punto"; guia = document.createElement("span"); guia.className = "ms-guia"; tip = document.createElement("span"); tip.className = "ms-tip"; card.append(guia, punto, tip); }
