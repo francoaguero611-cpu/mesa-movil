@@ -1,10 +1,10 @@
 /* Service worker — Dashboard Lorenzo */
-const VERSION = "dash-v142";
-const SHELL = ["./", "index.html", "styles.css?v=60", "app.js?v=127", "glass.css?v=12", "liquid.js?v=2", "pulido.css?v=1", "pulido.js?v=2", "mesa.css?v=11", "mesa.js?v=8", "movil.css?v=1", "movil.js?v=1", "demo.js?v=37", "manifest.webmanifest", "avisos.css?v=2", "avisos.js?v=3",
+const VERSION = "dash-v143";
+const SHELL = ["./", "index.html", "styles.css?v=60", "app.js?v=128", "glass.css?v=12", "liquid.js?v=2", "pulido.css?v=1", "pulido.js?v=2", "mesa.css?v=11", "mesa.js?v=8", "movil.css?v=1", "movil.js?v=1", "demo.js?v=37", "manifest.webmanifest", "avisos.css?v=2", "avisos.js?v=3",
   "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png", "icons/apple-touch-icon.png"];
 // Cazador (antes Buscador de ofertas): se guarda aparte y sin trabar la instalación si algún archivo falta en el hosting.
 // buscador.html quedó como redirección a ./#cazador (links viejos).
-const EXTRA = ["buscador.html", "buscador.css?v=6", "buscador.js?v=10", "workspace.css?v=2", "workspace.js?v=2", "creativos.css?v=9", "creativos.js?v=9", "taller.css?v=6", "taller.js?v=7", "atc.css?v=4", "atc.js?v=3", "reportes.css?v=10", "reportes.js?v=9", "jarvis.css?v=14", "jarvis.js?v=17"];
+const EXTRA = ["buscador.html", "buscador.css?v=6", "buscador.js?v=10", "workspace.css?v=2", "workspace.js?v=2", "creativos.css?v=9", "creativos.js?v=9", "taller.css?v=6", "taller.js?v=7", "atc.css?v=4", "atc.js?v=3", "reportes.css?v=10", "reportes.js?v=10", "jarvis.css?v=14", "jarvis.js?v=18"];
 const API_HOST = "tppcpnfzcxxusdhrlmdx.supabase.co";
 const API_CACHE = "dash-api";
 
