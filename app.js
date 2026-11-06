@@ -500,6 +500,7 @@ function montar() {
       <button type="button" class="btn flecha next" id="b-next" aria-label="Grupo siguiente"><span class="der"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M9.5 5.5 C 12 8, 14 10.5, 15.5 12.2 C 13.6 14, 11.6 16.4, 9.2 18.6" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
       <div class="pos" id="pos"></div>
     </section>
+    <section class="mesa-of" id="mesa-of" aria-label="Resultados por oferta"></section>
     <section class="seccion-camp" aria-labelledby="t-camp">
       <div class="cab-tabla">
         <h2 id="t-camp">Campañas <small id="n-camp"></small></h2>
@@ -915,21 +916,27 @@ function pintarAvisos() {
 
 // ---------- carrusel ----------
 function metricasHTML(g) {
+  // (06/11, Lorenzo) diseño «Mesa»: fila 1 grande (Ganancia neta, Facturación, ROAS, Margen) + fila 2 bajita (Gasto, CPA, Ticket, % Post-compra).
+  // La comparación con ayer (window.MesaTend) aparece solo cuando hay datos de ayer a la misma hora; si no, no se muestra nada inventado.
   const m = g.metricas || {};
   const gan = m.ganancia;
+  const tend = (campo, valor, neutro) => (window.MesaTend ? window.MesaTend(g, campo, valor, neutro) : "");
+  const c = (lbl, val, cls, campo, valor, neutro) => `<div class="met boceto ${cls || ""}"><div class="lbl">${lbl}</div><div class="v-fila"><div class="val num">${val}</div>${campo ? tend(campo, valor, neutro) : ""}</div></div>`;
   return `
-    <div class="met boceto"><div class="lbl">Facturación bruta</div><div class="val num">${usdG(m.facturacion)}</div><div class="sub num">${m.ventas != null ? `${ent(m.ventas)} ventas` : "&nbsp;"}</div></div>
-    <div class="met boceto"><div class="lbl">Margen</div><div class="val num ${m.margen != null && m.margen < 0 ? "neg" : ""}">${pct(m.margen)}</div><div class="sub">ganancia ÷ facturación</div></div>
-    <div class="met boceto"><div class="lbl">ROAS</div><div class="val num"><span class="roas ${colorRoas(m.roas)} chip-roas">${roasTx(m.roas)}</span></div><div class="sub">facturación ÷ gasto</div></div>
-    <div class="met boceto"><div class="lbl">Importe gastado</div><div class="val num">${usdG(m.gasto)}</div><div class="sub">en Meta</div></div>
-    <div class="met boceto"><div class="lbl">Ganancia</div><div class="val num ${gan == null ? "" : gan < 0 ? "neg" : "positivo"}">${usdG(gan)}</div><div class="sub">neto real − gasto</div></div>
-    <div class="met boceto"><div class="lbl">Ventas</div><div class="val num">${m.ventas != null ? ent(m.ventas) : "—"}</div><div class="sub">compras reales</div></div>
-    <div class="met boceto"><div class="lbl">CPA</div><div class="val num">${m.ventas ? usdG(m.gasto / m.ventas) : "—"}</div><div class="sub">gasto ÷ ventas</div></div>
-    <div class="met boceto"><div class="lbl">Ticket promedio</div><div class="val num">${m.ventas ? usdG(m.facturacion / m.ventas) : "—"}</div><div class="sub">facturación ÷ ventas</div></div>
-    <div class="met boceto"><div class="lbl">% Order bump</div><div class="val num">${m.pct_bump != null ? pct(m.pct_bump) : "—"}</div><div class="sub num">${m.con_bump != null ? `${ent(m.con_bump)} de ${ent(m.ventas_principales ?? m.ventas)} ventas` : "&nbsp;"}</div></div>
-    <div class="met boceto"><div class="lbl">% Post-compra</div><div class="val num">${m.pct_post != null ? pct(m.pct_post) : "—"}</div><div class="sub num">${m.con_post != null ? `${ent(m.con_post)} de ${ent(m.ventas_principales ?? m.ventas)} ventas` : "&nbsp;"}</div></div>
-    <div class="sec-fila"><button type="button" class="sec-link" data-sec aria-expanded="${!!S.secAbierto}">${S.secAbierto ? "Ocultar métricas secundarias ▴" : "Ver métricas secundarias ▾"}</button></div>
-    ${S.secAbierto ? secundariasHTML(g) : ""}`;
+    <div class="mesa-fila1">
+      ${c("Ganancia neta", usdG(gan), "heroe " + (gan == null ? "" : gan < 0 ? "neg" : "gana"), "ganancia", gan)}
+      ${c("Facturación", usdG(m.facturacion), "", "facturacion", m.facturacion)}
+      ${c("ROAS", `<span class="roas ${colorRoas(m.roas)} chip-roas">${roasTx(m.roas)}</span>`, "", "roas", m.roas)}
+      ${c("Margen", pct(m.margen), m.margen != null && m.margen < 0 ? "neg" : "", "margen", m.margen)}
+    </div>
+    <div class="mesa-fila2">
+      ${c("Gasto en Meta", usdG(m.gasto), "ancha", "gasto", m.gasto, true)}
+      ${c("CPA", m.ventas ? usdG(m.gasto / m.ventas) : "—")}
+      ${c("Ticket promedio", m.ventas ? usdG(m.facturacion / m.ventas) : "—")}
+      ${c("% Post-compra", m.pct_post != null ? pct(m.pct_post) : "—")}
+    </div>
+    ${S.secAbierto ? secundariasHTML(g) : ""}
+    <div class="sec-fila"><button type="button" class="sec-link" data-sec aria-expanded="${!!S.secAbierto}">${S.secAbierto ? "Ocultar métricas secundarias" : "Ver métricas secundarias"}<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>`;
 }
 // (03/11, Lorenzo) métricas secundarias del grupo (las de Ads Manager que no están arriba), sumadas de sus campañas
 function secundariasHTML(g) {
@@ -942,11 +949,14 @@ function secundariasHTML(g) {
     if (c.retencion_3s != null && c.impresiones) { t.hw += c.retencion_3s * c.impresiones; t.hi += +c.impresiones; } return t; },
     { g: 0, imp: 0, cl: 0, vis: 0, car: 0, pi: 0, v: 0, fi: 0, alc: 0, rw: 0, ri: 0, hw: 0, hi: 0 });
   const dv = (a, b) => b ? a / b : null, n = (x) => x == null ? "—" : ent(Math.round(x)), p = (x) => x == null ? "—" : pct(x), u = (x) => x == null ? "—" : usdG(x);
-  const M = [["CTR", p(dv(T.cl, T.imp)), "clics ÷ impresiones"], ["CPM", u(T.imp ? (T.g / T.imp) * 1000 : null), "costo por mil"], ["CPC", u(dv(T.g, T.cl)), "costo por clic"],
-    ["Retención 3 s", p(T.hi ? T.hw / T.hi : null), "vieron los primeros 3 s"], ["Frecuencia", T.alc ? NF2.format(T.fi / T.alc) : "—", "veces que lo ve cada uno"], ["Impresiones", n(T.imp), "veces que se mostró"], ["Clics", n(T.cl), "en el enlace"],
-    ["Visitas a la landing", n(T.vis), "cargaron la página"], ["Costo por visita", u(dv(T.g, T.vis)), "gasto ÷ visitas"], ["Conv. de la landing", p(dv(T.v, T.vis)), "ventas ÷ visitas"],
+  const m0 = g.metricas || {};
+  const M = [["Visitas a la landing", n(T.vis), "cargaron la página"], ["Costo por visita", u(dv(T.g, T.vis)), "gasto ÷ visitas"], ["Conv. de la landing", p(dv(T.v, T.vis)), "ventas ÷ visitas"],
     ["Carritos", n(T.car), "agregaron al carrito"], ["Costo por carrito", u(dv(T.g, T.car)), "gasto ÷ carritos"], ["Pagos iniciados", n(T.pi), "llegaron al checkout"],
-    ["Costo por pago iniciado", u(dv(T.g, T.pi)), "gasto ÷ pagos iniciados"], ["Conv. del checkout", p(dv(T.v, T.pi)), "ventas ÷ pagos iniciados"], ["Video completo", p(T.ri ? T.rw / T.ri : null), "ThruPlay ÷ impresiones"]];
+    ["Costo por pago iniciado", u(dv(T.g, T.pi)), "gasto ÷ pagos iniciados"], ["Conv. del checkout", p(dv(T.v, T.pi)), "ventas ÷ pagos iniciados"],
+    ["Ventas", m0.ventas != null ? ent(m0.ventas) : "—", "compras reales"], ["% Order bump", m0.pct_bump != null ? pct(m0.pct_bump) : "—", m0.con_bump != null ? `${ent(m0.con_bump)} de ${ent(m0.ventas_principales ?? m0.ventas)} ventas` : ""],
+    ["CTR", p(dv(T.cl, T.imp)), "clics ÷ impresiones"], ["CPM", u(T.imp ? (T.g / T.imp) * 1000 : null), "costo por mil"], ["CPC", u(dv(T.g, T.cl)), "costo por clic"],
+    ["Retención 3 s", p(T.hi ? T.hw / T.hi : null), "vieron los primeros 3 s"], ["Frecuencia", T.alc ? NF2.format(T.fi / T.alc) : "—", "veces que lo ve cada uno"], ["Impresiones", n(T.imp), "veces que se mostró"], ["Clics", n(T.cl), "en el enlace"],
+    ["Video completo", p(T.ri ? T.rw / T.ri : null), "ThruPlay ÷ impresiones"]];
   return `<div class="sec-grid">${M.map(([l, v, sub]) => `<div class="met met-chica boceto"><div class="lbl">${l}</div><div class="val num">${v}</div><div class="sub">${sub}</div></div>`).join("")}</div>`;
 }
 document.addEventListener("click", (e) => { const b = e.target.closest && e.target.closest("[data-sec]"); if (!b) return; S.secAbierto = !S.secAbierto; pintarCarrusel(); });
@@ -963,8 +973,24 @@ function pintarCarrusel() {
   $("#b-next").disabled = S.idx >= n - 1;
   $("#pos").innerHTML = (n > 1 && n <= 16 ? `<div class="puntos">${gs.map((x, i) => `<button type="button" class="punto" data-ir="${i}" aria-label="Ir a ${esc(x.etiqueta)}" ${i === S.idx ? 'aria-current="true"' : ""}></button>`).join("")}</div>` : "") + `<span class="contador num">${S.idx + 1} / ${n}</span>`;
   $$("[data-ir]").forEach((b) => b.onclick = () => irA(+b.dataset.ir));
+  pintarOfertasMesa(gs);
   const sg = $("#sel-grupo");
   if (sg) sg.innerHTML = gs.map((x, i) => `<option value="${i}"${i === S.idx ? " selected" : ""}>${esc((x.bandera ? x.bandera + " " : "") + (x.etiqueta || x.oferta || "Todas"))}</option>`).join("");
+}
+// (06/11, Lorenzo) «Por oferta»: una tarjeta por oferta con su ganancia, ROAS y gasto; tocarla muestra esa oferta arriba
+function pintarOfertasMesa(gs) {
+  const box = $("#mesa-of"); if (!box) return;
+  const xs = gs.map((g, i) => ({ g, i })).filter((x) => x.g.clave !== "todas");
+  if (!xs.length || !S.datos[S.periodo]) { box.innerHTML = ""; return; }
+  const scroll = $(".mesa-of-lista", box)?.scrollLeft || 0;
+  box.innerHTML = `<div class="mesa-of-cab"><h3>Por oferta <small>${xs.length} ofertas</small></h3><span class="mesa-of-fl"><button type="button" class="btn icono chico" data-of="-1" aria-label="Ofertas anteriores">‹</button><button type="button" class="btn icono chico" data-of="1" aria-label="Más ofertas">›</button></span></div>
+    <div class="mesa-of-lista">${xs.map(({ g, i }) => { const m = g.metricas || {}, gan = m.ganancia;
+      return `<button type="button" class="mesa-of-t${i === S.idx ? " act" : ""}" data-ir-of="${i}"><span class="mo-cab">${g.bandera ? `<span class="ban" aria-hidden="true">${esc(g.bandera)}</span>` : ""}<b>${esc(g.etiqueta || g.oferta || "")}</b></span>
+        <span class="mo-e">Ganancia</span><span class="mo-v num ${gan == null ? "" : gan < 0 ? "neg" : "gana"}">${usdG(gan)}</span>
+        <span class="mo-pills"><span class="roas ${colorRoas(m.roas)}">${roasTx(m.roas)}</span><span class="mo-g num">${usdG(m.gasto)} gastados</span></span></button>`; }).join("")}</div>`;
+  const lista = $(".mesa-of-lista", box); lista.scrollLeft = scroll;
+  $$("[data-ir-of]", box).forEach((b) => b.onclick = () => { irA(+b.dataset.irOf); $("#carr")?.scrollIntoView({ behavior: reducido() ? "auto" : "smooth", block: "start" }); });
+  $$("[data-of]", box).forEach((b) => b.onclick = () => lista.scrollBy({ left: +b.dataset.of * lista.clientWidth * 0.8, behavior: reducido() ? "auto" : "smooth" }));
 }
 function irA(i) {
   const n = grupos().length;
@@ -1141,17 +1167,18 @@ const porVisita = (x) => !x.visitas ? "—" : `${usdG(nulo(x.facturacion) ? null
 // [clave, título, formato(x) -> html, clase extra(x)]
 // (25/10, Lorenzo) sin ROI; orden fijo de métricas. Las que no pidió quedan ocultas de arranque (se prenden en «Columnas»).
 const COLS = [
+  // (06/11, Lorenzo) orden del diseño Mesa: Presupuesto, ROAS, Ganancia, Gasto, Facturación y después el resto
+  ["presupuesto", "Presupuesto", (x, nivel) => nivel === "campana" && x.tipo_presupuesto === "ABO" ? `<span class="chip-tp" title="Presupuesto por conjunto: abrí la campaña para verlo y cambiarlo">Presupuesto ABO</span>` : `${usdG(x.presupuesto)}${x.tipo_presupuesto ? ` <span class="chip-tp">${esc(x.tipo_presupuesto)}</span>` : ""}${editaPres(x, nivel) ? ` <button type="button" class="lapiz" data-pres="${esc(nivel + ":" + x.id)}" aria-label="Cambiar presupuesto de ${esc(x.nombre)}" title="Cambiar presupuesto"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z M14 6l4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg></button>` : ""}`], // (26/10, Lorenzo) antes de Ventas
+  ["roas", "ROAS", (x, nivel) => `<span class="roas-f">${chipRoas(x.roas)}${nivel === "campana" ? flechaRoas(x) : ""}</span>`],
+  ["ganancia", "Ganancia / pérdida", (x) => usdG(x.ganancia), (x) => signo(x.ganancia)],
+  ["gasto", "Importe gastado", (x) => usdG(x.gasto)],
+  ["facturacion", "Facturación", (x) => usdG(x.facturacion)],          // (06/11, Lorenzo) diseño Mesa
+  ["ventas", "Ventas", (x) => entN(x.ventas)],
+  ["margen", "Margen %", (x) => pctN(x.margen), (x) => signo(x.margen ?? x.ganancia)],
+  ["cpa", "CPA", (x) => usdG(cpaDe(x))],
+  ["ticket_promedio", "AOV", (x) => usdG(aovDe(x))],
   ["estado", "Estado", (x, nivel) => nivel ? estadoTxt(x) : ""],          // (24/10, Lorenzo)
   ["ultima", "Última modificación", (x, nivel) => nivel ? ultimaCelda(x, nivel) : ""], // (02/11) solo presupuesto, justo antes de Presupuesto
-  // (29/10, Lorenzo) columna «Acciones» sacada
-  ["presupuesto", "Presupuesto", (x, nivel) => nivel === "campana" && x.tipo_presupuesto === "ABO" ? `<span class="chip-tp" title="Presupuesto por conjunto: abrí la campaña para verlo y cambiarlo">Presupuesto ABO</span>` : `${usdG(x.presupuesto)}${x.tipo_presupuesto ? ` <span class="chip-tp">${esc(x.tipo_presupuesto)}</span>` : ""}${editaPres(x, nivel) ? ` <button type="button" class="lapiz" data-pres="${esc(nivel + ":" + x.id)}" aria-label="Cambiar presupuesto de ${esc(x.nombre)}" title="Cambiar presupuesto"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z M14 6l4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg></button>` : ""}`], // (26/10, Lorenzo) antes de Ventas
-  ["ventas", "Ventas", (x) => entN(x.ventas)],
-  ["roas", "ROAS", (x, nivel) => `<span class="roas-f">${chipRoas(x.roas)}${nivel === "campana" ? flechaRoas(x) : ""}</span>`],
-  ["margen", "Margen %", (x) => pctN(x.margen), (x) => signo(x.margen ?? x.ganancia)],
-  ["ganancia", "Ganancia / pérdida", (x) => usdG(x.ganancia), (x) => signo(x.ganancia)],
-  ["ticket_promedio", "AOV", (x) => usdG(aovDe(x))],
-  ["gasto", "Importe gastado", (x) => usdG(x.gasto)],
-  ["cpa", "CPA", (x) => usdG(cpaDe(x))],
   ["costo_pago_iniciado", "C/pago iniciado", (x) => usdG(x.costo_pago_iniciado)],
   ["retencion", "Retención %", (x) => pct1(x.retencion)], // (24/10 b) thruplays ÷ impresiones (WIKI/metricas-y-kpis: Santi pide > 10 %)
   ["ctr", "CTR", (x) => pct1(x.ctr)],
@@ -1650,7 +1677,19 @@ function clickTabla(e) {
   }
   if (e.target.closest("a, [data-nosel], button")) return;
   const tr = e.target.closest("tr.fila");
-  if (tr) { if (window.getSelection && String(window.getSelection()).length > 2) return; alternarSel(tr); }
+  if (!tr) return;
+  if (window.getSelection && String(window.getSelection()).length > 2 && !e.shiftKey) return;
+  // (06/11, Lorenzo) Shift + clic: de la última tocada hasta esta, todas seleccionadas
+  const fs = $$("tr.fila", $("#tabla-scroll")), a = fs.findIndex((f) => f.dataset.k === S.ultK);
+  if (e.shiftKey && a >= 0) {
+    window.getSelection?.().removeAllRanges?.();
+    const b = fs.indexOf(tr);
+    for (const f of fs.slice(Math.min(a, b), Math.max(a, b) + 1)) { const k = f.dataset.k; if (S.sel.has(k)) continue; const it = buscarItem(k); if (!it) continue;
+      S.sel.set(k, { id: it.id, act: it.act, nivel: it.nivel, nombre: it.nombre, estado: it.estado, camp: it.camp, cj: it.cj }); f.classList.add("sel"); f.setAttribute("aria-selected", "true"); }
+    if (S.soloSel) pintarTabla(); else pintarSoloSel();
+    pintarBarra();
+  } else alternarSel(tr);
+  S.ultK = tr.dataset.k;
 }
 function teclaTabla(e) {
   const tr = e.target.closest && e.target.closest("tr.fila");
