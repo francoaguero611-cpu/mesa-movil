@@ -590,7 +590,7 @@ function demo() {
     { u: uid(), rol: "aviso", t: t(12), feed: 2, verde: true, texto: "✅ **Impactó el cobro: Meta se llevó US$ 240 en Impultienda 6 · CP12.** En Whop te quedan US$ 4.068." },
     { u: uid(), rol: "aviso", t: t(2), feed: 3, urgente: true, texto: "🚨 **Bro, cargá US$ 600 en Whop ya mismo.** En ~5 min Meta te cobra US$ 1.000 y en Whop tenés US$ 500. Si no cargás, se frenan los anuncios." },
   ];
-  J.ultFeed = 3; pintar(); sonar(true); setTimeout(abrir, 1200);
+  J.ultFeed = 3; pintar(); sonar(true);   // (06/11) tampoco se abre solo en demo
 }
 async function demoResp(t) {
   await new Promise((ok) => setTimeout(ok, 900));

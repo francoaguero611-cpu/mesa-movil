@@ -1,0 +1,57 @@
+/* =====================================================================================================
+   PULIDO (06/11, Lorenzo) — efectos tomados de 21st.dev y adaptados al liquid glass (sin React).
+   1) Borde que se enciende donde está el puntero (Spotlight de 21st: anillo de luz, usa --mx/--my de liquid.js).
+   2) Números que «ruedan» al cambiar (Count Up de 21st, versión liviana en pulido.js) sin temblar: cifras de ancho fijo.
+   3) Las tarjetas entran en cascada (suben y aparecen, 35 ms entre una y otra) solo la primera vez.
+   4) Haz de luz que recorre el borde de la tarjeta de Ganancia cuando es positiva (Border Beam).
+   5) Carga con brillo que pasa (shimmer) en vez del bloque gris.
+   Todo respeta «reducir movimiento». Se carga después de glass.css.
+   ===================================================================================================== */
+
+/* 1) anillo de luz que sigue al puntero (solo con mouse) */
+@media (hover: hover) and (pointer: fine) {
+  .met.boceto::before, .rp-card.boceto::before, .rp-tile.boceto::before {
+    background:
+      radial-gradient(240px circle at var(--mx, 50%) var(--my, -60%), rgba(150,215,255,.75), transparent 60%),
+      linear-gradient(160deg, rgba(210,235,255,.30), rgba(210,235,255,.05) 38%, rgba(210,235,255,.02) 62%, rgba(210,235,255,.14));
+    background-size: 100% 100%;
+  }
+}
+
+/* 2) cifras de ancho fijo: el número no baila mientras rueda */
+.met .val, .met .sub.num, .val.num, .num { font-variant-numeric: tabular-nums; }
+.met .val { transition: color .4s var(--suave), text-shadow .4s var(--suave); }
+.met .val .pul-cambio { display: inline-block; }
+.met.pul-sube .val { animation: pulSube .9s var(--suave); }
+.met.pul-baja .val { animation: pulBaja .9s var(--suave); }
+@keyframes pulSube { 0% { text-shadow: 0 0 0 transparent; } 30% { text-shadow: 0 0 18px rgba(111,242,200,.55); } 100% { text-shadow: inherit; } }
+@keyframes pulBaja { 0% { text-shadow: 0 0 0 transparent; } 30% { text-shadow: 0 0 18px rgba(255,122,133,.5); } 100% { text-shadow: inherit; } }
+
+/* 3) entrada en cascada */
+.pul-entra { animation: pulEntra .6s var(--suave) both; animation-delay: calc(var(--i, 0) * 35ms); }
+@keyframes pulEntra { from { opacity: 0; transform: translateY(10px) scale(.985); filter: blur(3px); } to { opacity: 1; transform: none; filter: none; } }
+
+/* 4) haz de luz en el borde de Ganancia positiva */
+@property --pul-ang { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+.met.pul-haz { isolation: isolate; }
+.met.pul-haz > .pul-haz-luz {
+  position: absolute; inset: 0; border-radius: inherit; padding: 1.5px; pointer-events: none; z-index: 2;
+  background: conic-gradient(from var(--pul-ang), transparent 0deg, transparent 290deg, rgba(111,242,200,.0) 300deg, rgba(111,242,200,.95) 345deg, rgba(200,255,240,1) 352deg, transparent 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: pulGira 5s linear infinite;
+}
+@keyframes pulGira { to { --pul-ang: 360deg; } }
+
+/* 5) carga con brillo que pasa */
+.esqueleto { position: relative; overflow: hidden; animation: none !important;
+  background: linear-gradient(160deg, rgba(170,210,255,.06), rgba(170,210,255,.03)) !important; }
+.esqueleto::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(100deg, transparent 20%, rgba(190,228,255,.10) 45%, rgba(190,228,255,.18) 50%, rgba(190,228,255,.10) 55%, transparent 80%);
+  animation: pulBrillo 1.6s var(--suave) infinite; }
+@keyframes pulBrillo { to { transform: translateX(100%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .pul-entra, .met.pul-sube .val, .met.pul-baja .val { animation: none; }
+  .met.pul-haz > .pul-haz-luz { animation: none; display: none; }
+  .esqueleto::after { animation: none; }
+}
