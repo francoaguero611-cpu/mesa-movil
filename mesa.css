@@ -270,3 +270,69 @@ html body .liq-grupo .btn[aria-pressed="true"], html body .liq-grupo [aria-selec
   html body .barra, html body .barra > *, html body .carr .sec-grid, .ms-capas i, html body .jv-fab { animation: none !important; }
   html body .jv-panel { transition: opacity .2s; }
 }
+
+/* =====================================================================================================
+   (06/11 b) Ajustes para que quede IGUAL a la maqueta (pedido de Lorenzo)
+   ===================================================================================================== */
+/* barra de arriba: miga «Resumen / Dashboard» a la izquierda; saldo y botones a la derecha */
+html body .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0 14px; margin-bottom: 22px; border-bottom: 1px solid var(--linea); border-radius: 0; }
+html body .top .marca { display: flex; align-items: center; gap: 10px; min-width: 0; }
+html body .top .marca h1 { font-size: 14px; font-weight: 500; letter-spacing: 0; color: var(--tx); margin: 0; display: flex; align-items: center; gap: 8px; }
+html body .top .marca h1::before { content: attr(data-grupo) "  /"; white-space: pre; color: var(--mut-2); font-weight: 400; }
+html body .top .marca::before { content: ""; width: 17px; height: 17px; flex: none; background: currentColor; color: var(--mut-2);
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6'><path d='M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z'/></svg>") center / contain no-repeat;
+          mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6'><path d='M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z'/></svg>") center / contain no-repeat; }
+html body .top .garabato, html body .top .hola { display: none; }
+html body .top .badges { margin: 0; }
+html body .acciones-top { display: flex; align-items: center; gap: 8px; }
+html body .acciones-top .whop-mini { margin: 0; }
+html body .acciones-top .btn.icono { width: 40px; min-height: 40px; }
+/* encabezado de la página: «Última lectura» + «Resultados en vivo» a la izquierda, períodos a la derecha */
+html body #main:has(#carr) { display: flex; flex-direction: column; }
+html body #main:has(#carr) > .controles { order: -2; }
+html body #main:has(#carr) > .sel-grupo-caja { order: -1; margin-bottom: 18px; }
+html body .controles { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+html body .controles .hora, html body .controles > .whop-mini { display: none; }
+.ms-cab .vivo { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--mut-2); margin-bottom: 8px; }
+.ms-cab .vivo i { width: 7px; height: 7px; border-radius: 50%; background: var(--bien); box-shadow: 0 0 0 4px rgba(143,227,191,.15); }
+.ms-cab .vivo b { color: var(--tx); font-weight: 500; }
+.ms-cab h3 { margin: 0; font-size: clamp(28px, 3.2vw, 40px); line-height: 1.05; font-weight: 300; letter-spacing: -1px; }
+.ms-cab h3 b { font-weight: 600; background: var(--torna); -webkit-background-clip: text; background-clip: text; color: transparent; }
+/* métricas sin carrusel: sin flechas, sin puntitos, sin «Todas general» (la oferta se elige en la barra de arriba) */
+html body .carr { display: block; }
+html body .carr #b-prev, html body .carr #b-next, html body .carr #pos, html body .carr .etiqueta { display: none !important; }
+/* con Jarvis abierto: las 4 columnas se mantienen hasta que de verdad no entran (como la maqueta) */
+@container metricas (max-width: 860px) { .mesa-fila1 { grid-template-columns: minmax(0, 1.35fr) repeat(3, minmax(0, 1fr)); } .mesa-fila2 { grid-template-columns: minmax(0, 1.75fr) minmax(0, .9fr) minmax(0, .9fr) minmax(0, .8fr); } }
+@container metricas (max-width: 700px) { .mesa-fila1, .mesa-fila2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* resultados totales: una fila aparte, más finita, toda gris y pareja (sin el inicio celeste ni pegada a las campañas) */
+html body .camp tfoot td, html body .camp tfoot td.nom { background: #1b1b20 !important; background-clip: padding-box; border-top: 12px solid transparent; border-bottom: 0; box-shadow: none !important;
+  padding-top: 9px; padding-bottom: 9px; color: var(--tx-2); font-weight: 500; }
+html body .camp tfoot td:first-child { border-radius: 14px 0 0 14px; }
+html body .camp tfoot td:last-child { border-radius: 0 14px 14px 0; }
+html body .camp tfoot .nomwrap .n { font-family: var(--f-texto); font-weight: 500; font-size: 13.5px; color: var(--tx); }
+html body .camp tfoot .nomwrap .sub { font-size: 11.5px; color: var(--mut-2); }
+/* isla: la animación de entrada SOLO cuando aparece; al cambiar la selección todo queda quieto y solo rueda el número */
+html body .barra { animation: none; }
+html body .barra > *:not(.cuenta) { animation: none; }
+html body .barra.ms-nueva { animation: msIsla .9s var(--sale); }
+html body .barra.ms-nueva > *:not(.ms-n) { animation: msIslaBtn .6s var(--sale) both; animation-delay: .32s; }
+.ms-n { position: relative; overflow: hidden; }
+.ms-n .ms-rueda { position: absolute; inset: 0; display: grid; place-items: center; }
+.ms-n .ms-rueda.sale-arriba { animation: msSaleArriba .45s var(--sale) forwards; }
+.ms-n .ms-rueda.entra-abajo { animation: msEntraAbajo .45s var(--sale); }
+.ms-n .ms-rueda.sale-abajo { animation: msSaleAbajo .45s var(--sale) forwards; }
+.ms-n .ms-rueda.entra-arriba { animation: msEntraArriba .45s var(--sale); }
+@keyframes msSaleArriba { to { transform: translateY(-100%); opacity: 0; } }
+@keyframes msEntraAbajo { from { transform: translateY(100%); opacity: 0; } }
+@keyframes msSaleAbajo { to { transform: translateY(100%); opacity: 0; } }
+@keyframes msEntraArriba { from { transform: translateY(-100%); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .ms-n .ms-rueda { animation: none !important; } }
+/* cartel de avisos con el estilo Mesa (el naranja → rojo marca lo urgente) */
+html body .av-pop { background: linear-gradient(170deg, #1c1c21, #131316); color: var(--tx); border: 1px solid var(--linea-2); border-radius: 22px; font-family: var(--f-texto); box-shadow: 0 40px 80px -30px rgba(0,0,0,.95); }
+html body .av-pop.t-saldo, html body .av-pop.t-error { border-color: rgba(255,120,70,.45); box-shadow: 0 0 0 1px rgba(255,107,61,.12), 0 0 40px -10px rgba(255,90,50,.45), 0 40px 80px -30px rgba(0,0,0,.95); }
+html body .av-pop.t-campana, html body .av-pop.t-oferta { border-color: rgba(216,210,246,.35); }
+html body .av-pop h3 { font-weight: 600; letter-spacing: -.2px; }
+html body .av-pop p { color: var(--tx-2); }
+html body .av-b { background: #1d1d22; border: 1px solid var(--linea-2); border-radius: 999px; padding: 8px 14px; font-family: var(--f-texto); font-weight: 500; color: var(--tx); }
+html body .av-b.pri, html body .av-pop .av-b:first-child:not(.cerrar) { background: var(--fuego); color: #fff; border-color: transparent; }
+html body .av-pop-fondo { background: rgba(5,5,7,.6); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }

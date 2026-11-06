@@ -522,7 +522,7 @@ function montar() {
   $("#f-cuenta").onchange = (e) => { S.cuenta = e.target.value; ls.set("dash_cuenta", S.cuenta); pintarTabla(); pintarProblemas(); };
   let tb = null;
   $("#f-buscar").oninput = (e) => { clearTimeout(tb); tb = setTimeout(() => { S.buscar = e.target.value; pintarTabla(); }, 150); };
-  gestosCarrusel($("#carr"));
+  // (06/11, Lorenzo) diseño Mesa: la oferta se elige solo desde la barra de arriba (sin deslizar ni flechas)
   $("#tabla-scroll").addEventListener("click", (e) => { // (24/10) chips de Acciones y nubecita
     const x = e.target.closest("[data-nube-x]"); if (x) { e.stopPropagation(); S.nube = null; pintarTabla(); return; }
     const ch = e.target.closest("[data-nube]"); if (!ch) return;

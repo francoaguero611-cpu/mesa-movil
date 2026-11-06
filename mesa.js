@@ -75,13 +75,44 @@ function capasYa() {
 }
 addEventListener("resize", capas);
 
-// ---------- 5) isla: círculo con el número ----------
+// ---------- 5) isla: círculo con el número; al cambiar la selección solo rueda el número ----------
+let islaN = 0, islaVisible = false;
 function isla() {
-  const b = $("#barra"); if (!b || b.hidden) return;
-  const tx = $(".cuenta", b)?.textContent || "", n = (tx.match(/\d+/) || [""])[0];
+  const b = $("#barra"); if (!b) return;
+  if (b.hidden) { islaVisible = false; islaN = 0; return; }
+  const tx = $(".cuenta", b)?.textContent || "", n = +((tx.match(/\d+/) || ["0"])[0]);
+  if (!islaVisible) { islaVisible = true; b.classList.add("ms-nueva"); setTimeout(() => b.classList.remove("ms-nueva"), 1300); }
   let c = $(".ms-n", b);
   if (!c) { c = document.createElement("span"); c.className = "ms-n num"; b.prepend(c); }
-  c.textContent = n;
+  if (c.dataset.n === String(n)) return;
+  const antes = islaN; islaN = n; c.dataset.n = String(n);
+  if (!antes || antes === n || quieto) { c.innerHTML = `<span class="ms-rueda">${n}</span>`; return; }
+  const sube = n > antes;   // más seleccionadas: el número viejo sube y el nuevo entra de abajo; menos: al revés
+  c.innerHTML = `<span class="ms-rueda ${sube ? "sale-arriba" : "sale-abajo"}">${antes}</span><span class="ms-rueda ${sube ? "entra-abajo" : "entra-arriba"}">${n}</span>`;
+  setTimeout(() => { if (c.dataset.n === String(n)) c.innerHTML = `<span class="ms-rueda">${n}</span>`; }, 480);
+}
+// la app vuelve a armar la isla en cada cambio: la acomodamos en el mismo instante (antes de que se pinte) para que nada parpadee
+const OPC_ISLA = { childList: true, attributes: true, attributeFilter: ["hidden"] };
+const obsIsla = new MutationObserver(() => { obsIsla.disconnect(); try { isla(); } catch {} const b = $("#barra"); if (b) obsIsla.observe(b, OPC_ISLA); });
+function mirarIsla() { const b = $("#barra"); if (b && !b.dataset.msObs) { b.dataset.msObs = "1"; obsIsla.observe(b, OPC_ISLA); } }
+
+// ---------- encabezado como la maqueta ----------
+const GRUPO_DE = { dash: "Resumen", reportes: "Campañas", umbrales: "Campañas", ranking: "Campañas", cazador: "Producción", creativos: "Producción", atc: "Ayuda" };
+function encabezado() {
+  const h1 = $(".top .marca h1"), act = $('#secciones [data-sec][aria-pressed="true"]');
+  if (h1) { const g = GRUPO_DE[act?.dataset.sec] || "Resumen"; if (h1.dataset.grupo !== g) h1.dataset.grupo = g; }
+  // el saldo de Whop va arriba a la derecha (la app lo vuelve a crear al entrar al Dashboard: dejamos uno solo)
+  const nuevo = $(".controles #whop-barra"), arriba = $(".acciones-top");
+  if (nuevo && arriba) { $$(".acciones-top #whop-barra").forEach((x) => x.remove()); arriba.prepend(nuevo); }
+  // «Última lectura» + «Resultados en vivo»
+  const ctl = $("#main .controles");
+  if (ctl && $("#carr")) {
+    let cab = $(".ms-cab", ctl);
+    if (!cab) { cab = document.createElement("div"); cab.className = "ms-cab"; cab.innerHTML = `<div class="vivo"><i></i><span>Última lectura: <b class="num"></b></span></div><h3>Resultados<br><b>en vivo</b></h3>`; ctl.prepend(cab); }
+    const t = ($("#hora", ctl)?.textContent || "").trim(), hh = (t.match(/\d{1,2}:\d{2}/) || [""])[0];
+    const tx = /sin conexi/i.test(t) ? `sin conexión · ${hh}` : hh || "…";
+    const bb = $(".vivo b", cab); if (bb && bb.textContent !== tx) bb.textContent = tx;
+  }
 }
 
 // ---------- 6) entradas al deslizar ----------
@@ -117,9 +148,9 @@ let pend = false;
 const OPC = { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "hidden"] };
 const obs = new MutationObserver(() => { if (pend) return; pend = true; requestAnimationFrame(() => {
   pend = false; obs.disconnect();                       // lo que cambiamos acá no vuelve a disparar el observador
-  try { armarMenu(); isla(); revelar(); capasYa(); } catch { /* decorativo */ }
+  try { armarMenu(); encabezado(); mirarIsla(); isla(); revelar(); capasYa(); } catch { /* decorativo */ }
   obs.takeRecords(); obs.observe(document.body, OPC); }); });
 obs.observe(document.body, OPC);
 if ("ResizeObserver" in window) { const ro = new ResizeObserver(capas); const mirar = () => { const sc = $("#tabla-scroll"); if (sc && !sc.dataset.msRo) { sc.dataset.msRo = "1"; ro.observe(sc); } }; setInterval(mirar, 1500); }
-armarMenu(); isla(); revelar();
+armarMenu(); encabezado(); mirarIsla(); isla(); revelar();
 })();
