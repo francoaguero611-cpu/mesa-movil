@@ -167,7 +167,7 @@ document.addEventListener("mousedown", (e) => { if (e.shiftKey && e.target.close
 let efSaldo = null, efHora = null, efPidiendo = false, efUlt = 0;
 async function leerEtherfi() {
   if (efPidiendo || Date.now() - efUlt < 60e3 || typeof clave !== "function") return;
-  if (typeof DEMO !== "undefined" && DEMO) { efSaldo = 3407.17; efHora = new Date(); efCash = { pct: 3, gastado: { hoy: 539.26, d7: 6020.17, total: 6020.17 }, cashback: { hoy: 16.18, d7: 180.61, total: 180.61 } }; pintarEther(); return; }
+  if (typeof DEMO !== "undefined" && DEMO) { efSaldo = 3407.17; efHora = new Date(); efCash = { pct: 3, gastado: { hoy: 539.26, d7: 6020.17, total: 6020.17 }, cashback: { hoy: 16.18, d7: 180.61, total: 804.23 }, previo: 623.62 }; pintarEther(); return; }
   if (!clave()) return;
   efPidiendo = true; efUlt = Date.now();
   try {
@@ -185,7 +185,7 @@ function pintarCash() {
   const v = $(".ms-cash-v", c); if (!v) return;
   if (!efCash?.cashback) { v.textContent = "…"; return; }
   v.textContent = usd2(efCash.cashback[efPer]);
-  c.title = `Cashback ${efCash.pct ?? 3} % de ${usd2(efCash.gastado?.[efPer])} gastados con la tarjeta (${efPer === "hoy" ? "hoy" : efPer === "d7" ? "últimos 7 días" : "desde que la tarjeta está en OP Mainnet"}). Es un cálculo: las compras que la tarjeta todavía no asentó entran después.`;
+  c.title = `Cashback ${efCash.pct ?? 3} % de ${usd2(efCash.gastado?.[efPer])} gastados con la tarjeta (${efPer === "hoy" ? "hoy" : efPer === "d7" ? "últimos 7 días" : "desde el 05/11"}${efPer === "total" && efCash.previo ? ` + ${usd2(efCash.previo)} de antes del 05/11` : ""}). Es un cálculo: las compras que la tarjeta todavía no asentó entran después.`;
 }
 function pintarEther() {
   pintarCash();
