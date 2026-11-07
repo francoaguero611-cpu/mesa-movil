@@ -125,3 +125,7 @@
   .ac-av { width: 36px; height: 36px; }
   .v-inicio .ac-miga { font-size: 24px; }
 }
+/* (07/11) corrección para el bot (Tomi supervisa) */
+.ac-corr { margin: 8px 14px 12px; border: 1px dashed var(--linea-2, rgba(255,255,255,.18)); border-radius: 12px; padding: 8px 12px; }
+.ac-corr summary { cursor: pointer; font-size: 13px; color: var(--tx-2, #c9c9d1); }
+.ac-corr[open] summary { margin-bottom: 8px; }

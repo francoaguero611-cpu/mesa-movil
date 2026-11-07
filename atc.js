@@ -143,6 +143,9 @@ function chat() {
       <div class="ac-comp-f"><textarea id="ac-txt" rows="2" placeholder="Escribí la respuesta…" maxlength="1990"></textarea><button type="button" class="ac-env" id="ac-env" ${A.enviando ? "disabled" : ""}>${A.enviando ? "Enviando…" : "Enviar"}</button></div>
       <p class="ac-mut ac-nota">Sale por Messenger desde la página, como respuesta de una persona.</p>`
       : `<p class="ac-mut ac-nota">${d.canal === "mails" ? "Para responder un mail, abrilo en Gmail (botón de arriba)." : d.canal === "comentarios" ? "Para responder un comentario, abrilo en Facebook (botón de arriba)." : "Los reclamos de Mercado Pago los responde el bot de disputas."}</p>`}</footer>
+    <details class="ac-corr"><summary>✍️ ¿El bot respondió mal o falta algo? Dejá una corrección</summary>
+      <div class="ac-comp-f"><textarea id="ac-corr-txt" rows="2" placeholder="Ej.: no tenía que mandarle el link sin pedirle el mail · le respondió con frío · quedó sin responder" maxlength="2000"></textarea><button type="button" class="ac-env" id="ac-corr-env">Mandar</button></div>
+      <p class="ac-mut ac-nota">Le llega a Lorenzo y se usa para mejorar el bot.</p></details>
   </section>${ficha()}</div>`;
 }
 
@@ -208,6 +211,13 @@ function enlazar() {
   on("#ac-cli", () => { A.verCli = !A.verCli; pintar(); });
   on("#ac-usar", () => { const m = [...(A.conv?.mensajes ?? [])].reverse().find((x) => x.sin_enviar && x.de === "bot"); const t = $("#ac-txt", r); if (m && t) { t.value = m.texto; t.focus(); } });
   on("#ac-env", enviar);
+  on("#ac-corr-env", async () => {
+    const t = $("#ac-corr-txt", r), texto = (t?.value || "").trim(); if (!texto || !A.conv) return;
+    const b = $("#ac-corr-env", r); b.disabled = true; b.textContent = "Mandando…";
+    try { await api("accion=corregir", { canal: A.conv.canal, id: A.conv.id, cliente: A.conv.cab?.nombre || "", texto }); t.value = ""; A.ctx.toast?.("✓ Corrección enviada. ¡Gracias!", "ok"); }
+    catch (e) { A.ctx.toast?.(`No se pudo mandar: ${e.message}`, "error", 9000); }
+    b.disabled = false; b.textContent = "Mandar";
+  });
   const txt = $("#ac-txt", r); if (txt) txt.onkeydown = (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) enviar(); };
   enlazarFilas();
 }
