@@ -24,16 +24,20 @@ function iniciarLenis() {
   if (quieto || !window.Lenis || matchMedia("(hover: none)").matches) return;
   try {
     lenis = new Lenis({ lerp: 0.075, smoothWheel: true, wheelMultiplier: 1, // (06/11) modo continuo: con la rueda rápida no pega saltos (antes cada empujón reiniciaba la animación)
-      prevent: (n) => !!(n.closest && n.closest(".jv-panel, .dialogo, .menu, .modal, .ad-ver, [data-lenis-prevent], textarea, select")) });
+      // (07/11 b) SIN «select»: al deslizar rápido el mouse pasaba por el desplegable «Todas» (todo el ancho) o los filtros, el
+      // deslizado suave se soltaba, la Mac movía la página sola y al salir volvía atrás → el «sube y baja». Solo se suelta en
+      // lo que tiene su propio scroll: ventanas, menú, tablero de tareas, textos largos.
+      prevent: (n) => !!(n.closest && n.closest(".dialogo, .menu, .modal, .ad-ver, .tb-velo, .velo, [data-lenis-prevent], textarea")) });
+    // si algo movió la página por fuera (teclado, barra, ancla), el suave arranca desde ahí y no vuelve atrás
+    addEventListener("keydown", (e) => { if (["PageDown", "PageUp", "Home", "End", " ", "ArrowDown", "ArrowUp"].includes(e.key) && !e.target.closest?.("input, textarea, select")) lenis.stop(), requestAnimationFrame(() => lenis.start()); });
     window.MesaLenis = lenis;
     // (06/11) el encabezado flotante de la tabla se acomoda en el MISMO cuadro en que Lenis mueve la página (antes llegaba
     // un cuadro tarde con el evento scroll y al deslizar rápido titilaba o se veía corrido)
     lenis.on("scroll", () => { try { if (typeof ubicarCabFlotante === "function") ubicarCabFlotante(); } catch {} });
   } catch { lenis = null; }
 }
-// (07/11, Lorenzo) «deslizar rápido está roto: sube, se traba y rebota»: el deslizado suave (Lenis) peleaba con la inercia del
-// trackpad. Se saca: queda el deslizado nativo de la Mac/celular, que ya es suave y no se rompe. (iniciarLenis queda sin usar.)
-if (false) {
+// (07/11) vuelve el deslizado suave (Lorenzo: «que arranque rápido y termine lento, como antes»), con el arreglo del rebote.
+if (!quieto) {
   const sc = document.createElement("script");
   sc.src = "https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"; sc.async = true; sc.onload = iniciarLenis;
   document.head.append(sc);
