@@ -31,7 +31,9 @@ function iniciarLenis() {
     lenis.on("scroll", () => { try { if (typeof ubicarCabFlotante === "function") ubicarCabFlotante(); } catch {} });
   } catch { lenis = null; }
 }
-if (!quieto) {
+// (07/11, Lorenzo) «deslizar rápido está roto: sube, se traba y rebota»: el deslizado suave (Lenis) peleaba con la inercia del
+// trackpad. Se saca: queda el deslizado nativo de la Mac/celular, que ya es suave y no se rompe. (iniciarLenis queda sin usar.)
+if (false) {
   const sc = document.createElement("script");
   sc.src = "https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"; sc.async = true; sc.onload = iniciarLenis;
   document.head.append(sc);
@@ -194,7 +196,13 @@ function pintarEther() {
   if (h && efHora) { const m = Math.max(0, Math.round((Date.now() - efHora) / 60e3)); h.textContent = m < 1 ? "recién" : `hace ${m} min`; }
 }
 function etherfi() {
-  const arriba = $(".acciones-top"); if (!arriba) return;
+  // (07/11, Lorenzo) el saldo EtherFi + cashback va en el Dashboard, ARRIBA de «Hoy · Ayer · Últimos 3 días · Personalizado»,
+  // no en el encabezado (ahí dejaba los botones del menú corridos y anchos). Solo en el Dashboard.
+  $$(".acciones-top .ms-ether").forEach((x) => x.parentNode.removeChild(x));
+  const ctl = $("#main .controles"), per = ctl && $(".periodos", ctl); if (!ctl || !per) return;
+  let der = $(".ms-der", ctl);
+  if (!der) { der = document.createElement("div"); der.className = "ms-der"; ctl.insertBefore(der, per); der.append(per); }
+  const arriba = der;
   if (!$(".ms-ether", arriba)) {
     const w = document.createElement("div"); w.className = "ms-ether";
     w.innerHTML = `<button type="button" class="ms-ef-saldo" title="Saldo de la tarjeta EtherFi *0934 (se lee de OP Mainnet cada minuto)"><span class="pt" aria-hidden="true"></span><span class="tx"><small>Saldo EtherFi *0934</small><b class="num ms-ef-s">leyendo…</b></span><span class="hace"></span></button>

@@ -11,7 +11,7 @@ html.ms-cel .ms-sol { width: 150vmax; opacity: .7; }
 
 /* ---------- encabezado fijo arriba: logo + sección · avisos · actualizar · menú; saldo EtherFi debajo ---------- */
 html.ms-cel body .top { position: sticky; top: 0; z-index: 45; margin: 0 calc(var(--gut) * -1) 6px; padding: calc(env(safe-area-inset-top) + 10px) var(--gut) 10px;
-  display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto auto; grid-template-areas: "tit tb av ref menu" "eth eth eth eth eth"; align-items: center; gap: 10px 8px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto auto; grid-template-areas: "tit tb av ref menu"; align-items: center; gap: 10px 8px;
   background: linear-gradient(180deg, rgba(9,9,11,.94) 60%, rgba(9,9,11,.78)); -webkit-backdrop-filter: blur(18px) saturate(1.3); backdrop-filter: blur(18px) saturate(1.3);
   border-bottom: 1px solid var(--linea); }
 html.ms-cel body .top .acciones-top { display: contents; }
@@ -181,7 +181,7 @@ html.ms-cel .mc-tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5
 .mc-jv-orbe { position: absolute; inset: 0; border-radius: 50%; display: grid; place-items: center; color: #fff; background: var(--fuego);
   box-shadow: 0 0 0 5px #0b0b0d, 0 0 26px -2px rgba(255,96,52,.75); animation: mcJv 3.2s ease-in-out infinite; transition: transform .3s var(--sale); }
 .mc-jarvis:active .mc-jv-orbe { transform: scale(.9); }
-.mc-jv-orbe svg path { fill: currentColor; stroke: none; }
+.mc-jv-orbe svg path { fill: none; stroke: currentColor; stroke-width: 2.4; }
 @keyframes mcJv { 50% { box-shadow: 0 0 0 5px #0b0b0d, 0 0 36px 2px rgba(255,96,52,.9); } }
 .mc-jv-badge { position: absolute; top: -2px; right: -2px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: #fff; color: #c2272d; font: 700 11px/20px var(--f-texto); text-align: center; z-index: 1; }
 html.ms-cel body .jv-fab { display: none !important; }
@@ -255,3 +255,9 @@ html.ms-cel body .ms-cash { font-size: 12px; }
 html.ms-cel body .ms-cash-seg button { font-size: 11.5px; padding: 4px 9px; }
 
 html.ms-cel body .top #tb-btn { grid-area: tb; width: 40px; height: 40px; min-width: 40px; min-height: 40px; padding: 0; }
+
+/* (07/11) EtherFi ya no va en el encabezado: arriba de los períodos, a todo el ancho */
+html.ms-cel body #main .controles .ms-der { margin-left: 0; width: 100%; align-items: stretch; gap: 10px; }
+html.ms-cel body #main .controles .ms-der .ms-ether { min-width: 0; width: 100%; padding: 8px 12px; border-radius: 14px; }
+html.ms-cel body #main .controles .ms-der .ms-ether .tx { display: flex; align-items: baseline; justify-content: space-between; flex: 1; gap: 8px; }
+html.ms-cel body #main .controles .ms-der .ms-ef-saldo { width: 100%; }

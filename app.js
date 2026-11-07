@@ -3655,7 +3655,7 @@ async function recibirEvento(ev) {
   if (!ev) return;
   // (12/10) respuesta de Claude en Correcciones: abre la carpeta y el chat
   if (ev.sec === "creativos" && ev.cr) { if (!DEMO && !clave()) { ls.set("dash_ev_pend", JSON.stringify(ev)); return; } irASeccion("creativos", { ruta: { g: ev.cr.g, f: ev.cr.f, chat: ev.cr.chat } }); return; }
-  if (ev.sec === "jarvis") { if (!DEMO && !clave()) return; await iniciarJarvis(); return; } // (06/11, Lorenzo) tocar el push abre el Dashboard, no el chat de Jarvis (el anillo queda rojo) // (03/11) push de Jarvis → su chat
+  if (ev.sec === "jarvis") return; // (07/11) sin Jarvis: el push solo abre el Dashboard // (06/11, Lorenzo) tocar el push abre el Dashboard, no el chat de Jarvis (el anillo queda rojo) // (03/11) push de Jarvis → su chat
   if (ev.sec === "pagos") { mostrarEventoPagos(ev); return; } // (30/10) el link a Facturación no necesita sesión
   if (ev.sec === "camps" && Array.isArray(ev.ids) && ev.ids.length) { if (!DEMO && !clave()) { ls.set("dash_ev_pend", JSON.stringify(ev)); return; } const its = ev.ids.map((id) => ({ n: "campana", id: String(id) })); mostrarEnTabla(prepararEvento({ t: "surf", items: its }, its)).then(() => abrirVariosReloj(ev.ids.map(String))); return; } // (03/11) Jarvis: «seleccioná todas juntas» → quedan marcadas para Modificar presupuesto + pop-up con el antes/después de cada una
   if (ev.sec === "camp" && ev.id) { if (!DEMO && !clave()) { ls.set("dash_ev_pend", JSON.stringify(ev)); return; } abrirCampanaReloj(String(ev.id)); return; } // (03/11) link «Ver campaña» de Jarvis
@@ -3727,7 +3727,7 @@ function pintarNav() {
   }
 }
 function abrirInicial() {
-  pintarHola(); iniciarJarvis();
+  pintarHola(); // (07/11, Lorenzo) Jarvis se sacó: «no lo veo práctico». iniciarJarvis queda en el código sin llamarse.
   const h = location.hash.slice(1).split("/")[0]; // (12/10) #creativos/<oferta>/<fecha>
   const guardada = ls.get("dash_seccion");
   const s = seccionDe(h) || seccionDe(guardada) || SECCIONES[0];
