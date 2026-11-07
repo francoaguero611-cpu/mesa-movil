@@ -169,7 +169,7 @@ document.addEventListener("mousedown", (e) => { if (e.shiftKey && e.target.close
 let efSaldo = null, efHora = null, efPidiendo = false, efUlt = 0;
 async function leerEtherfi() {
   if (efPidiendo || Date.now() - efUlt < 60e3 || typeof clave !== "function") return;
-  if (typeof DEMO !== "undefined" && DEMO) { efSaldo = 3407.17; efHora = new Date(); efCash = { pct: 3, gastado: { hoy: 539.26, d7: 6020.17, total: 6020.17 }, cashback: { hoy: 16.18, d7: 180.61, total: 804.23 }, previo: 623.62 }; pintarEther(); return; }
+  if (typeof DEMO !== "undefined" && DEMO) { efSaldo = 3407.17; efHora = new Date(); efCash = { pct: 3, gastado: { hoy: 539.26, d7: 6020.17, total: 6020.17 }, por_dia: { "2026-11-05": 2173.85, "2026-11-06": 3307.06 }, cashback: { hoy: 16.18, d7: 180.61, total: 804.23 }, previo: 623.62 }; pintarEther(); return; }
   if (!clave()) return;
   efPidiendo = true; efUlt = Date.now();
   try {
@@ -179,37 +179,47 @@ async function leerEtherfi() {
   efPidiendo = false; pintarEther();
 }
 // (07/11, Lorenzo) cashback de EtherFi (3 % de lo gastado con la tarjeta) debajo del saldo: Hoy · 7 días · Total
-let efCash = null, efPer = (() => { try { return localStorage.getItem("ms_cash_per") || "d7"; } catch { return "d7"; } })();
+let efCash = null, efPer = (() => { try { const v = localStorage.getItem("ms_cash_per"); return v === "hoy" || v === "d7" ? v : "d7"; } catch { return "d7"; } })(), efDia = null;
 const usd2 = (n) => "US$ " + Number(n || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const usd0e = (n) => "US$ " + Number(n || 0).toLocaleString("es-AR", { maximumFractionDigits: 0 });
+// (07/11, Lorenzo) EtherFi en UNA línea fina en el encabezado: saldo · burbuja «Cashback 3 % US$ X» · círculos Hoy / 7 días / 📅
 function pintarCash() {
-  const c = $(".ms-cash"); if (!c) return;
-  $$("[data-cash]", c).forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.cash === efPer)));
+  const c = $(".ms-ether"); if (!c) return;
+  $$("[data-cash]", c).forEach((x) => x.setAttribute("aria-pressed", String(!efDia && x.dataset.cash === efPer)));
+  const cal = $(".ms-cal", c); if (cal) cal.classList.toggle("on", !!efDia);
   const v = $(".ms-cash-v", c); if (!v) return;
   if (!efCash?.cashback) { v.textContent = "…"; return; }
-  v.textContent = usd2(efCash.cashback[efPer]);
-  c.title = `Cashback ${efCash.pct ?? 3} % de ${usd2(efCash.gastado?.[efPer])} gastados con la tarjeta (${efPer === "hoy" ? "hoy" : efPer === "d7" ? "últimos 7 días" : "desde el 05/11"}${efPer === "total" && efCash.previo ? ` + ${usd2(efCash.previo)} de antes del 05/11` : ""}). Es un cálculo: las compras que la tarjeta todavía no asentó entran después.`;
+  const pct = efCash.pct ?? 3;
+  let monto, gasto, que;
+  if (efDia) { gasto = Number(efCash.por_dia?.[efDia] ?? 0); monto = Math.round(gasto * pct) / 100; que = `el ${efDia.slice(8, 10)}/${efDia.slice(5, 7)}`; }
+  else { monto = efCash.cashback[efPer]; gasto = efCash.gastado?.[efPer]; que = efPer === "hoy" ? "hoy" : "los últimos 7 días"; }
+  v.textContent = usd2(monto);
+  const b = $(".ms-cb", c); if (b) b.title = `Cashback ${pct} % de ${usd2(gasto)} gastados con la tarjeta ${que}. Es un cálculo: las compras que la tarjeta todavía no asentó entran después.`;
 }
 function pintarEther() {
   pintarCash();
-  const b = $(".ms-ether .ms-ef-s"), h = $(".ms-ether .hace"); if (!b) return;
-  b.textContent = efSaldo == null ? "leyendo…" : "US$ " + efSaldo.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  if (h && efHora) { const m = Math.max(0, Math.round((Date.now() - efHora) / 60e3)); h.textContent = m < 1 ? "recién" : `hace ${m} min`; }
+  const b = $(".ms-ether .ms-ef-s"); if (!b) return;
+  b.textContent = efSaldo == null ? "…" : usd0e(efSaldo);
+  const pt = $(".ms-ether .pt"); if (pt && efHora) pt.title = `Leído ${Math.max(0, Math.round((Date.now() - efHora) / 60e3))} min atrás`;
 }
 function etherfi() {
-  // (07/11, Lorenzo) el saldo EtherFi + cashback va en el Dashboard, ARRIBA de «Hoy · Ayer · Últimos 3 días · Personalizado»,
-  // no en el encabezado (ahí dejaba los botones del menú corridos y anchos). Solo en el Dashboard.
-  $$(".acciones-top .ms-ether").forEach((x) => x.parentNode.removeChild(x));
-  const ctl = $("#main .controles"), per = ctl && $(".periodos", ctl); if (!ctl || !per) return;
-  let der = $(".ms-der", ctl);
-  if (!der) { der = document.createElement("div"); der.className = "ms-der"; ctl.insertBefore(der, per); der.append(per); }
-  const arriba = der;
-  if (!$(".ms-ether", arriba)) {
-    const w = document.createElement("div"); w.className = "ms-ether";
-    w.innerHTML = `<button type="button" class="ms-ef-saldo" title="Saldo de la tarjeta EtherFi *0934 (se lee de OP Mainnet cada minuto)"><span class="pt" aria-hidden="true"></span><span class="tx"><small>Saldo EtherFi *0934</small><b class="num ms-ef-s">leyendo…</b></span><span class="hace"></span></button>
-      <div class="ms-cash"><span class="ms-cash-l">Cashback 3 %</span><span class="ms-cash-seg" role="group" aria-label="Período del cashback">${[["hoy", "Hoy"], ["d7", "7 días"], ["total", "Total"]].map(([k, t]) => `<button type="button" data-cash="${k}" aria-pressed="false">${t}</button>`).join("")}</span><b class="num ms-cash-v">…</b></div>`;
+  // va en el encabezado, antes de los botones (tareas, campanita, actualizar, menú)
+  $$("#main .controles .ms-der").forEach((d) => { const per = $(".periodos", d); if (per) d.parentNode.insertBefore(per, d); d.parentNode.removeChild(d); });
+  const arriba = $(".acciones-top"); if (!arriba) return;
+  let w = $(".ms-ether", arriba);
+  if (w && !w.classList.contains("linea")) { w.parentNode.removeChild(w); w = null; }
+  if (!w) {
+    w = document.createElement("div"); w.className = "ms-ether linea";
+    w.innerHTML = `<button type="button" class="ms-ef-saldo" title="Saldo de la tarjeta EtherFi *0934 (se lee cada minuto)"><span class="pt" aria-hidden="true"></span><small>EtherFi</small><b class="num ms-ef-s">…</b></button>
+      <span class="ms-cb"><small>Cashback ${3} %</small><b class="num ms-cash-v">…</b></span>
+      <span class="ms-cash-seg" role="group" aria-label="Período del cashback"><button type="button" data-cash="hoy" aria-pressed="false" title="Hoy">Hoy</button><button type="button" data-cash="d7" aria-pressed="false" title="Últimos 7 días">7d</button><label class="ms-cal" title="Elegir un día"><input type="date" class="ms-cal-in" aria-label="Elegir un día"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M5 6.5h14v13H5zM5 10.5h14M9 4v4M15 4v4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></label></span>`;
     $(".ms-ef-saldo", w).onclick = () => { efUlt = 0; leerEtherfi(); };
-    $$("[data-cash]", w).forEach((x) => x.onclick = () => { efPer = x.dataset.cash; try { localStorage.setItem("ms_cash_per", efPer); } catch {} pintarCash(); });
-    arriba.prepend(w);
+    $$("[data-cash]", w).forEach((x) => x.onclick = () => { efPer = x.dataset.cash; efDia = null; try { localStorage.setItem("ms_cash_per", efPer); } catch {} pintarCash(); });
+    const ci = $(".ms-cal-in", w);
+    ci.max = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);
+    ci.onchange = () => { efDia = ci.value || null; pintarCash(); };
+    $(".ms-cal", w).onclick = () => { try { ci.showPicker(); } catch {} };
+    const tb = $("#tb-btn", arriba); tb ? arriba.insertBefore(w, tb) : arriba.prepend(w);
   }
   pintarEther(); leerEtherfi();
 }
