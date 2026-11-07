@@ -440,3 +440,6 @@ html body .mesa-fila1 .met { cursor: crosshair; }
 /* la flechita del menú no se ve encima de ventanas ni del chat */
 html body:has(.dialogo) .ms-plegar, html body:has(.av-pop) .ms-plegar { display: none; }
 .ms-plegar { z-index: 30 !important; }
+/* (07/11, Lorenzo) el relojito del historial va en la isla también en la compu (antes solo se veía en el celular) */
+html body .barra .b-reloj-sel { display: inline-flex; align-items: center; gap: 6px; }
+html body .barra .b-reloj-sel svg { width: 16px; height: 16px; flex: none; }
