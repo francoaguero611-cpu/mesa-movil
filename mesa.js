@@ -167,28 +167,41 @@ document.addEventListener("mousedown", (e) => { if (e.shiftKey && e.target.close
 let efSaldo = null, efHora = null, efPidiendo = false, efUlt = 0;
 async function leerEtherfi() {
   if (efPidiendo || Date.now() - efUlt < 60e3 || typeof clave !== "function") return;
-  if (typeof DEMO !== "undefined" && DEMO) { efSaldo = 3407.17; efHora = new Date(); pintarEther(); return; }
+  if (typeof DEMO !== "undefined" && DEMO) { efSaldo = 3407.17; efHora = new Date(); efCash = { pct: 3, gastado: { hoy: 539.26, d7: 6020.17, total: 6020.17 }, cashback: { hoy: 16.18, d7: 180.61, total: 180.61 } }; pintarEther(); return; }
   if (!clave()) return;
   efPidiendo = true; efUlt = Date.now();
   try {
     const r = await fetch("https://tppcpnfzcxxusdhrlmdx.supabase.co/functions/v1/etherfi-saldo", { headers: { "x-app-clave": clave() }, cache: "no-store" });
-    const j = await r.json(); if (r.ok && j && j.saldo != null) { efSaldo = j.saldo; efHora = new Date(j.leido_en || Date.now()); }
+    const j = await r.json(); if (r.ok && j && j.saldo != null) { efSaldo = j.saldo; efHora = new Date(j.leido_en || Date.now()); if (j.cashback?.cashback) efCash = j.cashback; }
   } catch { /* se reintenta en 1 min */ }
   efPidiendo = false; pintarEther();
 }
+// (07/11, Lorenzo) cashback de EtherFi (3 % de lo gastado con la tarjeta) debajo del saldo: Hoy · 7 días · Total
+let efCash = null, efPer = (() => { try { return localStorage.getItem("ms_cash_per") || "d7"; } catch { return "d7"; } })();
+const usd2 = (n) => "US$ " + Number(n || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function pintarCash() {
+  const c = $(".ms-cash"); if (!c) return;
+  $$("[data-cash]", c).forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.cash === efPer)));
+  const v = $(".ms-cash-v", c); if (!v) return;
+  if (!efCash?.cashback) { v.textContent = "…"; return; }
+  v.textContent = usd2(efCash.cashback[efPer]);
+  c.title = `Cashback ${efCash.pct ?? 3} % de ${usd2(efCash.gastado?.[efPer])} gastados con la tarjeta (${efPer === "hoy" ? "hoy" : efPer === "d7" ? "últimos 7 días" : "desde que la tarjeta está en OP Mainnet"}). Es un cálculo: las compras que la tarjeta todavía no asentó entran después.`;
+}
 function pintarEther() {
-  const b = $(".ms-ether b"), h = $(".ms-ether .hace"); if (!b) return;
+  pintarCash();
+  const b = $(".ms-ether .ms-ef-s"), h = $(".ms-ether .hace"); if (!b) return;
   b.textContent = efSaldo == null ? "leyendo…" : "US$ " + efSaldo.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   if (h && efHora) { const m = Math.max(0, Math.round((Date.now() - efHora) / 60e3)); h.textContent = m < 1 ? "recién" : `hace ${m} min`; }
 }
 function etherfi() {
   const arriba = $(".acciones-top"); if (!arriba) return;
   if (!$(".ms-ether", arriba)) {
-    const b = document.createElement("button");
-    b.type = "button"; b.className = "ms-ether"; b.title = "Saldo de la tarjeta EtherFi *0934 (se lee de OP Mainnet cada minuto)";
-    b.innerHTML = `<span class="pt" aria-hidden="true"></span><span class="tx"><small>Saldo EtherFi *0934</small><b class="num">leyendo…</b></span><span class="hace"></span>`;
-    b.onclick = () => { efUlt = 0; leerEtherfi(); };
-    arriba.prepend(b);
+    const w = document.createElement("div"); w.className = "ms-ether";
+    w.innerHTML = `<button type="button" class="ms-ef-saldo" title="Saldo de la tarjeta EtherFi *0934 (se lee de OP Mainnet cada minuto)"><span class="pt" aria-hidden="true"></span><span class="tx"><small>Saldo EtherFi *0934</small><b class="num ms-ef-s">leyendo…</b></span><span class="hace"></span></button>
+      <div class="ms-cash"><span class="ms-cash-l">Cashback 3 %</span><span class="ms-cash-seg" role="group" aria-label="Período del cashback">${[["hoy", "Hoy"], ["d7", "7 días"], ["total", "Total"]].map(([k, t]) => `<button type="button" data-cash="${k}" aria-pressed="false">${t}</button>`).join("")}</span><b class="num ms-cash-v">…</b></div>`;
+    $(".ms-ef-saldo", w).onclick = () => { efUlt = 0; leerEtherfi(); };
+    $$("[data-cash]", w).forEach((x) => x.onclick = () => { efPer = x.dataset.cash; try { localStorage.setItem("ms_cash_per", efPer); } catch {} pintarCash(); });
+    arriba.prepend(w);
   }
   pintarEther(); leerEtherfi();
 }
