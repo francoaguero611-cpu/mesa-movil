@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="glass.css?v=12">
 <link rel="stylesheet" href="pulido.css?v=1">
 <link rel="stylesheet" href="mesa.css?v=16">
-<link rel="stylesheet" href="atc.css?v=9">
+<link rel="stylesheet" href="atc.css?v=10">
 <style>
   /* (07/11) página SOLO de Atención al cliente, para Tomi: supervisa al bot (privados, comentarios, mails, reclamos) */
   body.solo-atc { min-height: 100vh; }
@@ -25,6 +25,12 @@
   .sa-err { color: #ff8a8a; min-height: 1.2em; font-size: 13px; }
   .sa-toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: #1d1d22; border: 1px solid rgba(255,255,255,.15); padding: 10px 16px; border-radius: 12px; font-size: 14px; z-index: 50; max-width: 90vw; }
   .sa-toast.error { border-color: #ff6b6b; }
+  @media (max-width: 760px) {
+    .sa-top { padding: max(8px, env(safe-area-inset-top)) 12px 4px; }
+    .sa-top button { padding: 5px 12px; font-size: 12.5px; }
+    #sa-main { padding: 0 12px 16px; position: relative; }
+    body.en-chat .sa-top { display: none; }
+  }
 </style>
 </head>
 <body class="solo-atc">
@@ -55,13 +61,14 @@
     };
   }
   function cargarAtc() {
-    return new Promise((ok, mal) => { if (window.Atc) return ok(); const s = document.createElement("script"); s.src = "atc.js?v=8"; s.onload = ok; s.onerror = mal; document.body.appendChild(s); });
+    return new Promise((ok, mal) => { if (window.Atc) return ok(); const s = document.createElement("script"); s.src = "atc.js?v=9"; s.onload = ok; s.onerror = mal; document.body.appendChild(s); });
   }
   async function abrir() {
     if (!ls.get("dash_clave")) return login();
     salir.hidden = false;
     try { await cargarAtc(); } catch { main.textContent = "No se pudo cargar. Recargá la página."; return; }
     window.Atc.montar(main, { toast, login: (m) => { ls.del("dash_clave"); login(m); } });
+    new MutationObserver(() => document.body.classList.toggle("en-chat", !!main.querySelector(".v-chat"))).observe(main, { childList: true, subtree: false });
   }
   salir.onclick = () => { ls.del("dash_clave"); login(); };
   abrir();

@@ -3799,11 +3799,11 @@ function cargarAtc() {
   if (atcCarga) return atcCarga;
   const css = new Promise((ok) => {
     if ($('link[href^="atc.css"]')) return ok();
-    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "atc.css?v=9";
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "atc.css?v=10";
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "atc.js?v=8";
+    const sc = document.createElement("script"); sc.src = "atc.js?v=9";
     sc.onload = () => window.Atc ? ok() : mal(new Error("Atención al cliente no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar Atención al cliente. ¿Hay conexión?")); };
     document.head.appendChild(sc);

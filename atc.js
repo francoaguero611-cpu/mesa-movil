@@ -128,11 +128,11 @@ function compraLi(o) {
 function ficha() {
   const cl = A.cli, cab = A.conv?.cab;
   if (!A.conv) return "";
-  if (!A.conv.email) return `<aside class="ac-ficha"><h4>Cliente</h4><p class="ac-mut">${cab?.canal === "comentarios" ? "Es un comentario público: Facebook no nos da el mail." : "Todavía no tenemos el mail de este cliente."}</p></aside>`;
-  if (!cl) return `<aside class="ac-ficha"><h4>Cliente</h4><p class="ac-vacio"><span class="cargador"></span>Buscando compras…</p></aside>`;
-  if (cl.error) return `<aside class="ac-ficha"><h4>Cliente</h4><p class="ac-mut">${esc(cl.error)}</p></aside>`;
+  if (!A.conv.email) return `<aside class="ac-ficha"><button type="button" class="ac-ficha-x" data-cli-x aria-label="Cerrar cliente">✕ Volver al chat</button><h4>Cliente</h4><p class="ac-mut">${cab?.canal === "comentarios" ? "Es un comentario público: Facebook no nos da el mail." : "Todavía no tenemos el mail de este cliente."}</p></aside>`;
+  if (!cl) return `<aside class="ac-ficha"><button type="button" class="ac-ficha-x" data-cli-x aria-label="Cerrar cliente">✕ Volver al chat</button><h4>Cliente</h4><p class="ac-vacio"><span class="cargador"></span>Buscando compras…</p></aside>`;
+  if (cl.error) return `<aside class="ac-ficha"><button type="button" class="ac-ficha-x" data-cli-x aria-label="Cerrar cliente">✕ Volver al chat</button><h4>Cliente</h4><p class="ac-mut">${esc(cl.error)}</p></aside>`;
   const tot = Object.entries(cl.total_comprado ?? {}).map(([m, v]) => `${num(v)} ${m}`).join(" · "), recAb = (cl.reclamos ?? []).filter((r) => r.abierta);
-  return `<aside class="ac-ficha"><div class="ac-cli"><span class="ac-av grande">${esc((cl.nombre || cl.email).charAt(0).toUpperCase())}</span><div><b>${esc(cl.nombre || cl.email)}</b>${cl.nombre ? `<span class="ac-mut">${esc(cl.email)}</span>` : ""}</div></div>
+  return `<aside class="ac-ficha"><button type="button" class="ac-ficha-x" data-cli-x aria-label="Cerrar cliente">✕ Volver al chat</button><div class="ac-cli"><span class="ac-av grande">${esc((cl.nombre || cl.email).charAt(0).toUpperCase())}</span><div><b>${esc(cl.nombre || cl.email)}</b>${cl.nombre ? `<span class="ac-mut">${esc(cl.email)}</span>` : ""}</div></div>
     <div class="ac-kpis"><div><b>${num(cl.compras.length)}</b><span>compras</span></div><div><b class="${recAb.length ? "malo" : ""}">${num(recAb.length)}</b><span>reclamos abiertos</span></div></div>
     ${tot ? `<p class="ac-mut">Pagó en total: <b>${esc(tot)}</b></p>` : ""}
     <h4>Compras</h4>${cl.compras.length ? `<ul class="ac-ul ac-compras">${cl.compras.map(compraLi).join("")}</ul>` : `<p class="ac-aviso">No hay compras con este mail. Antes de entregar, pedile el mail con el que compró o el comprobante.</p>`}
@@ -231,6 +231,7 @@ function enlazar() {
   const on = (sel, f) => { const b = $(sel, r); if (b) b.onclick = f; };
   on("#ac-trad", () => { A.original = !A.original; pintar(); });
   on("#ac-cli", () => { A.verCli = !A.verCli; pintar(); });
+  $$("[data-cli-x]", r).forEach((b) => b.onclick = () => { A.verCli = false; pintar(); });
   on("#ac-usar", () => { const m = [...(A.conv?.mensajes ?? [])].reverse().find((x) => x.sin_enviar && x.de === "bot"); const t = $("#ac-txt", r); if (m && t) { t.value = m.texto; t.focus(); } });
   on("#ac-env", enviar);
   $$("[data-com]", r).forEach((b) => b.onclick = () => accionCom(b.dataset.com));
