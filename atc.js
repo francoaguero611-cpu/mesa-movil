@@ -84,7 +84,7 @@ function inicio() {
 // ---------- 2) lista del canal ----------
 function fila(x) {
   const txt = x.ultimo_es || x.ultimo || "", ini = (x.canal === "comentarios" ? (x.sub || "?") : (x.nombre || "?")).trim().charAt(0).toUpperCase();
-  return `<button type="button" class="ac-fila e-${x.etq}" data-k="${esc(`${x.canal}|${x.id}`)}">
+  return `<button type="button" class="ac-fila e-${x.etq}${A.sel === `${x.canal}|${x.id}` ? " sel" : ""}" data-k="${esc(`${x.canal}|${x.id}`)}">
     <span class="ac-av c-${x.canal}">${esc(ini)}</span>
     <span class="ac-fc"><span class="ac-f1"><b>${esc(x.nombre)}</b><time>${esc(hace(x.fecha))}</time></span>
       <span class="ac-f2">${x.sub && x.canal !== "comentarios" ? esc(x.sub) : ""}${x.oferta ? `${x.sub && x.canal !== "comentarios" ? " · " : ""}${esc(x.oferta)}` : ""}</span>
@@ -145,7 +145,8 @@ function chat() {
   const cab = d.cab ?? {}, linkTxt = d.canal === "mails" ? "Abrir en Gmail" : d.canal === "reclamos" ? "" : "Abrir en Facebook";
   const borrador = [...(d.mensajes ?? [])].reverse().find((m) => m.sin_enviar && m.de === "bot");
   const puede = d.canal === "privados" || d.canal === "mails";
-  return `<div class="ac-chat ${A.verCli ? "con-cli" : ""}"><section class="ac-hilo-caja">
+  const tres = d.canal === "privados" || d.canal === "comentarios";
+  return `<div class="ac-chat ${tres ? "tres" : ""} ${A.verCli ? "con-cli" : ""}">${tres ? `<aside class="ac-col-lista">${lista()}</aside>` : ""}<section class="ac-hilo-caja">
     <header class="ac-ch"><span class="ac-av c-${esc(d.canal)}">${esc((cab.nombre || "?").charAt(0).toUpperCase())}</span>
       <div class="ac-chi"><b>${esc(cab.nombre || "")}</b><span class="ac-mut">${esc(NOMBRE[d.canal] || "")}${cab.sub ? ` · ${esc(cab.sub)}` : ""}${cab.oferta ? ` · ${esc(cab.oferta)}` : ""}</span></div>
       <span class="ac-etq e-${esc(cab.etq)}">${esc(cab.estado || ETQ[cab.etq] || "")}</span>
@@ -210,7 +211,7 @@ function pintar() {
   enlazar();
   const h = $("#ac-hilo", r); if (h) h.scrollTop = h.scrollHeight;
 }
-function pintarFilas() { const n = $("#ac-filas", A.raiz); if (!n || A.vista !== "lista") return; const t = document.createElement("div"); t.innerHTML = lista(); n.replaceWith($("#ac-filas", t)); enlazarFilas(); }
+function pintarFilas() { const n = $("#ac-filas", A.raiz); if (!n || (A.vista !== "lista" && A.vista !== "chat")) return; const t = document.createElement("div"); t.innerHTML = lista(); n.replaceWith($("#ac-filas", t)); enlazarFilas(); }
 function ir(v) { A.vista = v; window.scrollTo({ top: 0 }); pintar(); }
 function enlazar() {
   const r = A.raiz;
@@ -276,7 +277,11 @@ async function cargarLista(mas = false) {
 }
 async function abrir(k) {
   const i = k.indexOf("|"), canal = k.slice(0, i), id = k.slice(i + 1);
-  A.sel = k; A.conv = null; A.cli = null; A.original = false; A.verCli = false; ir("chat");
+  const enLista = A.vista === "chat" || A.vista === "lista";
+  A.sel = k; A.conv = null; A.cli = null; A.original = false; A.verCli = false;
+  if (A.canal !== canal && (canal === "privados" || canal === "comentarios" || canal === "mails")) { A.canal = canal; A.items = []; }
+  if (A.vista === "chat") pintar(); else ir("chat");
+  if (!enLista || !A.items.length) cargarLista();
   try { A.conv = await api(`accion=conversacion&canal=${canal}&id=${encodeURIComponent(id)}`); } catch (e) { A.conv = { error: e.message }; }
   if (A.sel !== k) return; pintar();
   if (A.conv?.email) { try { A.cli = await api(`accion=cliente&email=${encodeURIComponent(A.conv.email)}`); } catch (e) { A.cli = { error: e.message }; } if (A.sel === k) pintar(); }
