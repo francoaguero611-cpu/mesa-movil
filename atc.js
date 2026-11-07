@@ -110,6 +110,21 @@ function burbuja(m, cab) {
     <span class="ac-bq">${esc(nombre)}${m.sin_enviar ? ' <em class="ac-etq e-pendiente">Sin enviar</em>' : ""}${m.oculto ? ' <em class="ac-etq e-oculto">Oculto</em>' : ""}</span>
     <p>${esc(txt || "(sin texto: imagen o sticker)")}</p>${m.texto_es && !A.original ? `<p class="ac-orig">${esc(m.texto)}</p>` : ""}<time>${esc(fecha(m.fecha))}</time></div>`;
 }
+
+// (07/11) cada compra: qué, hace cuánto, estado, mail de entrega y link al panel de Impultienda
+const EST_O = { paid: ["Pagada", "g-ve"], refunded: ["Reembolsada", "g-ro"], partially_refunded: ["Reembolso parcial", "g-am"], pending: ["Pago no aprobado", "g-am"], cancelled: ["Cancelada", "g-ro"] };
+const EST_ENT = { delivered: ["Mail entregado", "g-ve"], opened: ["Mail abierto", "g-ve"], failed: ["El mail rebotó", "g-ro"], bounced: ["El mail rebotó", "g-ro"], sent: ["Mail enviado", "g-am"] };
+function haceDias(f) { const d = Math.floor((Date.now() - Date.parse(f)) / 86400e3); return d <= 0 ? "hoy" : d === 1 ? "ayer" : `hace ${d} días`; }
+function compraLi(o) {
+  const [est, cls] = EST_O[o.estado] || [o.estado, ""];
+  const e = o.entrega, [ent, ecl] = e ? (EST_ENT[e.estado] || [e.estado, ""]) : [null, ""];
+  const motivo = e?.motivo ? (/quota|full|llena|overquota/i.test(e.motivo) ? "casilla llena" : /no_mailbox|not exist|unknown/i.test(e.motivo) ? "el mail no existe" : e.motivo) : "";
+  return `<li><b>${esc(o.productos.join(" + ") || o.tienda || "Compra")}</b>
+    <span class="ac-mut">${esc(haceDias(o.fecha))} · ${esc(dia(o.fecha))} · ${num(o.total)} ${esc(o.moneda ?? "")}${o.postcompra ? " · post-venta" : ""}</span>
+    <span class="ac-fila-etq"><span class="ac-etq ${cls}">${esc(est)}</span>${ent ? `<span class="ac-etq ${ecl}">${esc(ent)}${motivo ? ` · ${esc(motivo)}` : ""}${e.aperturas ? ` · abierto ${num(e.aperturas)} ${e.aperturas === 1 ? "vez" : "veces"}` : ""}</span>` : ""}</span>
+    ${o.tipeo ? `<span class="ac-etq g-am">En la compra el mail quedó mal escrito: ${esc(o.tipeo)}</span>` : ""}
+    <span class="ac-mut">#${esc(o.orden)}${o.tienda ? ` · ${esc(o.tienda)}` : ""}${o.sub ? ` · <a href="https://impultienda.ar/dashboard/${encodeURIComponent(o.sub)}" target="_blank" rel="noopener">Ver en Impultienda ↗</a>` : ""}</span></li>`;
+}
 function ficha() {
   const cl = A.cli, cab = A.conv?.cab;
   if (!A.conv) return "";
@@ -120,7 +135,7 @@ function ficha() {
   return `<aside class="ac-ficha"><div class="ac-cli"><span class="ac-av grande">${esc((cl.nombre || cl.email).charAt(0).toUpperCase())}</span><div><b>${esc(cl.nombre || cl.email)}</b>${cl.nombre ? `<span class="ac-mut">${esc(cl.email)}</span>` : ""}</div></div>
     <div class="ac-kpis"><div><b>${num(cl.compras.length)}</b><span>compras</span></div><div><b class="${recAb.length ? "malo" : ""}">${num(recAb.length)}</b><span>reclamos abiertos</span></div></div>
     ${tot ? `<p class="ac-mut">Pagó en total: <b>${esc(tot)}</b></p>` : ""}
-    <h4>Compras</h4>${cl.compras.length ? `<ul class="ac-ul">${cl.compras.map((o) => `<li><b>${esc(o.productos.join(" + ") || o.tienda || "Compra")}</b><span class="ac-mut">${esc(dia(o.fecha))} · ${num(o.total)} ${esc(o.moneda ?? "")} · ${esc(o.pago ?? "")} · ${esc(o.estado === "paid" ? "pagada" : o.estado)}${o.reembolsado ? ` · reembolsado ${num(o.reembolsado)}` : ""}</span><span class="ac-mut">#${esc(o.orden)}</span></li>`).join("")}</ul>` : `<p class="ac-mut">No encontramos compras con este mail.</p>`}
+    <h4>Compras</h4>${cl.compras.length ? `<ul class="ac-ul ac-compras">${cl.compras.map(compraLi).join("")}</ul>` : `<p class="ac-aviso">No hay compras con este mail. Antes de entregar, pedile el mail con el que compró o el comprobante.</p>`}
     ${(cl.reclamos ?? []).length ? `<h4>Reclamos</h4><ul class="ac-ul">${cl.reclamos.map((r) => `<li><span class="ac-etq ${r.abierta ? "e-reclamo" : "e-neutro"}">${r.abierta ? "Abierto" : "Cerrado"}</span> ${num(r.monto)} ${esc(r.moneda ?? "")} · ${esc(dia(r.fecha))}</li>`).join("")}</ul>` : ""}</aside>`;
 }
 function chat() {
