@@ -129,7 +129,7 @@ function chat() {
   if (d.error) return `<div class="err-box" role="alert"><b>No se pudo abrir.</b> ${esc(d.error)}</div>`;
   const cab = d.cab ?? {}, linkTxt = d.canal === "mails" ? "Abrir en Gmail" : d.canal === "reclamos" ? "" : "Abrir en Facebook";
   const borrador = [...(d.mensajes ?? [])].reverse().find((m) => m.sin_enviar && m.de === "bot");
-  const puede = d.canal === "privados";
+  const puede = d.canal === "privados" || d.canal === "mails";
   return `<div class="ac-chat ${A.verCli ? "con-cli" : ""}"><section class="ac-hilo-caja">
     <header class="ac-ch"><span class="ac-av c-${esc(d.canal)}">${esc((cab.nombre || "?").charAt(0).toUpperCase())}</span>
       <div class="ac-chi"><b>${esc(cab.nombre || "")}</b><span class="ac-mut">${esc(NOMBRE[d.canal] || "")}${cab.sub ? ` · ${esc(cab.sub)}` : ""}${cab.oferta ? ` · ${esc(cab.oferta)}` : ""}</span></div>
@@ -141,7 +141,13 @@ function chat() {
     <div class="ac-hilo" id="ac-hilo">${(d.mensajes ?? []).map((m) => burbuja(m, cab)).join("")}</div>
     <footer class="ac-comp">${puede ? `${borrador ? `<button type="button" class="ac-usar" id="ac-usar">↳ Usar la respuesta del bot</button>` : ""}
       <div class="ac-comp-f"><textarea id="ac-txt" rows="2" placeholder="Escribí la respuesta…" maxlength="1990"></textarea><button type="button" class="ac-env" id="ac-env" ${A.enviando ? "disabled" : ""}>${A.enviando ? "Enviando…" : "Enviar"}</button></div>
-      <p class="ac-mut ac-nota">Sale por Messenger desde la página, como respuesta de una persona.</p>`
+      <p class="ac-mut ac-nota">${d.canal === "mails" ? "Sale desde soporte@ en el mismo hilo del mail." : "Sale por Messenger desde la página, como respuesta de una persona. (Facebook no deja borrar un mensaje ya enviado: si el bot se equivocó, mandá la corrección acá abajo.)"}</p>`
+      : d.canal === "comentarios" ? `<div class="ac-acc">
+          <button type="button" class="ac-b2" data-com="${cab.oculto ? "mostrar" : "ocultar"}">${cab.oculto ? "👁 Mostrar comentario" : "🙈 Ocultar comentario"}</button>
+          ${cab.resp_bot ? `<button type="button" class="ac-b2" data-com="borrar_respuesta">🗑 Borrar la respuesta del bot</button>` : ""}</div>
+        <div class="ac-comp-f"><textarea id="ac-ctxt" rows="2" placeholder="Escribí la respuesta…" maxlength="1990"></textarea>
+          <div class="ac-acc-col"><button type="button" class="ac-env" data-com="responder">Responder en público</button>
+          <button type="button" class="ac-env ac-env2" data-com="privado" ${cab.privado_enviado ? 'disabled title="Ya se le mandó un privado por este comentario"' : ""}>Responder por privado</button></div></div>`
       : `<p class="ac-mut ac-nota">${d.canal === "mails" ? "Para responder un mail, abrilo en Gmail (botón de arriba)." : d.canal === "comentarios" ? "Para responder un comentario, abrilo en Facebook (botón de arriba)." : "Los reclamos de Mercado Pago los responde el bot de disputas."}</p>`}</footer>
     <details class="ac-corr"><summary>✍️ ¿El bot respondió mal o falta algo? Dejá una corrección</summary>
       <div class="ac-comp-f"><textarea id="ac-corr-txt" rows="2" placeholder="Ej.: no tenía que mandarle el link sin pedirle el mail · le respondió con frío · quedó sin responder" maxlength="2000"></textarea><button type="button" class="ac-env" id="ac-corr-env">Mandar</button></div>
@@ -211,6 +217,7 @@ function enlazar() {
   on("#ac-cli", () => { A.verCli = !A.verCli; pintar(); });
   on("#ac-usar", () => { const m = [...(A.conv?.mensajes ?? [])].reverse().find((x) => x.sin_enviar && x.de === "bot"); const t = $("#ac-txt", r); if (m && t) { t.value = m.texto; t.focus(); } });
   on("#ac-env", enviar);
+  $$("[data-com]", r).forEach((b) => b.onclick = () => accionCom(b.dataset.com));
   on("#ac-corr-env", async () => {
     const t = $("#ac-corr-txt", r), texto = (t?.value || "").trim(); if (!texto || !A.conv) return;
     const b = $("#ac-corr-env", r); b.disabled = true; b.textContent = "Mandando…";
@@ -259,12 +266,41 @@ async function abrir(k) {
   if (A.sel !== k) return; pintar();
   if (A.conv?.email) { try { A.cli = await api(`accion=cliente&email=${encodeURIComponent(A.conv.email)}`); } catch (e) { A.cli = { error: e.message }; } if (A.sel === k) pintar(); }
 }
+// (07/11, Lorenzo) cada cambio de Tomi pregunta «¿por qué?» y eso le llega a Claude para corregir al bot
+function motivo(titulo, obligatorio) {
+  return new Promise((res) => {
+    const d = document.createElement("div"); d.className = "ac-velo";
+    d.innerHTML = `<div class="ac-pop" role="dialog" aria-modal="true"><h3>${esc(titulo)}</h3>
+      <p class="ac-mut">${obligatorio ? "Contanos por qué, así el bot aprende y no lo vuelve a hacer." : "Si el bot lo había hecho mal, contanos qué (opcional)."}</p>
+      <textarea rows="3" maxlength="1500" placeholder="Ej.: la clienta preguntó bien, no había por qué ocultarlo"></textarea>
+      <div class="ac-pop-b"><button type="button" class="ac-b2" data-x="no">Cancelar</button><button type="button" class="ac-env" data-x="si">${obligatorio ? "Hacer el cambio" : "Enviar"}</button></div></div>`;
+    document.body.appendChild(d);
+    const t = $("textarea", d); t.focus();
+    const fin = (v) => { d.parentNode && d.parentNode.removeChild(d); res(v); };
+    d.onclick = (e) => {
+      const x = e.target.closest("[data-x]")?.dataset.x;
+      if (e.target === d || x === "no") return fin(null);
+      if (x === "si") { const v = t.value.trim(); if (obligatorio && !v) { t.focus(); t.classList.add("falta"); return; } fin(v); }
+    };
+  });
+}
+const NOM_ACC = { ocultar: "Ocultar el comentario", mostrar: "Mostrar el comentario", borrar_respuesta: "Borrar la respuesta del bot", responder: "Responder en público", privado: "Responder por privado" };
+async function accionCom(tipo) {
+  if (!A.conv) return;
+  const texto = ($("#ac-ctxt", A.raiz)?.value || "").trim();
+  if ((tipo === "responder" || tipo === "privado") && !texto) { $("#ac-ctxt", A.raiz)?.focus(); return; }
+  const m = await motivo(`${NOM_ACC[tipo]}: ¿por qué?`, ["ocultar", "mostrar", "borrar_respuesta"].includes(tipo)); if (m === null) return;
+  try { await api("accion=comentario", { id: A.conv.id, tipo, texto, motivo: m }); A.ctx.toast?.("✓ Listo.", "ok"); await abrir(A.sel); cargarCont(); }
+  catch (e) { A.ctx.toast?.(`No se pudo: ${e.message}`, "error", 9000); }
+}
 async function enviar() {
   const t = $("#ac-txt", A.raiz), texto = (t?.value || "").trim(); if (!texto || A.enviando || !A.conv) return;
+  const huboBot = (A.conv.mensajes ?? []).some((x) => x.de === "bot");
+  const mot = huboBot ? await motivo("Tu respuesta", false) : ""; if (mot === null) return;
   A.enviando = true; const b = $("#ac-env", A.raiz); if (b) { b.disabled = true; b.textContent = "Enviando…"; }
   try {
-    await api("accion=responder", { canal: "privados", id: A.conv.id, texto });
-    A.ctx.toast?.("✓ Mensaje enviado por Messenger.", "ok");
+    await api("accion=responder", { canal: A.conv.canal, id: A.conv.id, cliente: A.conv.cab?.nombre || "", texto, motivo: mot });
+    A.ctx.toast?.(A.conv.canal === "mails" ? "✓ Mail enviado." : "✓ Mensaje enviado por Messenger.", "ok");
     const k = A.sel; A.enviando = false; await abrir(k); cargarCont();
   } catch (e) { A.enviando = false; A.ctx.toast?.(`No se pudo enviar: ${e.message}`, "error", 9000); if (b) { b.disabled = false; b.textContent = "Enviar"; } }
 }

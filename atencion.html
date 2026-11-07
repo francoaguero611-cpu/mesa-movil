@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Atención al cliente</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@200..800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css?v=60">
+<link rel="stylesheet" href="glass.css?v=12">
+<link rel="stylesheet" href="pulido.css?v=1">
+<link rel="stylesheet" href="mesa.css?v=16">
+<link rel="stylesheet" href="atc.css?v=7">
+<style>
+  /* (07/11) página SOLO de Atención al cliente, para Tomi: supervisa al bot (privados, comentarios, mails, reclamos) */
+  body.solo-atc { min-height: 100vh; }
+  .sa-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: max(14px, env(safe-area-inset-top)) 18px 10px; }
+  .sa-top h1 { font-size: 18px; margin: 0; }
+  .sa-top button { background: none; border: 1px solid var(--linea-2, rgba(255,255,255,.18)); color: inherit; border-radius: 999px; padding: 6px 14px; cursor: pointer; font: inherit; font-size: 13px; }
+  #sa-main { padding: 0 16px 24px; }
+  .sa-login { max-width: 360px; margin: 12vh auto 0; display: grid; gap: 10px; }
+  .sa-login input { padding: 12px 14px; border-radius: 12px; border: 1px solid var(--linea-2, rgba(255,255,255,.18)); background: rgba(255,255,255,.04); color: inherit; font: inherit; }
+  .sa-login button { padding: 12px; border-radius: 12px; border: 0; background: var(--torna, #fff); color: #111; font-weight: 600; cursor: pointer; }
+  .sa-err { color: #ff8a8a; min-height: 1.2em; font-size: 13px; }
+  .sa-toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: #1d1d22; border: 1px solid rgba(255,255,255,.15); padding: 10px 16px; border-radius: 12px; font-size: 14px; z-index: 50; max-width: 90vw; }
+  .sa-toast.error { border-color: #ff6b6b; }
+</style>
+</head>
+<body class="solo-atc">
+<header class="sa-top"><span></span><button type="button" id="sa-salir" hidden>Salir</button></header>
+<main id="sa-main"></main>
+<script>
+"use strict";
+(() => {
+  const API = "https://tppcpnfzcxxusdhrlmdx.supabase.co/functions/v1/atc";
+  const ls = { get: (k) => { try { return localStorage.getItem(k) || ""; } catch { return ""; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} }, del: (k) => { try { localStorage.removeItem(k); } catch {} } };
+  const main = document.getElementById("sa-main"), salir = document.getElementById("sa-salir");
+  function toast(t, tipo = "ok", ms = 4000) {
+    const d = document.createElement("div"); d.className = "sa-toast " + tipo; d.textContent = t; document.body.appendChild(d); setTimeout(() => d.remove(), ms);
+  }
+  function login(msg = "") {
+    salir.hidden = true;
+    main.innerHTML = `<form class="sa-login" id="sa-f" autocomplete="on"><h2>Entrar</h2>
+      <input id="sa-mail" type="email" autocomplete="username" placeholder="Mail" required>
+      <input id="sa-pass" type="password" autocomplete="current-password" placeholder="Contraseña" required>
+      <button type="submit">Entrar</button><div class="sa-err" role="alert"></div></form>`;
+    main.querySelector(".sa-err").textContent = msg;
+    document.getElementById("sa-f").onsubmit = async (e) => {
+      e.preventDefault();
+      const v = `${document.getElementById("sa-mail").value.trim().toLowerCase()}|${document.getElementById("sa-pass").value}`;
+      const r = await fetch(`${API}?accion=bots`, { headers: { "x-app-clave": v } }).catch(() => null);
+      if (!r || r.status === 401) { main.querySelector(".sa-err").textContent = r ? "Mail o contraseña incorrectos" : "Sin conexión"; return; }
+      ls.set("dash_clave", v); abrir();
+    };
+  }
+  function cargarAtc() {
+    return new Promise((ok, mal) => { if (window.Atc) return ok(); const s = document.createElement("script"); s.src = "atc.js?v=6"; s.onload = ok; s.onerror = mal; document.body.appendChild(s); });
+  }
+  async function abrir() {
+    if (!ls.get("dash_clave")) return login();
+    salir.hidden = false;
+    try { await cargarAtc(); } catch { main.textContent = "No se pudo cargar. Recargá la página."; return; }
+    window.Atc.montar(main, { toast, login: (m) => { ls.del("dash_clave"); login(m); } });
+  }
+  salir.onclick = () => { ls.del("dash_clave"); login(); };
+  abrir();
+})();
+</script>
+</body>
+</html>

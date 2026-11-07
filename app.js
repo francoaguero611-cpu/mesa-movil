@@ -418,7 +418,12 @@ function login(msg = "") {
       abrirInicial();
       eventoPendiente();
     } catch (err) {
-      if (err.code === 401) { ls.del("dash_clave"); login("Mail o contraseña incorrectos"); }
+      if (err.code === 401) {
+        // (07/11) usuarios que solo ven Atención al cliente (Tomi): van a su página
+        const r = await fetch("https://tppcpnfzcxxusdhrlmdx.supabase.co/functions/v1/atc?accion=bots", { headers: { "x-app-clave": v } }).catch(() => null);
+        if (r && r.ok) { location.href = "atencion.html"; return; }
+        ls.del("dash_clave"); login("Mail o contraseña incorrectos");
+      }
       else { login(err.message || "No se pudo conectar"); ls.set("dash_clave", v); }
     }
   };
@@ -3794,11 +3799,11 @@ function cargarAtc() {
   if (atcCarga) return atcCarga;
   const css = new Promise((ok) => {
     if ($('link[href^="atc.css"]')) return ok();
-    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "atc.css?v=6";
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "atc.css?v=7";
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "atc.js?v=5";
+    const sc = document.createElement("script"); sc.src = "atc.js?v=6";
     sc.onload = () => window.Atc ? ok() : mal(new Error("Atención al cliente no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar Atención al cliente. ¿Hay conexión?")); };
     document.head.appendChild(sc);

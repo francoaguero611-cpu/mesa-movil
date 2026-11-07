@@ -129,3 +129,15 @@
 .ac-corr { margin: 8px 14px 12px; border: 1px dashed var(--linea-2, rgba(255,255,255,.18)); border-radius: 12px; padding: 8px 12px; }
 .ac-corr summary { cursor: pointer; font-size: 13px; color: var(--tx-2, #c9c9d1); }
 .ac-corr[open] summary { margin-bottom: 8px; }
+
+/* (07/11) acciones de Tomi + ventana «¿por qué?» */
+.ac-acc { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; }
+.ac-acc-col { display: flex; flex-direction: column; gap: 6px; }
+.ac-env2 { background: transparent !important; border: 1px solid var(--linea-2, rgba(255,255,255,.2)) !important; color: inherit !important; }
+.ac-env2:disabled { opacity: .45; cursor: not-allowed; }
+.ac-velo { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: grid; place-items: center; z-index: 80; padding: 16px; }
+.ac-pop { width: min(460px, 100%); background: #17171b; border: 1px solid rgba(255,255,255,.14); border-radius: 16px; padding: 18px; display: grid; gap: 10px; }
+.ac-pop h3 { margin: 0; font-size: 16px; }
+.ac-pop textarea { width: 100%; box-sizing: border-box; border-radius: 10px; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.04); color: inherit; font: inherit; padding: 10px; }
+.ac-pop textarea.falta { border-color: #ff6b6b; }
+.ac-pop-b { display: flex; justify-content: flex-end; gap: 8px; }
