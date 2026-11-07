@@ -1514,7 +1514,10 @@ function pintarHist(m, c, r, sel) {
     // (02/11 noche, Lorenzo) solo: el momento del cambio, el cierre de cada día y, al final, ahora (la hora en que se mira)
     const dm = (d) => `${d.slice(8, 10)}/${d.slice(5, 7)}`, ahoraTx = fh(new Date().toISOString()).slice(6);
     filas.push(filaH(`${sube ? "Surfeo" : "Tirón"} ${dias[0].hora ?? fh(s.t).slice(6)}`, dm(dias[0].dia), metH(dias[0], s.de)));
-    dias.slice(1).forEach((d) => filas.push(d.final ? filaH("Cierre", dm(d.dia), metH(d)) : filaH(`Ahora ${ahoraTx}`, dm(d.dia), metH(d), "ph-ahora")));
+    // (07/11, Lorenzo) la fila de hoy = lo MISMO que el Dashboard en pantalla (antes era la foto de hace hasta 30 min)
+    const hoyIso = isoAR(new Date()), cv = (S.datos[cmpPer(hoyIso)]?.campanas || S.datos.hoy?.campanas || []).find((y) => String(y.id) === String(c.id));
+    const vivo = cv ? { g: cv.gasto, v: cv.ventas, val: cv.facturacion, gan: cv.ganancia, p: cv.presupuesto } : null;
+    dias.slice(1).forEach((d) => filas.push(d.final ? filaH("Cierre", dm(d.dia), metH(d)) : filaH(`Ahora ${ahoraTx}`, dm(d.dia), metH(d.dia === hoyIso && vivo ? vivo : d), "ph-ahora")));
   }
   const A = metH(dias[0]), N = metH(s.post), txt = [];
   if (A) txt.push(`Antes del cambio venía con ${A.ventas} venta${A.ventas === 1 ? "" : "s"} y ROAS ${A.ventas ? NF2.format(A.roas) : "—"}, con presupuesto ${NF2.format(s.de)}.`);
