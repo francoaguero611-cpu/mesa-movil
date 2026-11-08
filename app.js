@@ -997,7 +997,9 @@ function pintarCarrusel() {
 // (06/11, Lorenzo) «Por oferta»: una tarjeta por oferta con su ganancia, ROAS y gasto; tocarla muestra esa oferta arriba
 function pintarOfertasMesa(gs) {
   const box = $("#mesa-of"); if (!box) return;
-  const xs = gs.map((g, i) => ({ g, i })).filter((x) => x.g.clave !== "todas");
+  // (08/11, Lorenzo) ordenadas por GANANCIA, de mayor a menor (el ROAS se sigue viendo en cada tarjeta)
+  const xs = gs.map((g, i) => ({ g, i })).filter((x) => x.g.clave !== "todas")
+    .sort((a, b) => (b.g.metricas?.ganancia ?? -Infinity) - (a.g.metricas?.ganancia ?? -Infinity));
   if (!xs.length || !S.datos[S.periodo]) { box.innerHTML = ""; return; }
   const scroll = $(".mesa-of-lista", box)?.scrollLeft || 0;
   box.innerHTML = `<div class="mesa-of-cab"><h3>Por oferta <small>${xs.length} ofertas</small></h3><span class="mesa-of-fl"><button type="button" class="btn icono chico" data-of="-1" aria-label="Ofertas anteriores">‹</button><button type="button" class="btn icono chico" data-of="1" aria-label="Más ofertas">›</button></span></div>
