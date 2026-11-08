@@ -543,9 +543,9 @@ function montar() {
 // (24/10, Lorenzo) «Acciones a realizar»: rectángulo arriba de las métricas; al entrar se abre solo (una vez por sesión) con la lista.
 // Tocar una acción → la tabla con esa campaña / conjunto seleccionado y la nubecita con el porqué. Nada se aplica solo.
 var ACC = { st: null, data: null, error: null }; // var: la tabla puede pintarse antes de esta línea
-const ACC_ORDEN = ["testeo_matar", "reno_matar", "techo", "testeo_dia1", "surf_sug", "reno_minimo", "lista_horizontal"];
+const ACC_ORDEN = ["testeo_matar", "reno_matar", "optimizar", "techo", "testeo_dia1", "surf_sug", "surf_espera", "reno_minimo", "lista_horizontal"];
 const ACC_TIT = { surf_sug: "Surfeo", testeo_dia1: "Testeos: día 1 en pérdida", testeo_matar: "Testeos para apagar", reno_minimo: "Sacar el gasto mínimo", reno_matar: "Renovaciones para apagar",
-  techo: "Techo de la cuenta", lista_horizontal: "Listas para escala horizontal" };
+  techo: "Techo de la cuenta", lista_horizontal: "Listas para escala horizontal", surf_espera: "Surfear más tarde", optimizar: "Vienen mal hace 48 h: optimizar" };
 async function cargarAcciones(forzar = false) {
   if (ACC.st === "cargando") return;
   ACC.st = "cargando"; pintarAccBarra();
@@ -1095,8 +1095,9 @@ function estadoTxt(x) {
 // (24/10, Lorenzo) Columna Acciones: lo que sugiere el manual de la CBO (dash_acciones) + días del testeo / del mínimo + techo.
 // Tocar un chip abre la nubecita con el porqué. Nada se aplica solo: la acción la hace uno con la barra de siempre.
 const AC_TX = { surf_sug: (a) => a.ac === "s-30" ? "bajar 30 %" : "surfear +30 %", testeo_dia1: () => "bajar 30 %", testeo_matar: () => "apagar", reno_minimo: () => "sacar mínimo",
-  reno_matar: () => "apagar", techo: () => "bajar 30 % y techo", lista_horizontal: () => "escala horizontal" };
-const AC_COLOR = { surf_sug: (a) => a.ac === "s-30" ? "naranja" : "ok", testeo_dia1: () => "naranja", testeo_matar: () => "mal", reno_minimo: () => "acento", reno_matar: () => "mal", techo: () => "naranja", lista_horizontal: () => "ok" };
+  reno_matar: () => "apagar", techo: () => "bajar y techo", lista_horizontal: () => "escala horizontal",
+  surf_espera: (a) => `surfear en ${a.horas ?? "?"} h`, optimizar: () => "optimizar" }; // (08/11) reglas de margen
+const AC_COLOR = { surf_sug: (a) => a.ac === "s-30" ? "naranja" : "ok", testeo_dia1: () => "naranja", testeo_matar: () => "mal", reno_minimo: () => "acento", reno_matar: () => "mal", techo: () => "naranja", lista_horizontal: () => "ok", surf_espera: () => "acento", optimizar: () => "mal" };
 const diaDe = (iso) => { if (!iso) return null; const hoy = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" })); const d = new Date(new Date(iso).toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
   hoy.setHours(12, 0, 0, 0); d.setHours(12, 0, 0, 0); return Math.round((hoy - d) / 86400e3) + 1; };
 function accionesDe(id) { return (ACC.data?.acciones || []).filter((a) => a.id === id); }
@@ -1105,7 +1106,8 @@ function accionesCelda(x, nivel) {
   const info = [];
   if (nivel === "campana" && /testeo/i.test(x.nombre) && prendido(x.estado)) { const n = diaDe(x.inicio); if (n && n <= 3) info.push(`testeo día ${n}/3`); }
   if (nivel === "conjunto" && x.minimo && prendido(x.estado)) { const n = diaDe(x.inicio); info.push(n && n > 3 ? "mín. vencido" : `mín. día ${n ?? "?"}/3`); }
-  if (nivel === "campana" && x.techo) info.push(`techo ${NF0.format(x.techo)}`);
+  const tch = accionesDe(x.id).find((a) => a.tipo === "techo" && a.techo); // (08/11) el techo se muestra solo si hay acción de techo
+  if (nivel === "campana" && tch) info.push(`techo ${NF0.format(tch.techo)}`);
   if (!chips.length && !info.length) return "";
   return `<div class="qh">${chips.join("")}${info.map((t) => `<span class="ac-info">${esc(t)}</span>`).join("")}</div>`;
 }
