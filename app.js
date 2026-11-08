@@ -1093,7 +1093,7 @@ function estadoTxt(x) {
 // (24/10, Lorenzo) Columna Acciones: lo que sugiere el manual de la CBO (dash_acciones) + días del testeo / del mínimo + techo.
 // Tocar un chip abre la nubecita con el porqué. Nada se aplica solo: la acción la hace uno con la barra de siempre.
 const AC_TX = { surf_sug: (a) => a.ac === "s-30" ? "bajar 30 %" : "surfear +30 %", testeo_dia1: () => "bajar 30 %", testeo_matar: () => "apagar", reno_minimo: () => "sacar mínimo",
-  reno_matar: () => "apagar", techo: () => "bajar 30 % · techo", lista_horizontal: () => "escala horizontal" };
+  reno_matar: () => "apagar", techo: () => "bajar 30 % y techo", lista_horizontal: () => "escala horizontal" };
 const AC_COLOR = { surf_sug: (a) => a.ac === "s-30" ? "naranja" : "ok", testeo_dia1: () => "naranja", testeo_matar: () => "mal", reno_minimo: () => "acento", reno_matar: () => "mal", techo: () => "naranja", lista_horizontal: () => "ok" };
 const diaDe = (iso) => { if (!iso) return null; const hoy = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" })); const d = new Date(new Date(iso).toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
   hoy.setHours(12, 0, 0, 0); d.setHours(12, 0, 0, 0); return Math.round((hoy - d) / 86400e3) + 1; };
@@ -1103,8 +1103,9 @@ function accionesCelda(x, nivel) {
   const info = [];
   if (nivel === "campana" && /testeo/i.test(x.nombre) && prendido(x.estado)) { const n = diaDe(x.inicio); if (n && n <= 3) info.push(`testeo día ${n}/3`); }
   if (nivel === "conjunto" && x.minimo && prendido(x.estado)) { const n = diaDe(x.inicio); info.push(n && n > 3 ? "mín. vencido" : `mín. día ${n ?? "?"}/3`); }
-  if (nivel === "campana" && x.techo) info.push(`techo ~${NF0.format(x.techo)}`);
-  return chips.join("") + info.map((t) => `<span class="ac-info">${esc(t)}</span>`).join("");
+  if (nivel === "campana" && x.techo) info.push(`techo ${NF0.format(x.techo)}`);
+  if (!chips.length && !info.length) return "";
+  return `<div class="qh">${chips.join("")}${info.map((t) => `<span class="ac-info">${esc(t)}</span>`).join("")}</div>`;
 }
 // (24/10, Lorenzo) estado en texto chiquito al lado del punto; rechazado / con problemas en rojo
 function estadoConTx(e) {
@@ -1185,7 +1186,9 @@ const porVisita = (x) => !x.visitas ? "—" : `${usdG(nulo(x.facturacion) ? null
 // (25/10, Lorenzo) sin ROI; orden fijo de métricas. Las que no pidió quedan ocultas de arranque (se prenden en «Columnas»).
 const COLS = [
   // (06/11, Lorenzo) orden del diseño Mesa: Presupuesto, ROAS, Ganancia, Gasto, Facturación y después el resto
-  ["presupuesto", "Presupuesto", (x, nivel) => nivel === "campana" && x.tipo_presupuesto === "ABO" ? `<span class="chip-tp" title="Presupuesto por conjunto: abrí la campaña para verlo y cambiarlo">Presupuesto ABO</span>` : `${usdG(x.presupuesto)}${x.tipo_presupuesto ? ` <span class="chip-tp">${esc(x.tipo_presupuesto)}</span>` : ""}${editaPres(x, nivel) ? ` <button type="button" class="lapiz" data-pres="${esc(nivel + ":" + x.id)}" aria-label="Cambiar presupuesto de ${esc(x.nombre)}" title="Cambiar presupuesto"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z M14 6l4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg></button>` : ""}`], // (26/10, Lorenzo) antes de Ventas
+  // (08/11, Lorenzo) «Última modificación» a la izquierda de Presupuesto, siempre visible
+  ["ultima", "Última modificación", (x, nivel) => nivel ? ultimaCelda(x, nivel) : ""], // (02/11) solo presupuesto, justo antes de Presupuesto
+  ["presupuesto", "Presupuesto", (x, nivel) => nivel === "campana" && x.tipo_presupuesto === "ABO" ? `<span class="chip-tp" title="Presupuesto por conjunto: abrí la campaña para verlo y cambiarlo">Presupuesto ABO</span>` : `<span class="pres-c"><span class="pres-n">${usdG(x.presupuesto)}${editaPres(x, nivel) ? ` <button type="button" class="lapiz" data-pres="${esc(nivel + ":" + x.id)}" aria-label="Cambiar presupuesto de ${esc(x.nombre)}" title="Cambiar presupuesto"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z M14 6l4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg></button>` : ""}</span>${x.tipo_presupuesto ? `<span class="chip-tp">${esc(x.tipo_presupuesto)}</span>` : ""}</span>`], // (26/10, Lorenzo) antes de Ventas
   ["roas", "ROAS", (x, nivel) => `<span class="roas-f">${chipRoas(x.roas)}${nivel === "campana" ? flechaRoas(x) : ""}</span>`],
   ["ganancia", "Ganancia / pérdida", (x) => usdG(x.ganancia), (x) => signo(x.ganancia)],
   ["gasto", "Importe gastado", (x) => usdG(x.gasto)],
@@ -1195,7 +1198,6 @@ const COLS = [
   ["cpa", "CPA", (x) => usdG(cpaDe(x))],
   ["ticket_promedio", "AOV", (x) => usdG(aovDe(x))],
   ["estado", "Estado", (x, nivel) => nivel ? estadoTxt(x) : ""],          // (24/10, Lorenzo)
-  ["ultima", "Última modificación", (x, nivel) => nivel ? ultimaCelda(x, nivel) : ""], // (02/11) solo presupuesto, justo antes de Presupuesto
   ["costo_pago_iniciado", "C/pago iniciado", (x) => usdG(x.costo_pago_iniciado)],
   ["retencion", "Retención %", (x) => pct1(x.retencion)], // (24/10 b) thruplays ÷ impresiones (WIKI/metricas-y-kpis: Santi pide > 10 %)
   ["ctr", "CTR", (x) => pct1(x.ctr)],
@@ -1214,7 +1216,7 @@ const COLS = [
 ];
 const COLS_EXTRA = ["costo_carrito", "pagos_iniciados", "carritos", "visitas", "clics", "cpc", "cpm", "impresiones", "frecuencia"];
 // (26/10) Presupuesto pasa a verse siempre: se saca de lo oculto que cada dispositivo tenía guardado
-const colsOcultas = (() => { try { const v = ls.get("dash_cols_ocultas3", null) ?? ls.get("dash_cols_ocultas2", null); const o = new Set(v == null ? COLS_EXTRA : JSON.parse(v)); if (ls.get("dash_cols_ocultas3", null) == null) o.delete("presupuesto"); return o; } catch { return new Set(COLS_EXTRA); } })();
+const colsOcultas = (() => { try { const v = ls.get("dash_cols_ocultas3", null) ?? ls.get("dash_cols_ocultas2", null); const o = new Set(v == null ? COLS_EXTRA : JSON.parse(v)); if (ls.get("dash_cols_ocultas3", null) == null) o.delete("presupuesto"); if (ls.get("dash_cols_ultima", null) == null) { o.delete("ultima"); ls.set("dash_cols_ultima", "1"); try { ls.set("dash_cols_ocultas3", JSON.stringify([...o])); } catch {} } return o; } catch { return new Set(COLS_EXTRA); } })();
 const colsVisibles = () => COLS.filter((c) => !colsOcultas.has(c[0]));
 const nCols = () => 1 + colsVisibles().length;
 // (14/10) lapicito: campaña CBO o conjunto ABO (donde vive el presupuesto diario)
@@ -3384,7 +3386,8 @@ function cmpCelda(x, m) {
   // (05/11) ROAS 0 = gastó y no vendió nada (ni el pixel ni Impultienda): se dice así en vez de «0,00».
   const sinV = !(+x.ventas > 0) && !(+x.facturacion > 0);
   if (m === "roas" && sinV) return `<td class="num${poco}" title="Gastó US$ ${NF2.format(+x.gasto || 0)} y no tuvo ninguna venta ese día (ni en el pixel de Meta ni en Impultienda)"><span class="roas rojo num cmp-sinv">0 · sin ventas</span></td>`;
-  const v = m === "roas" ? `<span class="roas ${roas < CMP.umbral ? "rojo" : colorRoas(roas)} num">${roasTx(roas)}</span>`
+  const gan = +x.ganancia || 0, ganTx = `${gan < 0 ? "−" : "+"}$${NF0.format(Math.abs(Math.round(gan)))}`;
+  const v = m === "roas" ? `<span class="roas ${roas < CMP.umbral ? "rojo" : colorRoas(roas)} num cmp-rg" title="ROAS ${roasTx(roas)} · ganancia US$ ${NF2.format(gan)}">${roasTx(roas)}<i>·</i>${ganTx}</span>`
     : m === "ganancia" ? `<span class="${signo(x.ganancia)}">${usdG(x.ganancia)}</span>`
     : m === "ventas" ? entN(x.ventas)
     : m === "cpm" ? usdG(x.cpm ?? (x.impresiones ? (x.gasto / x.impresiones) * 1000 : null))
@@ -3395,6 +3398,11 @@ async function compararDias() {
   const h = isoAR(new Date());
   if (!CMP.dias) CMP.dias = [isoMenos(h, 2), isoMenos(h, 1), h];
   CMP.grupo = S.grupoClave || "todas"; CMP.cuenta = S.cuenta || ""; CMP.abierta = null; CMP.sel = new Set(); CMP.conf = null;
+  // (08/11, Lorenzo) con campañas tildadas en el tablero → solo esas (y todas, no solo las malas); sin nada → lo filtrado
+  const tild = new Set([...S.sel.values()].map((v) => v.nivel === "campana" ? v.id : v.camp).filter(Boolean));
+  CMP.soloIds = tild.size ? tild : null; CMP.buscar = tild.size ? "" : (S.buscar || "").trim();
+  if (CMP.soloIds) { CMP.soloMalas = false; CMP.grupo = "todas"; CMP.cuenta = ""; }
+  CMP.pres = {};
   abrirModal(`<div class="cmp" id="cmp"></div>`, { ancho: true, bloqueado: () => CMP.enviando });
   modalActual.dlg.classList.add("cmp-dlg");
   pintarCmp(); cargarCmp();
@@ -3419,19 +3427,18 @@ function pintarCmp() {
   const gruposM = new Map();
   for (const iso of CMP.dias) for (const g of S.datos[cmpPer(iso)]?.grupos || []) if (g.clave !== "todas") gruposM.set(g.clave, g.etiqueta);
   const cuentasM = new Map(todas.map((f) => [f.act, f.cuenta || f.act]));
-  let fs = todas.filter((f) => (CMP.grupo === "todas" || f.grupo === CMP.grupo) && (!CMP.cuenta || f.act === CMP.cuenta));
+  let fs = todas.filter((f) => (CMP.grupo === "todas" || f.grupo === CMP.grupo) && (!CMP.cuenta || f.act === CMP.cuenta)
+    && (!CMP.soloIds || CMP.soloIds.has(f.id)) && (!CMP.buscar || normTx(f.nombre).includes(normTx(CMP.buscar))));
   const nArch = fs.filter(cmpArchivada).length, nPrend = fs.length - nArch;
   fs = fs.filter((f) => cmpArchivada(f) === CMP.archivadas);
   const nMalas = fs.filter((f) => f.mala).length;
   if (CMP.soloMalas) fs = fs.filter((f) => f.mala);
   const cols = [...CMP.dias, "tot"];
   const th = cols.map((k) => `<th scope="col">${k === "tot" ? "Total" : esc(cmpDiaTx(k)) + (k === h ? "<span class='cmp-hoy' title='Día en curso'>*</span>" : "")}</th>`).join("");
-  const det = (f) => `<tr class="cmp-det"><td colspan="${cols.length + 1}"><div class="cmp-det-caja">
-      <table class="cmp-mini num"><thead><tr><th></th>${th}</tr></thead><tbody>
-      ${CMP_METS.map(([m, t]) => `<tr><th scope="row">${t}</th>${cols.map((k) => cmpCelda(k === "tot" ? f.tot : f.d[k], m)).join("")}</tr>`).join("")}
-      </tbody></table>
-      <div class="cmp-det-pie"><span class="mut">${esc(f.cuenta || "")}${prendido(f.estado) ? "" : " · apagada"}</span><button type="button" class="btn chico" data-cmp-ver="${esc(f.id)}">Ver en el Dashboard</button></div>
-    </div></td></tr>`;
+  // (08/11, Lorenzo) el detalle va en filas de la MISMA tabla: cada métrica queda alineada bajo su día, con el mismo ancho
+  const presFila = (f) => { const pr = CMP.pres?.[f.id]; return `<tr class="cmp-det cmp-det-m"><th scope="row" class="cmp-nom cmp-det-n">Presupuesto</th>${cols.map((k) => k === "tot" ? `<td class="num mut">—</td>` : `<td class="num">${pr === undefined ? '<span class="mut">…</span>' : pr?.[k] != null ? usdG(pr[k]) : '<span class="mut">—</span>'}</td>`).join("")}</tr>`; };
+  const det = (f) => presFila(f) + CMP_METS.map(([m, t]) => `<tr class="cmp-det cmp-det-m"><th scope="row" class="cmp-nom cmp-det-n">${t}</th>${cols.map((k) => cmpCelda(k === "tot" ? f.tot : f.d[k], m)).join("")}</tr>`).join("")
+    + `<tr class="cmp-det cmp-det-pie-f"><td colspan="${cols.length + 1}"><div class="cmp-det-pie"><span class="mut">${esc(f.cuenta || "")}${prendido(f.estado) ? "" : " · apagada"}</span><button type="button" class="btn chico" data-cmp-ver="${esc(f.id)}">Ver en el Dashboard</button></div></td></tr>`;
   // (05/11, Lorenzo) flechita a la izquierda = abrir el detalle; tocar la fila = seleccionar (para apagar/prender desde acá).
   for (const id of [...CMP.sel]) if (!todas.some((f) => f.id === id)) CMP.sel.delete(id);
   const filas = fs.map((f) => { const ab = CMP.abierta === f.id, se = CMP.sel.has(f.id); return `<tr class="cmp-fila${f.mala ? " mala" : ""}${ab ? " abierta" : ""}${se ? " sel" : ""}" data-cmp-id="${esc(f.id)}" tabindex="0" aria-selected="${se}">
@@ -3514,6 +3521,7 @@ function pintarCmp() {
   $$("[data-cmp-dia]", raiz).forEach((b) => b.onclick = () => {
     const iso = b.dataset.cmpDia, s = new Set(CMP.dias);
     if (s.has(iso)) { if (s.size === 1) return; s.delete(iso); } else s.add(iso);
+    CMP.pres = {}; // (08/11) cambian los días: el presupuesto se vuelve a pedir al abrir
     CMP.dias = [...s].sort(); cargarCmp();
   });
   $$("[data-cmp-crit]", raiz).forEach((b) => b.onclick = () => { CMP.crit = b.dataset.cmpCrit; ls.set("cmp_crit", CMP.crit); pintarCmp(); });
@@ -3524,7 +3532,12 @@ function pintarCmp() {
   $$("[data-cmp-arch]", raiz).forEach((b) => b.onclick = () => { CMP.archivadas = b.dataset.cmpArch === "true"; pintarCmp(); });
   $("#cmp-umb", raiz).onchange = (e) => { const n = parseFloat(e.target.value); if (n > 0) { CMP.umbral = n; ls.set("cmp_umbral", String(n)); } pintarCmp(); };
   $("#cmp-act", raiz).onclick = () => cargarCmp(true);
-  const abrir = (id) => { CMP.abierta = CMP.abierta === id ? null : id; pintarCmp(); $(`[data-cmp-tg="${CSS.escape(id)}"]`, raiz)?.focus({ preventScroll: true }); };
+  const abrir = (id) => { CMP.abierta = CMP.abierta === id ? null : id; pintarCmp(); $(`[data-cmp-tg="${CSS.escape(id)}"]`, raiz)?.focus({ preventScroll: true });
+    // (08/11) presupuesto de cada día de esa campaña (una sola vez por campaña y días)
+    if (CMP.abierta && !(CMP.pres ||= {})[id] && !DEMO) {
+      api("pres_dias", { q: `&ids=${encodeURIComponent(id)}&dias=${CMP.dias.join(",")}` }).then((r) => { CMP.pres[id] = r.pres?.[id] ?? null; pintarCmp(); }).catch(() => { CMP.pres[id] = null; pintarCmp(); });
+    } else if (CMP.abierta && DEMO && !CMP.pres[id]) { CMP.pres[id] = Object.fromEntries(CMP.dias.map((d, i) => [d, 80 + i * 24])); pintarCmp(); }
+  };
   const tildar = (id) => { if (CMP.enviando) return; CMP.sel.has(id) ? CMP.sel.delete(id) : CMP.sel.add(id); CMP.conf = null; pintarCmp(); $(`[data-cmp-id="${CSS.escape(id)}"]`, raiz)?.focus({ preventScroll: true }); };
   $$("[data-cmp-tg]", raiz).forEach((b) => b.onclick = (e) => { e.stopPropagation(); abrir(b.dataset.cmpTg); });
   $$("[data-cmp-id]", raiz).forEach((tr) => {

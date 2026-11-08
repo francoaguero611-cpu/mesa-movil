@@ -476,3 +476,23 @@ html.lenis, html.lenis body { height: auto; }
 .lenis.lenis-smooth { scroll-behavior: auto !important; }
 .lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
 .lenis.lenis-stopped { overflow: hidden; }
+
+/* (08/11, Lorenzo) Presupuesto: número centrado bajo el título y CBO/ABO abajo */
+html body .camp th.c-presupuesto, html body .camp td.c-presupuesto { text-align: center !important; }
+.pres-c { display: inline-flex; flex-direction: column; align-items: center; gap: 3px; }
+.pres-n { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.pres-c .chip-tp { font-size: 10.5px; padding: 1px 7px; }
+html body .camp th.c-ultima, html body .camp td.c-ultima { text-align: center !important; }
+/* (08/11, Lorenzo) «Qué hacer» angosta: una acción por renglón, el dato en gris abajo */
+html body .camp th.c-que_hacer, html body .camp td.c-que_hacer { min-width: 0 !important; width: 128px; max-width: 140px; white-space: normal; }
+.qh { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.qh .chip-ac { white-space: nowrap; font-size: 12px; padding: 3px 9px; margin: 0; }
+.qh .ac-info { color: var(--mut, #8a8a94); font-size: 11px; white-space: nowrap; margin: 0; padding: 0; background: none; border: 0; }
+/* (08/11) Comparar días: detalle alineado con las columnas de arriba */
+.cmp-det-m th.cmp-det-n { padding-left: 64px !important; color: var(--mut, #8a8a94); font-weight: 600; text-align: left; font-size: 13px; }
+.cmp-det-m > td, .cmp-det-m > th { background: rgba(124,200,255,.04); }
+.cmp-det-pie-f > td { padding: 6px 12px 12px !important; background: rgba(124,200,255,.04); }
+
+/* (08/11) Comparar días: ROAS y ganancia en la misma burbuja */
+.cmp-tabla .roas.cmp-rg { min-width: 0; white-space: nowrap; display: inline-flex; gap: 5px; align-items: center; padding: 2px 9px; }
+.cmp-tabla .roas.cmp-rg i { opacity: .55; font-style: normal; }
