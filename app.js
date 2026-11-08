@@ -165,25 +165,28 @@ async function optimizador() {
   if (optCorriendo) return; optCorriendo = true;
   const b = $("#b-opt"); if (b) { b.disabled = true; b.textContent = "Buscando…"; }
   try {
-    const h = isoAR(new Date()), p = `r:${isoMenos(h, 1)}:${h}`;
+    const h = isoAR(new Date()), p = `r:${isoMenos(h, 2)}:${h}`; // (08/11) últimos 3 días, hoy incluido
     if (S.periodo !== p) { S.periodo = p; pintarTodo(); }
     if (!S.datos[p]) S.datos[p] = await api("dash", { q: `&periodo=${p}` });
-    const MAL = 1.3, MIN = 20;
+    const MAL = 1.3;
+    // (08/11, Lorenzo) gasto mínimo = medio ticket promedio (AOV) de la oferta en esos días; sin dato, US$ 10
+    const aov = new Map((S.datos[p].grupos || []).map((g) => [g.clave, g.metricas?.ventas ? (+g.metricas.facturacion || 0) / g.metricas.ventas : null]));
+    const minDe = (c) => { const a = aov.get(c.grupo); return a ? a / 2 : 10; };
     const enOferta = (c) => !S.grupoClave || S.grupoClave === "todas" || c.grupo === S.grupoClave;
-    const cs = (S.datos[p].campanas || []).filter((c) => prendido(c.estado) && deCuenta(c) && enOferta(c) && (+c.gasto || 0) >= MIN && (c.roas ?? 0) < MAL);
+    const cs = (S.datos[p].campanas || []).filter((c) => prendido(c.estado) && deCuenta(c) && enOferta(c) && (+c.gasto || 0) >= minDe(c) && (c.roas ?? 0) < MAL);
     await Promise.all(cs.map((c) => cargarDetalle(c)));
     const elegidos = [];
     for (const c of cs) for (const st of detDe(c)) {
       if (!prendido(st.estado) || (st.roas ?? 0) >= MAL) continue;
-      for (const a of st.anuncios || []) if (prendido(a.estado) && (+a.gasto || 0) >= MIN && (a.roas ?? 0) < MAL) elegidos.push({ a, st, c });
+      for (const a of st.anuncios || []) if (prendido(a.estado) && (+a.gasto || 0) >= minDe(c) && (a.roas ?? 0) < MAL) elegidos.push({ a, st, c });
     }
-    if (!elegidos.length) { pintarTodo(); miniAviso("No hay anuncios para optimizar en las últimas 48 h."); return; }
+    if (!elegidos.length) { pintarTodo(); miniAviso("No hay anuncios para optimizar en los últimos 3 días."); return; }
     S.sel.clear();
     for (const { a, st, c } of elegidos) S.sel.set("anuncio:" + a.id, { id: a.id, act: c.act, nivel: "anuncio", nombre: a.nombre, estado: a.estado, camp: c.id, cj: st.id });
     // (08/11, Lorenzo) se ve TODO: los malos quedan tildados y sus campañas y conjuntos abiertos, para revisar y tildar más a mano
     S.soloSel = false;
     abrirPadresSel(); pintarTodo(); pintarSoloSel(); pintarBarra();
-    toast(`${elegidos.length} anuncio${elegidos.length === 1 ? "" : "s"} tildado${elegidos.length === 1 ? "" : "s"} para optimizar (48 h: ROAS < 1,3 con US$ 20+ de gasto, en conjuntos y campañas también < 1,3). Sus campañas quedaron abiertas; revisá, tildá o destildá lo que quieras y apagá desde la isla.`, "ok", 8000);
+    toast(`${elegidos.length} anuncio${elegidos.length === 1 ? "" : "s"} tildado${elegidos.length === 1 ? "" : "s"} para optimizar (últimos 3 días: ROAS < 1,3 y gasto de al menos medio ticket promedio de su oferta, en conjuntos y campañas también < 1,3). Sus campañas quedaron abiertas; revisá, tildá o destildá lo que quieras y apagá desde la isla.`, "ok", 8000);
   } catch (e) { miniAviso(`No se pudo buscar: ${e.message}`); }
   finally { optCorriendo = false; if (b) { b.disabled = false; b.textContent = "Optimizador"; } }
 }
@@ -544,7 +547,7 @@ function montar() {
     <section class="seccion-camp" aria-labelledby="t-camp">
       <div class="cab-tabla">
         <h2 id="t-camp">Campañas <small id="n-camp"></small></h2>
-        <span class="cab-der"><span id="acc-barra"></span><button type="button" class="btn chico" id="b-opt" title="Selecciona los anuncios que vienen mal en las últimas 48 h (ROAS < 1,3, gasto ≥ US$ 20, en conjuntos y campañas también < 1,3). No apaga nada: revisás y apagás desde la isla.">Optimizador</button><button type="button" class="btn chico" id="b-cmp" aria-haspopup="dialog" title="Cada campaña día por día: gasto, ventas, ROAS, ganancia y CPM">Comparar días</button><button type="button" class="btn chico" id="b-malos" title="Tilda los conjuntos y anuncios con ROAS < 1,3 de las campañas con ROAS < 1,3 (últimos 3 días)">Lo que viene mal</button><button type="button" class="toggle-chico" role="switch" id="t-solosel" aria-checked="${S.soloSel}"><span class="mini" aria-hidden="true"></span><span id="t-solosel-tx">solo seleccionadas</span></button><button type="button" class="btn chico" id="b-cols" aria-haspopup="dialog">Columnas</button><button type="button" class="toggle-chico" role="switch" id="t-apagadas" aria-checked="${S.verApagadas}"><span class="mini" aria-hidden="true"></span><span id="t-apagadas-tx">ver apagadas</span></button></span>
+        <span class="cab-der"><span id="acc-barra"></span><button type="button" class="btn chico" id="b-opt" title="Tilda los anuncios que vienen mal en los últimos 3 días (ROAS < 1,3 y gasto de al menos medio ticket promedio de su oferta, en conjuntos y campañas también < 1,3). No apaga nada: revisás y apagás desde la isla.">Optimizador</button><button type="button" class="btn chico" id="b-cmp" aria-haspopup="dialog" title="Cada campaña día por día: gasto, ventas, ROAS, ganancia y CPM">Comparar días</button><button type="button" class="btn chico" id="b-malos" title="Tilda los conjuntos y anuncios con ROAS < 1,3 de las campañas con ROAS < 1,3 (últimos 3 días)">Lo que viene mal</button><button type="button" class="toggle-chico" role="switch" id="t-solosel" aria-checked="${S.soloSel}"><span class="mini" aria-hidden="true"></span><span id="t-solosel-tx">solo seleccionadas</span></button><button type="button" class="btn chico" id="b-cols" aria-haspopup="dialog">Columnas</button><button type="button" class="toggle-chico" role="switch" id="t-apagadas" aria-checked="${S.verApagadas}"><span class="mini" aria-hidden="true"></span><span id="t-apagadas-tx">ver apagadas</span></button></span>
       </div>
       <div class="filtro-camp"><label class="sr" for="f-buscar">Buscar por nombre</label><input type="search" id="f-buscar" class="campo f-buscar" placeholder="Buscar campaña, conjunto o anuncio…" autocomplete="off" value="${esc(S.buscar)}"><label class="sr" for="f-cuenta">Cuenta publicitaria</label><select id="f-cuenta" class="campo f-cuenta"></select></div>
       <div class="tabla-con-reloj"><div class="tabla-caja boceto"><div class="tabla-scroll" id="tabla-scroll"></div></div><div class="riel-reloj" id="riel-reloj" aria-label="Historial de cambios por campaña"></div></div>
@@ -1365,11 +1368,14 @@ function ubicarCabFlotante() {
   const visible = tr.top < top && tb.getBoundingClientRect().bottom > top + tr.height + 40;
   f.hidden = !visible; if (!visible) return;
   f.style.top = top + "px"; f.style.left = r.left + "px"; f.style.width = sc.clientWidth + "px";
+  // (08/11, Lorenzo) cada título se copia en la posición y el ancho REALES de su columna en pantalla: así no se corre
+  // aunque la tabla tenga espacio entre filas o columnas fijas (Campaña a la izquierda, Qué hacer a la derecha)
   const ft = $("table", f), fth = $$("th", f);
-  ft.style.width = tb.getBoundingClientRect().width + "px";
-  th.forEach((x, i) => { if (fth[i]) { const w = x.getBoundingClientRect().width + "px"; fth[i].style.width = w; fth[i].style.minWidth = w; fth[i].style.maxWidth = w; } });
-  ft.style.transform = `translateX(${-sc.scrollLeft}px)`;
-  if (fth[0]) fth[0].style.transform = `translateX(${sc.scrollLeft}px)`; // la columna «Campaña» queda fija a la izquierda
+  f.style.height = tr.height + "px";
+  ft.style.cssText = `position:relative;width:${sc.clientWidth}px;height:${tr.height}px;transform:none;table-layout:auto;border-collapse:separate;border-spacing:0`;
+  th.forEach((x, i) => { const c = fth[i]; if (!c) return; const b = x.getBoundingClientRect();
+    const fija = /\bnom\b|c-que_hacer/.test(x.className);
+    c.style.cssText = `position:absolute;top:0;left:${b.left - r.left}px;width:${b.width}px;min-width:${b.width}px;max-width:${b.width}px;height:${b.height}px;box-sizing:border-box;transform:none;z-index:${fija ? 3 : 1}`; });
 }
 // (14/10, Lorenzo) Fila de resultados totales al final, como en Meta, y pegada abajo de la pantalla (celu y compu).
 // Suma las campañas que se ven (respeta grupo y «ver apagadas»); las tasas se recalculan con los totales.
