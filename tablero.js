@@ -33,6 +33,7 @@
   function delTaller(items, fecha) {
     const ini = Date.parse(fecha + "T03:00:00Z"), fin = ini + 86400e3, hoy = isoAR(), G = new Map();
     for (const it of items || []) {
+      if (it.estado === "archivado" || it.estado === "cancelado") continue; // (08/11) lo terminado o descartado no es tarea
       const a = Date.parse(it.actualizado || it.inicio || 0), i0 = Date.parse(it.inicio || it.actualizado || 0);
       if (fecha === hoy) { const edad = (Date.now() - a) / 3600e3; if (edad > 72 || (edad > 24 && HECHO.has(it.estado))) continue; }
       else if (fecha < hoy) { if (!(i0 < fin && a >= ini)) continue; }
@@ -44,11 +45,14 @@
     const out = [];
     for (const g of G.values()) {
       const post = g.items.filter((x) => POST.has(x.tipo)), renos = g.items.filter((x) => !POST.has(x.tipo) && esReno(x));
-      const resto = g.items.filter((x) => !post.includes(x) && !renos.includes(x)), esTest = resto.some((x) => TESTEO.has(x.tipo));
-      const soloCrea = resto.every((x) => /creativo|traduccion|avatar/.test(x.tipo));
+      let resto = g.items.filter((x) => !post.includes(x) && !renos.includes(x));
+      const esTest = resto.some((x) => TESTEO.has(x.tipo));
+      // (08/11, Lorenzo) renovaciones y creativos de la misma oferta son UNA tarea (si no es un testeo)
+      const crea = esTest ? [] : resto.filter((x) => /creativo|traduccion|avatar/.test(x.tipo));
+      resto = resto.filter((x) => !crea.includes(x));
       if (post.length) out.push(armar("postventa", `Post-venta ${g.oferta}`, post));
-      if (renos.length) out.push(armar("renos", `Renovaciones ${g.oferta}`, renos));
-      if (resto.length) out.push(armar(esTest ? "testeo" : soloCrea ? "creativos" : "otros", `${esTest ? "Testeo" : soloCrea ? "Creativos" : "Tareas"} ${g.oferta}`, resto));
+      if (renos.length || crea.length) out.push(armar("renos", `${renos.length ? "Renovaciones" : "Creativos"} ${g.oferta}`, [...renos, ...crea]));
+      if (resto.length) out.push(armar(esTest ? "testeo" : "otros", `${esTest ? "Testeo" : "Tareas"} ${g.oferta}`, resto));
     }
     return out;
   }

@@ -241,7 +241,7 @@ function filtros() {
     sel.onchange = () => { sg.value = sel.value; sg.dispatchEvent(new Event("change", { bubbles: true })); };
     (cuenta ? cuenta.after.bind(cuenta) : f.append.bind(f))(lab, sel);
   }
-  for (const id of ["b-cmp", "t-solosel", "t-apagadas", "b-cols"]) { const x = document.getElementById(id); if (x) f.append(x); }
+  for (const id of ["b-cmp", "b-opt", "t-solosel", "t-apagadas", "b-cols"]) { const x = document.getElementById(id); if (x) f.append(x); }
 }
 
 // ---------- (06/11 c) métricas secundarias: se esconden con animación ----------

@@ -152,6 +152,40 @@ function toast(msg, tipo = "ok", ms = 5200) {
   if (ms) setTimeout(() => t.remove(), ms);
   return t;
 }
+// (08/11, Lorenzo) cartelito chico abajo a la derecha
+function miniAviso(msg, tipo = "error", ms = 4500) {
+  const t = document.createElement("div"); t.className = "mini-aviso" + (tipo === "error" ? " error" : ""); t.setAttribute("role", "status"); t.textContent = msg;
+  document.body.appendChild(t); requestAnimationFrame(() => t.classList.add("ve"));
+  setTimeout(() => { t.classList.remove("ve"); setTimeout(() => t.remove(), 300); }, ms);
+}
+// (08/11, Lorenzo) «Optimizador»: últimas 48 h (ayer + hoy), selecciona SOLO los anuncios prendidos con gasto ≥ US$ 20 y ROAS < 1,3
+// que están dentro de conjuntos con ROAS < 1,3, dentro de campañas con ROAS < 1,3. No apaga nada: se revisa y se apaga desde la isla.
+let optCorriendo = false;
+async function optimizador() {
+  if (optCorriendo) return; optCorriendo = true;
+  const b = $("#b-opt"); if (b) { b.disabled = true; b.textContent = "Buscando…"; }
+  try {
+    const h = isoAR(new Date()), p = `r:${isoMenos(h, 1)}:${h}`;
+    if (S.periodo !== p) { S.periodo = p; pintarTodo(); }
+    if (!S.datos[p]) S.datos[p] = await api("dash", { q: `&periodo=${p}` });
+    const MAL = 1.3, MIN = 20;
+    const enOferta = (c) => !S.grupoClave || S.grupoClave === "todas" || c.grupo === S.grupoClave;
+    const cs = (S.datos[p].campanas || []).filter((c) => prendido(c.estado) && deCuenta(c) && enOferta(c) && (+c.gasto || 0) >= MIN && (c.roas ?? 0) < MAL);
+    await Promise.all(cs.map((c) => cargarDetalle(c)));
+    const elegidos = [];
+    for (const c of cs) for (const st of detDe(c)) {
+      if (!prendido(st.estado) || (st.roas ?? 0) >= MAL) continue;
+      for (const a of st.anuncios || []) if (prendido(a.estado) && (+a.gasto || 0) >= MIN && (a.roas ?? 0) < MAL) elegidos.push({ a, st, c });
+    }
+    if (!elegidos.length) { pintarTodo(); miniAviso("No hay anuncios para optimizar en las últimas 48 h."); return; }
+    S.sel.clear();
+    for (const { a, st, c } of elegidos) S.sel.set("anuncio:" + a.id, { id: a.id, act: c.act, nivel: "anuncio", nombre: a.nombre, estado: a.estado, camp: c.id, cj: st.id });
+    S.soloSel = true;
+    abrirPadresSel(); pintarTodo(); pintarSoloSel(); pintarBarra();
+    toast(`${elegidos.length} anuncio${elegidos.length === 1 ? "" : "s"} para optimizar (48 h: ROAS < 1,3 con US$ 20+ de gasto, en conjuntos y campañas también < 1,3). Revisalos y apagalos desde la isla.`, "ok", 7000);
+  } catch (e) { miniAviso(`No se pudo buscar: ${e.message}`); }
+  finally { optCorriendo = false; if (b) { b.disabled = false; b.textContent = "Optimizador"; } }
+}
 // Traduce los errores de Meta a algo que se entienda.
 function errorClaro(msg = "") {
   const m = String(msg);
@@ -509,7 +543,7 @@ function montar() {
     <section class="seccion-camp" aria-labelledby="t-camp">
       <div class="cab-tabla">
         <h2 id="t-camp">Campañas <small id="n-camp"></small></h2>
-        <span class="cab-der"><span id="acc-barra"></span><button type="button" class="btn chico" id="b-cmp" aria-haspopup="dialog" title="Cada campaña día por día: gasto, ventas, ROAS, ganancia y CPM">Comparar días</button><button type="button" class="btn chico" id="b-malos" title="Tilda los conjuntos y anuncios con ROAS < 1,3 de las campañas con ROAS < 1,3 (últimos 3 días)">Lo que viene mal</button><button type="button" class="toggle-chico" role="switch" id="t-solosel" aria-checked="${S.soloSel}"><span class="mini" aria-hidden="true"></span><span id="t-solosel-tx">solo seleccionadas</span></button><button type="button" class="btn chico" id="b-cols" aria-haspopup="dialog">Columnas</button><button type="button" class="toggle-chico" role="switch" id="t-apagadas" aria-checked="${S.verApagadas}"><span class="mini" aria-hidden="true"></span><span id="t-apagadas-tx">ver apagadas</span></button></span>
+        <span class="cab-der"><span id="acc-barra"></span><button type="button" class="btn chico" id="b-opt" title="Selecciona los anuncios que vienen mal en las últimas 48 h (ROAS < 1,3, gasto ≥ US$ 20, en conjuntos y campañas también < 1,3). No apaga nada: revisás y apagás desde la isla.">Optimizador</button><button type="button" class="btn chico" id="b-cmp" aria-haspopup="dialog" title="Cada campaña día por día: gasto, ventas, ROAS, ganancia y CPM">Comparar días</button><button type="button" class="btn chico" id="b-malos" title="Tilda los conjuntos y anuncios con ROAS < 1,3 de las campañas con ROAS < 1,3 (últimos 3 días)">Lo que viene mal</button><button type="button" class="toggle-chico" role="switch" id="t-solosel" aria-checked="${S.soloSel}"><span class="mini" aria-hidden="true"></span><span id="t-solosel-tx">solo seleccionadas</span></button><button type="button" class="btn chico" id="b-cols" aria-haspopup="dialog">Columnas</button><button type="button" class="toggle-chico" role="switch" id="t-apagadas" aria-checked="${S.verApagadas}"><span class="mini" aria-hidden="true"></span><span id="t-apagadas-tx">ver apagadas</span></button></span>
       </div>
       <div class="filtro-camp"><label class="sr" for="f-buscar">Buscar por nombre</label><input type="search" id="f-buscar" class="campo f-buscar" placeholder="Buscar campaña, conjunto o anuncio…" autocomplete="off" value="${esc(S.buscar)}"><label class="sr" for="f-cuenta">Cuenta publicitaria</label><select id="f-cuenta" class="campo f-cuenta"></select></div>
       <div class="tabla-con-reloj"><div class="tabla-caja boceto"><div class="tabla-scroll" id="tabla-scroll"></div></div><div class="riel-reloj" id="riel-reloj" aria-label="Historial de cambios por campaña"></div></div>
@@ -524,6 +558,7 @@ function montar() {
   $("#t-solosel").onclick = alternarSoloSel;
   $("#b-malos").onclick = () => seleccionarMalos();
   $("#b-cmp").onclick = () => compararDias();
+  $("#b-opt").onclick = () => optimizador();
   $("#f-cuenta").onchange = (e) => { S.cuenta = e.target.value; ls.set("dash_cuenta", S.cuenta); pintarTabla(); pintarProblemas(); };
   let tb = null;
   $("#f-buscar").oninput = (e) => { clearTimeout(tb); tb = setTimeout(() => { S.buscar = e.target.value; pintarTabla(); }, 150); };

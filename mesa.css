@@ -496,3 +496,9 @@ html body .camp th.c-que_hacer, html body .camp td.c-que_hacer { min-width: 0 !i
 /* (08/11) Comparar días: ROAS y ganancia en la misma burbuja */
 .cmp-tabla .roas.cmp-rg { min-width: 0; white-space: nowrap; display: inline-flex; gap: 5px; align-items: center; padding: 2px 9px; }
 .cmp-tabla .roas.cmp-rg i { opacity: .55; font-style: normal; }
+
+/* (08/11) cartelito chico abajo a la derecha (Optimizador sin resultados) */
+.mini-aviso { position: fixed; right: 18px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 90; max-width: min(340px, calc(100vw - 36px)); padding: 10px 14px; border-radius: 14px; font-size: 13.5px;
+  background: rgba(28,28,33,.96); color: #f1f1f3; border: 1px solid rgba(255,255,255,.12); box-shadow: 0 14px 40px -12px rgba(0,0,0,.8); opacity: 0; transform: translateY(8px); transition: opacity .25s, transform .25s; }
+.mini-aviso.ve { opacity: 1; transform: none; }
+.mini-aviso.error { background: linear-gradient(160deg, rgba(80,20,28,.96), rgba(40,12,18,.96)); color: #ffd9dd; border-color: rgba(255,120,130,.3); }
