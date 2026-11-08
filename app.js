@@ -421,7 +421,7 @@ function login(msg = "") {
       if (err.code === 401) {
         // (07/11) usuarios que solo ven Atención al cliente (Tomi): van a su página
         const r = await fetch("https://tppcpnfzcxxusdhrlmdx.supabase.co/functions/v1/atc?accion=bots", { headers: { "x-app-clave": v } }).catch(() => null);
-        if (r && r.ok) { location.href = "atencion.html"; return; }
+        if (r && r.ok) { ls.set("dash_rol", "atc"); location.href = "atencion.html"; return; }
         ls.del("dash_clave"); login("Mail o contraseña incorrectos");
       }
       else { login(err.message || "No se pudo conectar"); ls.set("dash_clave", v); }

@@ -57,7 +57,10 @@
       const v = `${document.getElementById("sa-mail").value.trim().toLowerCase()}|${document.getElementById("sa-pass").value}`;
       const r = await fetch(`${API}?accion=bots`, { headers: { "x-app-clave": v } }).catch(() => null);
       if (!r || r.status === 401) { main.querySelector(".sa-err").textContent = r ? "Mail o contraseña incorrectos" : "Sin conexión"; return; }
-      ls.set("dash_clave", v); abrir();
+      ls.set("dash_clave", v);
+      const full = await fetch("https://tppcpnfzcxxusdhrlmdx.supabase.co/functions/v1/app-movil?accion=pres_dias", { headers: { "x-app-clave": v } }).catch(() => null);
+      if (full && full.status === 401) ls.set("dash_rol", "atc");
+      abrir();
     };
   }
   function cargarAtc() {
@@ -70,7 +73,7 @@
     window.Atc.montar(main, { toast, login: (m) => { ls.del("dash_clave"); login(m); } });
     new MutationObserver(() => document.body.classList.toggle("en-chat", !!main.querySelector(".v-chat"))).observe(main, { childList: true, subtree: false });
   }
-  salir.onclick = () => { ls.del("dash_clave"); login(); };
+  salir.onclick = () => { ls.del("dash_clave"); ls.del("dash_rol"); ls.del("dash_usuario"); login(); };
   abrir();
 })();
 </script>
