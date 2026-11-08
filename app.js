@@ -180,9 +180,10 @@ async function optimizador() {
     if (!elegidos.length) { pintarTodo(); miniAviso("No hay anuncios para optimizar en las últimas 48 h."); return; }
     S.sel.clear();
     for (const { a, st, c } of elegidos) S.sel.set("anuncio:" + a.id, { id: a.id, act: c.act, nivel: "anuncio", nombre: a.nombre, estado: a.estado, camp: c.id, cj: st.id });
-    S.soloSel = true;
+    // (08/11, Lorenzo) se ve TODO: los malos quedan tildados y sus campañas y conjuntos abiertos, para revisar y tildar más a mano
+    S.soloSel = false;
     abrirPadresSel(); pintarTodo(); pintarSoloSel(); pintarBarra();
-    toast(`${elegidos.length} anuncio${elegidos.length === 1 ? "" : "s"} para optimizar (48 h: ROAS < 1,3 con US$ 20+ de gasto, en conjuntos y campañas también < 1,3). Revisalos y apagalos desde la isla.`, "ok", 7000);
+    toast(`${elegidos.length} anuncio${elegidos.length === 1 ? "" : "s"} tildado${elegidos.length === 1 ? "" : "s"} para optimizar (48 h: ROAS < 1,3 con US$ 20+ de gasto, en conjuntos y campañas también < 1,3). Sus campañas quedaron abiertas; revisá, tildá o destildá lo que quieras y apagá desde la isla.`, "ok", 8000);
   } catch (e) { miniAviso(`No se pudo buscar: ${e.message}`); }
   finally { optCorriendo = false; if (b) { b.disabled = false; b.textContent = "Optimizador"; } }
 }
