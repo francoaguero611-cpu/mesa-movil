@@ -29,14 +29,12 @@
     n.className = "mc-tabs"; n.setAttribute("aria-label", "Secciones");
     const tab = (id, t, d) => `<button type="button" class="mc-tab" data-mc="${id}" aria-current="false">${ico(d)}<span>${t}</span></button>`;
     n.innerHTML = `${tab("dash", "Inicio", I.dash)}${tab("ranking", "Ranking", I.ranking)}
-      <button type="button" class="mc-jarvis" data-mc="tareas" aria-label="Tareas"><span class="mc-jv-orbe">${ico("M4 6.5l1.6 1.6L8.6 5M4 12.5l1.6 1.6 3-3.1M4 18.5l1.6 1.6 3-3.1M11.5 6.8H20M11.5 12.8H20M11.5 18.8H17", 22)}</span><span class="mc-jv-badge" hidden></span></button>
       ${tab("umbrales", "Umbrales", I.umbrales)}${tab("mas", "Más", I.mas)}`;
     document.body.append(n);
     n.addEventListener("click", (e) => {
       const b = e.target.closest("[data-mc]"); if (!b) return;
       vibrar();
       const id = b.dataset.mc;
-      if (id === "tareas") return window.Tablero?.abrir(); // (07/11) Jarvis se sacó: el botón del medio abre las Tareas
       if (id === "mas") return abrirMas();
       cerrarMas(); irSec(id);
     });
@@ -46,9 +44,6 @@
     const act = $('#secciones [data-sec][aria-pressed="true"]')?.dataset.sec || "dash";
     const tab = MAS.some(([k]) => k === act) ? "mas" : act;
     $$(".mc-tab").forEach((b) => b.setAttribute("aria-current", b.dataset.mc === tab ? "page" : "false"));
-    // número de avisos de Jarvis en el botón del medio
-    const bj = $("#jv-fab .jv-badge"), mb = $(".mc-jv-badge");
-    if (mb) { const v = bj && !bj.hidden ? bj.textContent.trim() : ""; mb.hidden = !v; mb.textContent = v; }
   }
 
   // ---------- hoja «Más» ----------

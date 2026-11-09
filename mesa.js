@@ -26,8 +26,8 @@ function iniciarLenis() {
     lenis = new Lenis({ lerp: 0.075, smoothWheel: true, wheelMultiplier: 1, // (06/11) modo continuo: con la rueda rápida no pega saltos (antes cada empujón reiniciaba la animación)
       // (07/11 b) SIN «select»: al deslizar rápido el mouse pasaba por el desplegable «Todas» (todo el ancho) o los filtros, el
       // deslizado suave se soltaba, la Mac movía la página sola y al salir volvía atrás → el «sube y baja». Solo se suelta en
-      // lo que tiene su propio scroll: ventanas, menú, tablero de tareas, textos largos.
-      prevent: (n) => !!(n.closest && n.closest(".dialogo, .menu, .modal, .ad-ver, .tb-velo, .velo, [data-lenis-prevent], textarea")) });
+      // lo que tiene su propio scroll: ventanas, menú, textos largos.
+      prevent: (n) => !!(n.closest && n.closest(".dialogo, .menu, .modal, .ad-ver, .velo, [data-lenis-prevent], textarea")) });
     // si algo movió la página por fuera (teclado, barra, ancla), el suave arranca desde ahí y no vuelve atrás
     addEventListener("keydown", (e) => { if (["PageDown", "PageUp", "Home", "End", " ", "ArrowDown", "ArrowUp"].includes(e.key) && !e.target.closest?.("input, textarea, select")) lenis.stop(), requestAnimationFrame(() => lenis.start()); });
     window.MesaLenis = lenis;
@@ -207,7 +207,7 @@ function pintarEther() {
   const pt = $(".ms-ether .pt"); if (pt && efHora) pt.title = `Leído ${Math.max(0, Math.round((Date.now() - efHora) / 60e3))} min atrás`;
 }
 function etherfi() {
-  // va en el encabezado, antes de los botones (tareas, campanita, actualizar, menú)
+  // va en el encabezado, antes de los botones (campanita, actualizar, menú)
   $$("#main .controles .ms-der").forEach((d) => { const per = $(".periodos", d); if (per) d.parentNode.insertBefore(per, d); d.parentNode.removeChild(d); });
   const arriba = $(".acciones-top"); if (!arriba) return;
   let w = $(".ms-ether", arriba);
@@ -223,7 +223,7 @@ function etherfi() {
     ci.max = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);
     ci.onchange = () => { efDia = ci.value || null; pintarCash(); };
     $(".ms-cal", w).onclick = () => { try { ci.showPicker(); } catch {} };
-    const tb = $("#tb-btn", arriba); tb ? arriba.insertBefore(w, tb) : arriba.prepend(w);
+    const av = $(".av-wrap", arriba); av ? arriba.insertBefore(w, av) : arriba.prepend(w);
   }
   pintarEther(); leerEtherfi();
 }
