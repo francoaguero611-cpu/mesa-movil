@@ -301,7 +301,16 @@ function detalle(s) {
   }
   if (s.id === "elevenlabs") { if (d.creditos != null) out.push(`hoy ${ent(d.creditos)} créditos`); if (d.creditos_libres != null) out.push(`quedan ${ent(d.creditos_libres)}`); if (d.plan_usd_mes) out.push(`plan ${usd(d.plan_usd_mes, 0)}/mes`); }
   if (s.id === "gemini" && d.consultas) out.push(`hoy ${ent(d.consultas)} consultas`);
-  if (s.id === "apimart" && s.saldo != null) out.push(`saldo ${usd(s.saldo)}`);
+  if (s.id === "apimart") {
+    // (11/11) historial real de la consola de APIMart: en qué modelos se va + aviso si el saldo no llega a 2 días
+    const corto = (m) => m.replace(/^grok-imagine-[\d.]+-video(-ext)?$/, "Grok video").replace(/^kling-v(\d+).*/, "Kling $1").replace(/^gpt-image-[\d.]+-?\w*$/, "GPT Image").replace(/^wan[\d.]+-.*/, "Wan").replace(/^seedance.*/, "Seedance").replace(/^gemini.*image.*|^gemini-nano-banana.*/, "Nano Banana").replace(/^veo.*/, "Veo");
+    if (d.modelos?.length) out.push("hoy: " + d.modelos.map(([m, v]) => `${esc(corto(m))} ${usd(v)}`).join(" · "));
+    if (s.saldo != null) {
+      const ult7 = G.datos.dias.slice(-8, -1).map((x) => x.servicios.apimart || 0), prom = ult7.length ? ult7.reduce((a, b) => a + b, 0) / ult7.length : 0;
+      const dias = prom ? s.saldo / prom : null;
+      out.push(dias != null && dias < 2 ? `<span class="gst-alerta">● saldo ${usd(s.saldo)}: alcanza ~${numTx(dias, 1)} días, cargar</span>` : `saldo ${usd(s.saldo)}${dias ? ` (~${Math.floor(dias)} días)` : ""}`);
+    }
+  }
   if (s.fijo) { const f = G.datos.fijos.find((x) => `fijo:${x.id}` === s.id); if (f) out.push(`suscripción · ${usd(f.usd_mes, 0)}/mes`); }
   return out.join(" · ");
 }
