@@ -70,6 +70,7 @@ function recortar() {
   return { dias, sv, total, d, h };
 }
 
+const perHTML = () => `<div class="gst-per" role="tablist">${PERIODOS.map(([k, t]) => `<button type="button" role="tab" data-per="${k}" aria-selected="${G.per === k}">${t}</button>`).join("")}</div>`;
 // ---------- tarjetas de arriba ----------
 const plata = (v, dec) => { const n = Number(v || 0); return `<span class="mon">US$</span>${numTx(n, dec ?? (Math.abs(n) < 100 ? 2 : 0))}`; };
 function kpis() {
@@ -150,7 +151,7 @@ const CH = { pistas: new Map(), min: 0, max: 100, w: 0, dibujado: 0, cursor: 1, 
 
 function graficoHTML() {
   return `<div class="gst-card gst-graf-card">
-    <div class="gst-cab"><h3>Gasto por herramienta</h3><div class="gst-per" role="tablist">${PERIODOS.map(([k, t]) => `<button type="button" role="tab" data-per="${k}" aria-selected="${G.per === k}">${t}</button>`).join("")}</div></div>
+    <div class="gst-cab"><h3>Día por día <small>mismo período que arriba</small></h3></div>
     <div class="gst-ley" role="group" aria-label="Herramientas"></div>
     <div class="gst-chart">
       <div class="gst-gutter" aria-hidden="true"></div>
@@ -183,7 +184,10 @@ function montarGrafico(R) {
   const ult = CH.dias.length - 1, cada = Math.max(1, Math.ceil(CH.dias.length / Math.max(2, Math.floor((plot.clientWidth || 600) / 76))));
   $(".gst-eje", card).innerHTML = CH.dias.map((x, i) => (ult - i) % cada === 0 ? `<span style="left:${ult ? i / ult * 100 : 50}%;transform:translateX(-${ult ? i / ult * 100 : 50}%)">${dsem(x.fecha)} ${diaCorto(x.fecha)}</span>` : "").join("");
   // formas nuevas y transformación desde las de antes
-  const metas = new Map(CH.series.map((s) => [s.key, curva(CH.dias.map((x) => x.servicios[s.key] || 0))]));
+  // (11/11 c, Lorenzo: «más prolijas, que no hagan movimientos chiquitos»): con más de 10 días el trazo se suaviza
+  // promediando cada día con sus vecinos (¼ · ½ · ¼); el cartel sigue mostrando el monto real de cada día.
+  const suave = (v) => v.length <= 10 ? v : v.map((x, i) => { const a = v[i - 1] ?? x, c = v[i + 1] ?? x; return (a + 2 * x + c) / 4; });
+  const metas = new Map(CH.series.map((s) => [s.key, curva(suave(CH.dias.map((x) => x.servicios[s.key] || 0)))]));
   const movs = [];
   for (const [k, meta] of metas) {
     const p = CH.pistas.get(k);
@@ -293,7 +297,7 @@ function detalle(s) {
   return out.join(" · ");
 }
 function lista(R) {
-  return `<div class="gst-card"><div class="gst-cab"><h3>Por herramienta <small>${G.per === "mes" ? "este mes" : `últimos ${G.per} días`}</small></h3><span class="gst-tot">${usd(R.total)}</span></div>
+  return `<div class="gst-card"><div class="gst-cab"><h3>Cuánto se fue en cada herramienta</h3>${perHTML()}</div><div class="gst-subtot"><span>${G.per === "mes" ? "Este mes" : `Últimos ${G.per} días`}</span><b>${usd(R.total)}</b></div>
     ${R.sv.map((s) => `<div class="gst-fila"><i style="background:${colorDe(s.id)}"></i><div class="gst-nom"><b>${esc(s.nombre)}</b><small>${detalle(s)}</small></div>
       <div class="gst-num"><b>${usd(s.per)}</b><small>${R.total ? Math.round(s.per / R.total * 100) : 0} %</small></div></div>`).join("") || `<p class="gst-vacio">Todavía no hay gastos medidos.</p>`}</div>`;
 }
@@ -324,11 +328,12 @@ function pintar() {
   const R = recortar();
   const ya = $(".gst-graf-card", r);
   if (ya) { // solo cambia lo que depende del período: el gráfico se transforma en su lugar
-    ya.querySelectorAll("[data-per]").forEach((b) => b.setAttribute("aria-selected", b.dataset.per === G.per));
+    r.querySelectorAll("[data-per]").forEach((b) => b.setAttribute("aria-selected", b.dataset.per === G.per));
     $(".gst-kpis", r).outerHTML = kpis();
-    $(".gst-lista", r).innerHTML = lista(R) + fijos();
+    $(".gst-lista", r).innerHTML = lista(R);
+    $(".gst-fijos", r).innerHTML = fijos();
   } else {
-    r.innerHTML = `${cab}${G.error ? `<p class="gst-aviso">No se pudo actualizar: ${esc(G.error)}</p>` : ""}${kpis()}${graficoHTML()}<div class="gst-lista">${lista(R)}${fijos()}</div>`;
+    r.innerHTML = `${cab}${G.error ? `<p class="gst-aviso">No se pudo actualizar: ${esc(G.error)}</p>` : ""}${kpis()}<div class="gst-lista">${lista(R)}</div>${graficoHTML()}<div class="gst-fijos">${fijos()}</div>`;
   }
   montarGrafico(R);
 }
