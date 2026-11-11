@@ -3898,11 +3898,11 @@ function cargarGastos() {
   if (gstCarga) return gstCarga;
   const css = new Promise((ok) => {
     if ($('link[href^="gastos.css"]')) return ok();
-    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "gastos.css?v=1";
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "gastos.css?v=2";
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "gastos.js?v=1";
+    const sc = document.createElement("script"); sc.src = "gastos.js?v=2";
     sc.onload = () => window.Gastos ? ok() : mal(new Error("Gastos no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar Gastos. ¿Hay conexión?")); };
     document.head.appendChild(sc);
