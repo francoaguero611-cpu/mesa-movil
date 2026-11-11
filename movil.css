@@ -258,3 +258,34 @@ html.ms-cel body #main .controles .ms-der .ms-ef-saldo { width: 100%; }
 html.ms-cel body .top { grid-template-areas: "tit av ref menu" "eth eth eth eth"; }
 html.ms-cel body .top .ms-ether.linea { grid-area: eth; width: 100%; height: 38px; overflow-x: auto; scrollbar-width: none; justify-content: space-between; padding: 0 4px 0 10px; }
 html.ms-cel body .top .ms-ether.linea::-webkit-scrollbar { display: none; }
+
+/* (11/11, Lorenzo: «en el celu no se ve bien EtherFi») la regla vieja de arriba (.ms-ether en columna) le ganaba a la línea:
+   los 3 pedazos quedaban uno debajo del otro en 38 px y solo se veía el saldo. Ahora: una fila que entra a lo ancho. */
+html.ms-cel body .top .ms-ether.linea { flex-direction: row; align-items: center; gap: 6px; height: 40px; padding: 0 4px 0 12px; border-radius: 999px; overflow: hidden; }
+html.ms-cel body .top .ms-ether.linea .ms-ef-saldo { width: auto; flex: 0 1 auto; min-width: 0; }
+html.ms-cel body .top .ms-ether.linea .ms-cb { flex: 0 1 auto; min-width: 0; height: 28px; padding: 0 9px; margin-left: auto; }
+html.ms-cel body .top .ms-ether.linea .ms-cb small { font-size: 11px; }
+html.ms-cel body .top .ms-ether.linea .ms-cash-seg { flex: none; }
+html.ms-cel body .top .ms-ether.linea .ms-cash-seg button, html.ms-cel body .top .ms-ether.linea .ms-cal { width: 28px; height: 28px; font-size: 10px; padding: 0; }
+/* (11/11 b) con números reales se pisaban saldo y cashback: nada se encoge, letra justa, sin la palabra «EtherFi» (queda el punto) */
+html.ms-cel body .top .ms-ether.linea { overflow-x: auto; gap: 5px; padding: 0 4px 0 10px; }
+html.ms-cel body .top .ms-ether.linea > * { flex: none; }
+html.ms-cel body .top .ms-ether.linea .ms-ef-saldo small { display: none; }
+html.ms-cel body .top .ms-ether.linea .ms-ef-s { font-size: 14px; }
+html.ms-cel body .top .ms-ether.linea .ms-cb { gap: 5px; padding: 0 8px; }
+html.ms-cel body .top .ms-ether.linea .ms-cb small { font-size: 10.5px; }
+html.ms-cel body .top .ms-ether.linea .ms-cash-v { font-size: 12.5px; }
+/* (11/11 c) filtros de campañas: antes era una fila deslizable y el 3.er elemento quedaba cortado contra el borde (parecía roto).
+   Ahora: Cuenta y Oferta a lo ancho (mitad y mitad) y los botones abajo, todos a la vista. «Columnas» no aplica a las tarjetas. */
+html.ms-cel body .filtro-camp { flex-wrap: wrap !important; overflow: visible; margin: 0 0 12px; padding: 0; gap: 8px; }
+html.ms-cel body .filtro-camp > .campo { flex: 1 1 calc(50% - 4px) !important; max-width: none !important; min-width: 0; }
+html.ms-cel body .filtro-camp > .btn, html.ms-cel body .filtro-camp > .toggle-chico { flex: 0 0 auto; min-height: 38px; padding: 0 12px; font-size: 13px; }
+html.ms-cel body .filtro-camp #b-cols { display: none; }
+/* (11/11 d) Ranking: sin videos elegidos, la barra de renovaciones tapaba un tercio de la pantalla. Vacía = una fila finita. */
+html.ms-cel body .rk-barra.vacia { flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; gap: 10px !important; padding: 8px 10px !important; min-height: 0 !important; }
+html.ms-cel body .rk-barra.vacia .rk-go, html.ms-cel body .rk-barra.vacia .sp { display: none !important; }
+html.ms-cel body .rk-barra.vacia .cuenta { font-size: 0 !important; flex: 1; min-width: 0; }
+html.ms-cel body .rk-barra.vacia .cuenta .num { display: none; }
+html.ms-cel body .rk-barra.vacia .cuenta small { font-size: 12.5px; display: block; color: var(--tx-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* (11/11 e) Umbrales: el saldo de EtherFi salía 3 veces (línea de arriba + esta barra + tarjeta). En el celular va la línea y la tarjeta. */
+html.ms-cel body .umb-pagina > .whop-barra { display: none; }

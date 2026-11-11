@@ -33,15 +33,20 @@ function colorDe(id) {
   return COL_FIJO[(i < 0 ? 0 : i) % COL_FIJO.length];
 }
 
-const PERIODOS = [["7", "7 días"], ["30", "30 días"], ["mes", "Este mes"]];
-const G = { raiz: null, per: ls.get("gst_per2", "7"), datos: null, cargando: false, toast: null, login: null, editando: null, ocultas: new Set() };
-if (!PERIODOS.some(([k]) => k === G.per)) G.per = "7";
+// (11/11 d, Lorenzo) «si quiero ver los gastos de hoy, veo lo de hoy, después 7 días, después 30 días y después personalizado»
+const PERIODOS = [["hoy", "Hoy"], ["7", "7 días"], ["30", "30 días"], ["pers", "Personalizado"]];
+const G = { raiz: null, per: ls.get("gst_per3", "hoy"), datos: null, cargando: false, toast: null, login: null, editando: null, ocultas: new Set(),
+  desde: ls.get("gst_desde", sumar(isoAR(), -13)), hasta: ls.get("gst_hasta", isoAR()) };
+if (!PERIODOS.some(([k]) => k === G.per)) G.per = "hoy";
 
 function rango() {
   const hoy = isoAR();
-  if (G.per === "mes") return [hoy.slice(0, 8) + "01", hoy];
+  if (G.per === "hoy") return [hoy, hoy];
+  if (G.per === "pers") return [G.desde, G.hasta > hoy ? hoy : G.hasta];
   return [sumar(hoy, -(+G.per - 1)), hoy];
 }
+// el gráfico necesita varios días: con «Hoy» muestra los últimos 7 (hoy al final, para comparar)
+function rangoGraf() { const [d, h] = rango(); return G.per === "hoy" ? [sumar(h, -6), h] : [d, h]; }
 
 async function pedir(accion, q = "", body) {
   const r = await fetch(`${API}?accion=${accion}${q}`, { method: body ? "POST" : "GET", cache: "no-store",
@@ -56,7 +61,8 @@ async function cargar() {
   if (!G.raiz) return;
   G.cargando = true; G.raiz.classList.add("cargando");
   const h = isoAR(), m1 = h.slice(0, 8) + "01", d30 = sumar(h, -29);
-  try { G.datos = await pedir("ver", `&desde=${m1 < d30 ? m1 : d30}&hasta=${h}`); G.error = null; }
+  let desde = m1 < d30 ? m1 : d30; if (G.per === "pers" && G.desde < desde) desde = G.desde;
+  try { G.datos = await pedir("ver", `&desde=${desde}&hasta=${h}`); G.error = null; }
   catch (e) { G.error = e.message; }
   G.cargando = false; G.raiz.classList.remove("cargando"); pintar();
 }
@@ -70,7 +76,8 @@ function recortar() {
   return { dias, sv, total, d, h };
 }
 
-const perHTML = () => `<div class="gst-per" role="tablist">${PERIODOS.map(([k, t]) => `<button type="button" role="tab" data-per="${k}" aria-selected="${G.per === k}">${t}</button>`).join("")}</div>`;
+const perHTML = () => `<div class="gst-per-w"><div class="gst-per" role="tablist">${PERIODOS.map(([k, t]) => `<button type="button" role="tab" data-per="${k}" aria-selected="${G.per === k}">${t}</button>`).join("")}</div>${G.per === "pers" ? `<span class="gst-fechas"><label>Desde<input type="date" name="gst-desde" value="${G.desde}" max="${isoAR()}"></label><label>Hasta<input type="date" name="gst-hasta" value="${G.hasta}" max="${isoAR()}"></label></span>` : ""}</div>`;
+const textoPer = () => { const [d, h] = rango(); return G.per === "hoy" ? "Hoy" : G.per === "pers" ? `Del ${diaCorto(d)} al ${diaCorto(h)}` : `Últimos ${G.per} días`; };
 // ---------- tarjetas de arriba ----------
 const plata = (v, dec) => { const n = Number(v || 0); return `<span class="mon">US$</span>${numTx(n, dec ?? (Math.abs(n) < 100 ? 2 : 0))}`; };
 function kpis() {
@@ -109,14 +116,16 @@ function escala(lo0, hi0) { // grilla prolija: paso de 1, 2, 2,5 o 5 que entre e
   }
   return { min: lo, max: hi, ticks: [lo, hi] };
 }
-function curva(vals) { // curva monótona muestreada en x de 0 a 1: suave, pero nunca se pasa de los datos
+// (11/11 d, Lorenzo: «redondas, bien redondas, que suba y baje haciendo curvas prolijas»): curva monótona (21st.dev), armada en la
+// escala de raíz: puntas redondeadas, nunca se pasa de los datos (sin rulitos) y sin temblar cerca de 0.
+function curva(vals) {
   if (!vals.length) return [];
   if (vals.length === 1) return [[0, vals[0]], [1, vals[0]]];
   const ult = vals.length - 1, paso = 1 / ult;
   const pend = vals.slice(1).map((v, i) => (v - vals[i]) / paso);
   const tan = vals.map((_, i) => i === 0 || i === ult ? 0 : (Math.sign(pend[i - 1]) + Math.sign(pend[i])) * Math.min(Math.abs(pend[i - 1]), Math.abs(pend[i]), Math.abs(pend[i - 1] + pend[i]) / 4) || 0);
   if (ult > 1) { tan[0] = (3 * pend[0] - tan[1]) / 2; tan[ult] = (3 * pend[ult - 1] - tan[ult - 1]) / 2; } else { tan[0] = tan[1] = pend[0]; }
-  const n = Math.max(1, Math.min(16, Math.round(192 / ult))), pts = [];
+  const n = Math.max(1, Math.min(40, Math.round(480 / ult))), pts = [];
   for (let i = 0; i < ult; i++) {
     const lo = Math.min(vals[i], vals[i + 1]), hi = Math.max(vals[i], vals[i + 1]);
     for (let s = 0; s < n; s++) {
@@ -151,7 +160,7 @@ const CH = { pistas: new Map(), min: 0, max: 100, w: 0, dibujado: 0, cursor: 1, 
 
 function graficoHTML() {
   return `<div class="gst-card gst-graf-card">
-    <div class="gst-cab"><h3>Día por día <small>mismo período que arriba</small></h3></div>
+    <div class="gst-cab"><h3>Día por día <small class="gst-graf-sub"></small></h3></div>
     <div class="gst-ley" role="group" aria-label="Herramientas"></div>
     <div class="gst-chart">
       <div class="gst-gutter" aria-hidden="true"></div>
@@ -173,8 +182,10 @@ function graficoHTML() {
 function montarGrafico(R) {
   const card = $(".gst-graf-card", G.raiz); if (!card) return;
   const plot = $(".gst-plot", card);
-  CH.dias = R.dias;
-  CH.series = R.sv.filter((s) => R.dias.some((x) => x.servicios[s.id] > 0)).map((s) => ({ key: s.id, label: s.nombre, color: colorDe(s.id) }));
+  const [gd, gh] = rangoGraf();
+  CH.dias = G.datos.dias.filter((x) => x.fecha >= gd && x.fecha <= gh);
+  $(".gst-graf-sub", card).textContent = G.per === "hoy" ? "últimos 7 días, hoy al final" : textoPer().toLowerCase();
+  CH.series = R.sv.filter((s) => CH.dias.some((x) => x.servicios[s.id] > 0)).map((s) => ({ key: s.id, label: s.nombre, color: colorDe(s.id) }));
   // leyenda (prende / apaga cada herramienta)
   $(".gst-ley", card).innerHTML = CH.series.map((s) => `<button type="button" class="gst-tog" data-serie="${esc(s.key)}" aria-pressed="${!G.ocultas.has(s.key)}" style="--serie:${s.color}"><i></i>${esc(s.label)}</button>`).join("");
   // líneas y puntos (se recrean; la forma vieja queda en CH.pistas para transformarla)
@@ -184,10 +195,8 @@ function montarGrafico(R) {
   const ult = CH.dias.length - 1, cada = Math.max(1, Math.ceil(CH.dias.length / Math.max(2, Math.floor((plot.clientWidth || 600) / 76))));
   $(".gst-eje", card).innerHTML = CH.dias.map((x, i) => (ult - i) % cada === 0 ? `<span style="left:${ult ? i / ult * 100 : 50}%;transform:translateX(-${ult ? i / ult * 100 : 50}%)">${dsem(x.fecha)} ${diaCorto(x.fecha)}</span>` : "").join("");
   // formas nuevas y transformación desde las de antes
-  // (11/11 c, Lorenzo: «más prolijas, que no hagan movimientos chiquitos»): con más de 10 días el trazo se suaviza
-  // promediando cada día con sus vecinos (¼ · ½ · ¼); el cartel sigue mostrando el monto real de cada día.
-  const suave = (v) => v.length <= 10 ? v : v.map((x, i) => { const a = v[i - 1] ?? x, c = v[i + 1] ?? x; return (a + 2 * x + c) / 4; });
-  const metas = new Map(CH.series.map((s) => [s.key, curva(suave(CH.dias.map((x) => x.servicios[s.key] || 0)))]));
+  // (11/11 d) la curva se arma ya en la escala de raíz (si no, cerca de 0 la raíz agrandaba cada vaivén y «temblaba»)
+  const metas = new Map(CH.series.map((s) => [s.key, curva(CH.dias.map((x) => raiz(x.servicios[s.key] || 0)))]));
   const movs = [];
   for (const [k, meta] of metas) {
     const p = CH.pistas.get(k);
@@ -231,7 +240,7 @@ function medir() { const p = $(".gst-plot", G.raiz); if (!p) return; CH.w = p.cl
 function pintarGraf() {
   const card = $(".gst-graf-card", G.raiz), w = CH.w; if (!card || !w) return;
   const rm = raiz(CH.max) || 1;
-  const aY = (v) => TOP + (1 - raiz(v) / rm) * (H - TOP);
+  const aY = (u) => TOP + (1 - u / rm) * (H - TOP);   // u = raíz del monto (la forma ya viene en esa escala)
   const at = CH.cursor, ys = [];
   for (const s of CH.series) {
     const p = CH.pistas.get(s.key); if (!p) continue;
@@ -297,7 +306,7 @@ function detalle(s) {
   return out.join(" · ");
 }
 function lista(R) {
-  return `<div class="gst-card"><div class="gst-cab"><h3>Cuánto se fue en cada herramienta</h3>${perHTML()}</div><div class="gst-subtot"><span>${G.per === "mes" ? "Este mes" : `Últimos ${G.per} días`}</span><b>${usd(R.total)}</b></div>
+  return `<div class="gst-card"><div class="gst-cab"><h3>Cuánto se fue en cada herramienta</h3>${perHTML()}</div><div class="gst-subtot"><span>${textoPer()}</span><b>${usd(R.total)}</b></div>
     ${R.sv.map((s) => `<div class="gst-fila"><i style="background:${colorDe(s.id)}"></i><div class="gst-nom"><b>${esc(s.nombre)}</b><small>${detalle(s)}</small></div>
       <div class="gst-num"><b>${usd(s.per)}</b><small>${R.total ? Math.round(s.per / R.total * 100) : 0} %</small></div></div>`).join("") || `<p class="gst-vacio">Todavía no hay gastos medidos.</p>`}</div>`;
 }
@@ -342,7 +351,7 @@ function pintar() {
 function eventos(r) {
   r.addEventListener("click", async (e) => {
     const b = e.target.closest("button"); if (!b) return;
-    if (b.dataset.per) { G.per = b.dataset.per; ls.set("gst_per2", G.per); pintar(); return; }
+    if (b.dataset.per) { const antes = G.per; G.per = b.dataset.per; ls.set("gst_per3", G.per); if (G.per === "pers" || antes === "pers") { pintar(); cargar(); } else pintar(); return; }
     if (b.dataset.serie) return alternar(b.dataset.serie);
     if (b.hasAttribute("data-reintentar")) return cargar();
     if (b.dataset.editar) { G.editando = b.dataset.editar === "nuevo" ? "nuevo" : +b.dataset.editar; pintar(); $(".gst-form input", r)?.focus(); return; }
@@ -352,6 +361,12 @@ function eventos(r) {
       if (b.dataset.seguro !== "1") { b.dataset.seguro = "1"; b.textContent = "¿Seguro? Tocá de nuevo"; return; }
       await guardar({ id: +b.dataset.borrar, borrar: true });
     }
+  });
+  r.addEventListener("change", (e) => {
+    const n = e.target.name; if (n !== "gst-desde" && n !== "gst-hasta") return;
+    if (n === "gst-desde") G.desde = e.target.value || G.desde; else G.hasta = e.target.value || G.hasta;
+    if (G.desde > G.hasta) [G.desde, G.hasta] = [G.hasta, G.desde];
+    ls.set("gst_desde", G.desde); ls.set("gst_hasta", G.hasta); cargar();
   });
   r.addEventListener("submit", async (e) => {
     e.preventDefault(); const f = e.target, fd = new FormData(f);

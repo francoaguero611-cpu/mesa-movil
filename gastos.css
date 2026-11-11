@@ -101,7 +101,7 @@
 .gst-form .gst-acc { grid-column: 1 / -1; }
 .btn.peligro { color: var(--mal, #f59aa6); }
 
-@media (max-width: 820px) { .gst-kpis { grid-template-columns: 1fr 1fr; } .gst-k.heroe { grid-column: 1 / -1; } }
+@media (max-width: 820px) { .gst-kpis { grid-template-columns: 1fr 1fr; } .gst-k.heroe, .gst-k:last-child { grid-column: 1 / -1; } }
 @media (max-width: 560px) {
   .gst-card { padding: 16px; }
   .gst-chart { grid-template-columns: 44px minmax(0, 1fr); }
@@ -109,3 +109,15 @@
   .gst-k { padding: 14px 16px; }
 }
 @media (prefers-reduced-motion: reduce) { .gst-sec * { transition: none !important; } }
+
+/* (11/11 d) períodos Hoy · 7 · 30 · Personalizado (con desde / hasta) */
+.gst-per-w { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.gst-fechas { display: inline-flex; gap: 8px; }
+.gst-fechas label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--tx-2, #b9b9c2); }
+.gst-fechas input { font: 400 12.5px var(--f-texto); color: var(--tx, #f1f1f3); background: rgba(255,255,255,.04); border: 1px solid var(--linea-2, rgba(255,255,255,.12)); border-radius: 999px; padding: 4px 10px; color-scheme: dark; }
+@media (max-width: 560px) {
+  .gst-lista .gst-cab { flex-direction: column; align-items: stretch; }
+  .gst-per-w { justify-content: stretch; }
+  .gst-per { width: 100%; } .gst-per button { flex: 1; padding: 6px 4px; }
+  .gst-fechas { width: 100%; } .gst-fechas label { flex: 1; } .gst-fechas input { flex: 1; min-width: 0; }
+}
