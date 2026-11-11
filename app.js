@@ -3744,6 +3744,8 @@ function eventoPendiente() {
 const SECCIONES = [
   { id: "dash", nombre: "Dashboard", raiz: "#carr", icono: "M4 20 C 9 19.6, 15 20.2, 20.5 19.8 M6.5 17 V11.5 M11.5 17 V6.5 M16.5 17 V9.5",
     montar: () => { try { history.replaceState(null, "", location.pathname + location.search); } catch {} montar(); window.scrollTo(0, 0); } },
+  { id: "gastos", nombre: "Gastos", raiz: "#gst", icono: "M12 3.2 V20.8 M16.4 6.6 C 15.2 5.4, 13.7 5, 12 5 C 9.6 5, 7.7 6.3, 7.7 8.4 C 7.7 13, 16.6 10.8, 16.6 15.6 C 16.6 17.8, 14.6 19, 12 19 C 10 19, 8.4 18.4, 7.2 17.2",
+    montar: () => montarGastos() }, // (11/11, Lorenzo) gastos de la empresa por día: RunPod, APIMart, ElevenLabs, Gemini, AWS y suscripciones
   // (06/11, Lorenzo) Reportes ya no es una sección: lo muestra Jarvis cuando se le pide «resumen» (montarReportes queda por si vuelve)
   { id: "umbrales", nombre: "Umbrales", raiz: "#sec-umb", icono: "M4.5 15.5 C 4.6 10.8, 8 7.2, 12 7.1 C 16.1 7, 19.5 10.6, 19.5 15.4 M12 15.2 L15.4 10.6 M3.8 18.6 H20.2",
     montar: () => montarUmbrales() }, // (02/11) saldo de Whop, pagos rechazados y umbrales de cada cuenta (antes, al final del Dashboard)
@@ -3887,6 +3889,44 @@ async function montarAtc() {
   }
   if (S.vista !== "atc" || !$("#atc")) return;
   window.Atc.montar($("#atc"), { login: (msg) => login(msg), toast });
+}
+
+// ---------- Gastos (11/11, Lorenzo): gastos de la empresa por día; gastos.js se carga la primera vez ----------
+let gstCarga = null;
+function cargarGastos() {
+  if (window.Gastos) return Promise.resolve();
+  if (gstCarga) return gstCarga;
+  const css = new Promise((ok) => {
+    if ($('link[href^="gastos.css"]')) return ok();
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "gastos.css?v=1";
+    l.onload = l.onerror = () => ok(); document.head.appendChild(l);
+  });
+  const js = new Promise((ok, mal) => {
+    const sc = document.createElement("script"); sc.src = "gastos.js?v=1";
+    sc.onload = () => window.Gastos ? ok() : mal(new Error("Gastos no arrancó"));
+    sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar Gastos. ¿Hay conexión?")); };
+    document.head.appendChild(sc);
+  });
+  gstCarga = Promise.all([css, js]).catch((e) => { gstCarga = null; throw e; });
+  return gstCarga;
+}
+async function montarGastos() {
+  cerrarMenu(); pararRanking();
+  S.vista = "gastos"; ls.set("dash_seccion", "gastos");
+  try { history.replaceState(null, "", location.pathname + location.search + "#gastos"); } catch {}
+  pintarNav();
+  $("#main").innerHTML = `<section class="gst-sec" id="gst" aria-label="Gastos de la empresa"><p class="vacio"><span class="cargador"></span>Abriendo Gastos…</p></section>`;
+  pintarBarra();
+  window.scrollTo(0, 0);
+  try { await cargarGastos(); }
+  catch (e) {
+    if (S.vista !== "gastos" || !$("#gst")) return;
+    $("#gst").innerHTML = `<div class="err-box" role="alert"><b>No se pudo abrir Gastos.</b> ${esc(e.message)}<div><button type="button" class="btn chico" id="gst-reintentar">Reintentar</button></div></div>`;
+    $("#gst-reintentar").onclick = () => montarGastos();
+    return;
+  }
+  if (S.vista !== "gastos" || !$("#gst")) return;
+  window.Gastos.montar($("#gst"), { login: (msg) => login(msg), toast });
 }
 
 // ---------- Umbrales (02/11, Lorenzo): sección propia con el saldo de Whop grande, pagos rechazados y la barra de cada cuenta ----------
