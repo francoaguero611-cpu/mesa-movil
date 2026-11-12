@@ -313,26 +313,27 @@ window.MesaTend = (g, campo, valor, neutro) => {
     <path d="${d}" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>`;
 };
 // (12/11, Lorenzo) «Por oferta»: tendencia de cada oferta — «saber si se está mejorando o empeorando».
-// ROAS de los últimos 3 días (ayer y 2 antes) contra los 4 anteriores, ponderado por gasto (facturación ÷ gasto).
-// ±10 % = estable. Mini curva del ROAS diario de los 7 días; gasto con flechita aparte.
+// (12/11 b, Lorenzo: «Yogur AR decía empeorando cuando ayer tenía 12 % de margen y hoy viene con 40 %») → se mide por MARGEN
+// (ganancia ÷ facturación) e incluye HOY: margen de hoy contra el de ayer. ±5 puntos = estable. Si hoy todavía gastó menos de
+// US$ 10, compara ayer contra anteayer (y lo dice). Curva: margen de cada día, últimos 6 días + hoy.
 window.MesaOfTend = (clave) => {
   const hoy = isoAR(new Date()), xs = [];
-  for (let n = 7; n >= 1; n--) { const iso = isoMenos(hoy, n), g = DIAS[iso]?.[clave]; xs.push({ iso, g: +(g?.gasto || 0), f: +(g?.facturacion || 0) }); }
-  const con = xs.filter((x) => x.g > 0); if (con.length < 3) return "";
-  const suma = (a) => a.reduce((s, x) => ({ g: s.g + x.g, f: s.f + x.f }), { g: 0, f: 0 });
-  const rec = suma(xs.slice(4)), ant = suma(xs.slice(0, 4));
-  if (!rec.g || !ant.g) return "";
-  const rR = rec.f / rec.g, rA = ant.f / ant.g, dif = rA ? (rR - rA) / rA : 0;
-  const est = dif >= 0.1 ? "sube" : dif <= -0.1 ? "baja" : "igual";
+  for (let n = 6; n >= 1; n--) { const iso = isoMenos(hoy, n), g = DIAS[iso]?.[clave]; if (g && +g.gasto > 0) xs.push({ iso, g: +g.gasto, m: g.margen != null ? +g.margen : null }); }
+  const gh = (S?.datos?.hoy?.grupos || []).find((x) => x.clave === clave)?.metricas;
+  if (gh && +gh.gasto > 0) xs.push({ iso: hoy, g: +gh.gasto, m: gh.margen != null ? +gh.margen : null });
+  const ys = xs.filter((x) => x.m != null && isFinite(x.m)); if (ys.length < 2) return "";
+  let a = ys[ys.length - 2], b = ys[ys.length - 1], nb = "hoy", na = "ayer";
+  if (b.iso === hoy && b.g < 10) { if (ys.length < 3) return ""; b = ys[ys.length - 2]; a = ys[ys.length - 3]; nb = "ayer"; na = "anteayer"; }
+  else if (b.iso !== hoy) { nb = "ayer"; na = "anteayer"; }
+  const dif = (b.m - a.m) * 100;
+  const est = dif >= 5 ? "sube" : dif <= -5 ? "baja" : "igual";
   const txt = est === "sube" ? "Mejorando" : est === "baja" ? "Empeorando" : "Estable";
-  const gR = rec.g / 3, gA = ant.g / 4, dg = gA ? (gR - gA) / gA : 0;
-  const f2 = (v) => v.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const ys = con.map((x) => x.f / x.g), w = 120, h = 28, min = Math.min(...ys), max = Math.max(...ys), r = max - min || 1;
-  const P = ys.map((v, i) => [(i / (ys.length - 1)) * w, h - 3 - ((v - min) / r) * (h - 6)]);
-  const flecha = Math.abs(dg) < 0.1 ? "" : `<span class="mo-tg num" title="Gasto por día: últimos 3 días contra los 4 anteriores">gasto ${dg > 0 ? "↑" : "↓"} ${Math.round(Math.abs(dg) * 100)} %</span>`;
-  return `<span class="mo-tend ${est}" title="ROAS de los últimos 3 días (${f2(rR)}) contra los 4 anteriores (${f2(rA)})">
+  const p = (v) => Math.round(v * 100).toLocaleString("es-AR") + " %";
+  const vals = ys.map((x) => x.m), w = 120, h = 28, min = Math.min(...vals), max = Math.max(...vals), r = max - min || 1;
+  const P = vals.map((v, i) => [(i / (vals.length - 1)) * w, h - 3 - ((v - min) / r) * (h - 6)]);
+  return `<span class="mo-tend ${est}" title="Margen (ganancia ÷ facturación) de cada día, últimos 7 días. Compara ${nb} contra ${na}.">
     <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><path d="${curva(P)}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>
-    <span class="mo-tt"><b>${est === "sube" ? "▲" : est === "baja" ? "▼" : "●"} ${txt}</b><span class="num">ROAS ${f2(rA)} → ${f2(rR)}</span></span>${flecha}</span>`;
+    <span class="mo-tt"><b>${est === "sube" ? "▲" : est === "baja" ? "▼" : "●"} ${txt}</b><span class="num">margen ${na} ${p(a.m)} → ${nb} ${p(b.m)}</span></span></span>`;
 };
 // pasar el mouse por el gráfico: círculo en el punto + fecha, número de ese día y % contra ahora
 const DSEM = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
