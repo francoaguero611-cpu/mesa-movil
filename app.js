@@ -3942,7 +3942,7 @@ function cargarLanzamientos() {
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "lanzamientos.js?v=4";
+    const sc = document.createElement("script"); sc.src = "lanzamientos.js?v=5";
     sc.onload = () => window.Lanzamientos ? ok() : mal(new Error("Lanzamientos no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar Lanzamientos. ¿Hay conexión?")); };
     document.head.appendChild(sc);

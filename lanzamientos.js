@@ -110,6 +110,16 @@ function burbuja(it, dias) {
     <tbody>${filas}</tbody></table></div></article>`;
 }
 
+function totalDe(lista, dias) {
+  const T = { gasto: 0, ventas: 0, facturacion: 0, por_dia: {} };
+  for (const x of dias) T.por_dia[x] = { gasto: 0, ventas: 0, facturacion: 0, roas: null };
+  const sumar = (m) => { T.gasto += m.gasto; T.ventas += m.ventas; T.facturacion += m.facturacion;
+    for (const x of dias) { const p = m.por_dia?.[x]; if (!p) continue; T.por_dia[x].gasto += p.gasto; T.por_dia[x].ventas += p.ventas; T.por_dia[x].facturacion += p.facturacion; } };
+  for (const it of lista) { if (it.nueva) sumar(it.metricas); else for (const s of it.conjuntos || []) sumar(s.metricas); }
+  for (const x of dias) { const p = T.por_dia[x]; p.roas = p.gasto > 0 ? p.facturacion / p.gasto : null; }
+  T.roas = T.gasto > 0 ? T.facturacion / T.gasto : null;
+  return T;
+}
 function pintar() {
   const R = L.raiz; if (!R) return;
   const hoy = isoAR(), f = L.fecha || sumar(hoy, -1), d = L.datos;
@@ -120,7 +130,10 @@ function pintar() {
   const tiposCon = Object.keys(TIPOS).filter((t) => items.some((x) => x.tipo === t));
   if (L.tipo !== "todo" && !tiposCon.includes(L.tipo)) L.tipo = "todo";
   const dias = listo ? d.dias : [];
-  const T = listo ? d.total : null;
+  // (12/11, Lorenzo) los números de arriba son los de la sección filtrada: Todo, Ofertas nuevas, Nuevos mercados, Escala, Renos.
+  // Campaña nueva = la campaña entera; madre = solo sus conjuntos nuevos.
+  const secTx = L.tipo === "todo" ? "Todo lo que salió" : TIPOS[L.tipo]?.[0] || "";
+  const T = listo ? totalDe(items.filter((x) => L.tipo === "todo" || x.tipo === L.tipo), dias) : null;
   const cab = `<div class="lz-top"><div><h2>Lanzamientos</h2><p class="lz-sub">Solo lo que salió un día y cómo viene.</p></div>
     ${d?.generado ? `<span class="lz-med">actualizado ${horaAR(d.generado)}${L.cargando ? " · actualizando…" : ""}</span>` : ""}</div>
     <div class="lz-ctrl">
@@ -136,17 +149,17 @@ function pintar() {
   else if (!items.length) cuerpo = `<p class="vacio">El ${diaCorto(f)} no salió nada nuevo (ni campañas ni conjuntos).</p>`;
   else {
     const rango = dias.length === 1 ? diaCorto(dias[0]) : `${diaCorto(dias[0])} → ${diaCorto(dias[dias.length - 1])}`;
-    cuerpo = `<div class="lz-kpis">
-      <div class="lz-k heroe"><span class="lz-kt">ROAS de lo que salió</span><span class="lz-val num">${roasTx(T.roas)}</span><small>${rango}</small></div>
-      <div class="lz-k"><span class="lz-kt">Gasto</span><span class="lz-val num">${usd(T.gasto)}</span><small>solo lo nuevo</small></div>
-      <div class="lz-k"><span class="lz-kt">Ventas</span><span class="lz-val num">${T.ventas}</span><small>${usd(T.facturacion)} facturado</small></div>
+    cuerpo = `<div class="lz-pills lz-tipos" role="tablist"><button type="button" role="tab" aria-selected="${L.tipo === "todo"}" data-tipo="todo">Todo</button>${[...new Set([...FIJOS, ...tiposCon])].sort((x, y) => Object.keys(TIPOS).indexOf(x) - Object.keys(TIPOS).indexOf(y)).map((t) => `<button type="button" role="tab" aria-selected="${L.tipo === t}" data-tipo="${t}"${tiposCon.includes(t) ? "" : " disabled"}>${TIPOS[t][0]} <span class="num">${cuenta(t)}</span></button>`).join("")}</div>
+    <div class="lz-kpis">
+      <div class="lz-k heroe"><span class="lz-kt">ROAS · ${esc(secTx)}</span><span class="lz-val num">${roasTx(T.roas)}</span><small>${rango}</small></div>
+      <div class="lz-k"><span class="lz-kt">Gasto · ${esc(secTx)}</span><span class="lz-val num">${usd(T.gasto)}</span><small>${L.tipo === "reno" || L.tipo === "todo" ? "renos: solo los conjuntos nuevos" : "campañas enteras"}</small></div>
+      <div class="lz-k"><span class="lz-kt">Ventas · ${esc(secTx)}</span><span class="lz-val num">${T.ventas}</span><small>${usd(T.facturacion)} facturado</small></div>
       <div class="lz-k"><span class="lz-kt">Qué salió</span><span class="lz-que">${tiposCon.map((t) => `<span><b>${cuenta(t)}</b> ${{ reno: ["conjunto de renos", "conjuntos de renos"], conjunto: ["conjunto nuevo", "conjuntos nuevos"], testeo: ["testeo", "testeos"], oferta: ["oferta nueva", "ofertas nuevas"], mercado: ["mercado nuevo", "mercados nuevos"], retesteo: ["re-testeo", "re-testeos"], escala: ["escala horizontal", "escalas horizontales"] }[t][cuenta(t) === 1 ? 0 : 1]}</span>`).join("")}</span></div>
     </div>
-    ${dias.length > 1 ? `<div class="lz-card lz-dias"><table><thead><tr><th>Todo lo nuevo, día por día</th>${dias.map((x) => `<th>${diaCorto(x)}</th>`).join("")}<th>Total</th></tr></thead>
+    ${dias.length > 1 ? `<div class="lz-card lz-dias"><table><thead><tr><th>${esc(secTx)}, día por día</th>${dias.map((x) => `<th>${diaCorto(x)}</th>`).join("")}<th>Total</th></tr></thead>
       <tbody><tr><td>ROAS</td>${dias.map((x) => `<td class="lz-r ${colR(T.por_dia[x].roas)}">${T.por_dia[x].gasto > 0 ? roasTx(T.por_dia[x].roas) : "—"}</td>`).join("")}<td class="lz-r tot ${colR(T.roas)}">${roasTx(T.roas)}</td></tr>
       <tr><td>Gasto</td>${dias.map((x) => `<td class="num">${usd(T.por_dia[x].gasto)}</td>`).join("")}<td class="num">${usd(T.gasto)}</td></tr>
       <tr><td>Ventas</td>${dias.map((x) => `<td class="num">${T.por_dia[x].ventas}</td>`).join("")}<td class="num">${T.ventas}</td></tr></tbody></table></div>` : ""}
-    <div class="lz-pills lz-tipos" role="tablist"><button type="button" role="tab" aria-selected="${L.tipo === "todo"}" data-tipo="todo">Todo</button>${[...new Set([...FIJOS, ...tiposCon])].sort((x, y) => Object.keys(TIPOS).indexOf(x) - Object.keys(TIPOS).indexOf(y)).map((t) => `<button type="button" role="tab" aria-selected="${L.tipo === t}" data-tipo="${t}"${tiposCon.includes(t) ? "" : " disabled"}>${TIPOS[t][0]} <span class="num">${cuenta(t)}</span></button>`).join("")}</div>
     ${tiposCon.filter((t) => L.tipo === "todo" || L.tipo === t).map((t) => `<section class="lz-grupo-t"><div class="lz-gt"><h3>${TIPOS[t][0]} <span class="num">${items.filter((x) => x.tipo === t).length}</span></h3><small>${TIPOS[t][1]}</small></div>
       ${items.filter((x) => x.tipo === t).map((x) => burbuja(x, dias)).join("")}</section>`).join("")}
     ${d.errores?.length ? `<p class="lz-aviso">Faltan datos de: ${esc(d.errores.join(" · "))}</p>` : ""}
