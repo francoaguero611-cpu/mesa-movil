@@ -297,16 +297,19 @@ function curva(P) {
   return d;
 }
 window.MesaTend = (g, campo, valor, neutro) => {
-  const se = serieDe(g.clave, campo); if (!se) return "";
-  const ys = se.map((x) => x.v);
-  const ult = ys[ys.length - 1], prev = ys.slice(0, -1), prom = prev.reduce((a, b) => a + b, 0) / prev.length;
+  const se0 = serieDe(g.clave, campo); if (!se0) return "";
+  const ys0 = se0.map((x) => x.v);
+  const ult = ys0[ys0.length - 1], prev = ys0.slice(0, -1), prom = prev.reduce((a, b) => a + b, 0) / prev.length;
   const sube = ult >= prom, pct = prom ? Math.abs((ult - prom) / prom) * 100 : 0;
+  // (12/11, Lorenzo) el último punto de la línea es HOY con el valor en vivo, no ayer
+  const se = (valor != null && isFinite(valor) && typeof S !== "undefined" && S.periodo === "hoy") ? [...se0, { iso: isoAR(new Date()), v: +valor, hoy: 1 }] : se0;
+  const ys = se.map((x) => x.v);
   if (neutro) return `<span class="ms-tend neutro num">${pct.toLocaleString("es-AR", { maximumFractionDigits: 1 })} % ${sube ? "más" : "menos"} que el promedio de la semana (ayer)</span>`;
   const w = 300, h = 80, min = Math.min(...ys), max = Math.max(...ys), rango = max - min || 1, n = ys.length;
   const x = (i) => (i / (n - 1)) * w, y = (v) => h - 6 - ((v - min) / rango) * (h - 26);
   const P = ys.map((v, i) => [x(i), y(v)]), d = curva(P);
   const id = "mg" + campo + Math.random().toString(36).slice(2, 6);
-  const datos = encodeURIComponent(JSON.stringify({ c: campo, a: valor, p: se.map((s2, i) => [s2.iso, s2.v, +(P[i][1] / h).toFixed(4)]) }));
+  const datos = encodeURIComponent(JSON.stringify({ c: campo, a: valor, p: se.map((s2, i) => [s2.iso, s2.v, +(P[i][1] / h).toFixed(4), s2.hoy || 0]) }));
   return `<svg class="ms-graf ${sube ? "sube" : "baja"}" data-ms="${datos}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-label="${sube ? "Viene subiendo" : "Viene bajando"} en los últimos 7 días" role="img">
     <defs><linearGradient id="${id}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="currentColor" stop-opacity=".34"/><stop offset="1" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs>
     <path d="${d} L${w},${h} L0,${h} Z" fill="url(#${id})"/>
@@ -367,7 +370,7 @@ document.addEventListener("pointermove", (e) => {
   // (06/11, Lorenzo) solo si el mouse está cerca de la línea (no en toda la tarjeta)
   const yLinea = yCurva(svg, (e.clientX - rs.left) / rs.width);
   if (yLinea == null || Math.abs(e.clientY - (rs.top + yLinea * rs.height)) > 16) { card.classList.remove("ms-hover"); return; }
-  const rel = Math.max(0, Math.min(1, (e.clientX - rs.left) / rs.width)), i = Math.round(rel * (n - 1)), [iso, v, yN] = info.p[i];
+  const rel = Math.max(0, Math.min(1, (e.clientX - rs.left) / rs.width)), i = Math.round(rel * (n - 1)), [iso, v, yN, esHoy] = info.p[i];
   let punto = $(".ms-punto", card), tip = $(".ms-tip", card), guia = $(".ms-guia", card);
   if (!punto) { punto = document.createElement("span"); punto.className = "ms-punto"; guia = document.createElement("span"); guia.className = "ms-guia"; tip = document.createElement("span"); tip.className = "ms-tip"; card.append(guia, punto, tip); }
   const px = rs.left - rc.left + (i / (n - 1)) * rs.width, py = rs.top - rc.top + yN * rs.height;
@@ -375,7 +378,7 @@ document.addEventListener("pointermove", (e) => {
   punto.style.color = getComputedStyle(svg).color;
   const ahora = info.a, dif = v ? ((ahora - v) / Math.abs(v)) * 100 : null;
   const f = new Date(iso + "T12:00:00Z"), fecha = `${DSEM[f.getUTCDay()]} ${f.getUTCDate()}/${f.getUTCMonth() + 1}`;
-  tip.innerHTML = `<small>${fecha}</small><b class="num">${fmtCampo(info.c, v)}</b>${dif == null || !isFinite(dif) ? "" : `<em class="num ${dif >= 0 ? "sube" : "baja"}">ahora ${dif >= 0 ? "+" : "−"}${Math.abs(dif).toLocaleString("es-AR", { maximumFractionDigits: 1 })} %</em>`}`;
+  tip.innerHTML = `<small>${fecha}${esHoy ? " · hoy" : ""}</small><b class="num">${fmtCampo(info.c, v)}</b>${esHoy ? `<em class="num">en vivo</em>` : dif == null || !isFinite(dif) ? "" : `<em class="num ${dif >= 0 ? "sube" : "baja"}">ahora ${dif >= 0 ? "+" : "−"}${Math.abs(dif).toLocaleString("es-AR", { maximumFractionDigits: 1 })} %</em>`}`;
   const tw = tip.offsetWidth || 120;
   tip.style.left = Math.max(8, Math.min(rc.width - tw - 8, px - tw / 2)) + "px";
   tip.style.top = Math.max(6, py - (tip.offsetHeight || 54) - 12) + "px";
