@@ -20,8 +20,12 @@ const diaCorto = (f) => `${DSEM[new Date(f + "T12:00:00Z").getUTCDay()]} ${+f.sl
 const horaAR = (iso) => iso ? new Date(Date.parse(iso) - 3 * 3600e3).toISOString().slice(11, 16) : "";
 const colR = (r) => r == null ? "" : r < 1.3 ? "mal" : r >= 2 ? "bien" : "medio";
 const roasTx = (r) => r == null ? "—" : num(r);
-const TIPOS = { testeo: ["Testeos y aperturas", "Una burbuja por oferta y mercado"], escala: ["Escala", "Campañas nuevas de winners, CostCap, BidCap…"],
+const TIPOS = { oferta: ["Ofertas nuevas", "Testeos de ofertas que nunca salieron"], mercado: ["Nuevos mercados", "Aperturas: ofertas que ya teníamos, en un país nuevo"],
+  retesteo: ["Re-testeos", "Misma oferta y mismo mercado que ya habían salido"], testeo: ["Testeos", "Campañas nuevas"],
+  escala: ["Escala horizontal", "Winners de campañas que ya teníamos, en otras CP"],
   reno: ["Renos", "Una burbuja por campaña madre: su total y, pegados abajo, solo los conjuntos nuevos"], conjunto: ["Otros conjuntos nuevos", "Conjuntos nuevos en campañas que ya existían"] };
+// (12/11 c, Lorenzo) filtros siempre a la vista, aunque ese día no haya nada de ese tipo
+const FIJOS = ["oferta", "mercado", "escala", "reno"];
 const ESTADO = { ACTIVE: ["Prendido", "on"], PAUSED: ["Apagado", "off"], CAMPAIGN_PAUSED: ["Campaña apagada", "off"], ADSET_PAUSED: ["Apagado", "off"],
   WITH_ISSUES: ["Con problemas", "mal"], DISAPPROVED: ["Rechazado", "mal"], PENDING_REVIEW: ["En revisión", "rev"], IN_PROCESS: ["Procesando", "rev"] };
 const VER = [["desde", "Desde que salió"], ["dia", "Solo ese día"], ["hoy", "Solo hoy"]];
@@ -136,13 +140,13 @@ function pintar() {
       <div class="lz-k heroe"><span class="lz-kt">ROAS de lo que salió</span><span class="lz-val num">${roasTx(T.roas)}</span><small>${rango}</small></div>
       <div class="lz-k"><span class="lz-kt">Gasto</span><span class="lz-val num">${usd(T.gasto)}</span><small>solo lo nuevo</small></div>
       <div class="lz-k"><span class="lz-kt">Ventas</span><span class="lz-val num">${T.ventas}</span><small>${usd(T.facturacion)} facturado</small></div>
-      <div class="lz-k"><span class="lz-kt">Qué salió</span><span class="lz-que">${tiposCon.map((t) => `<span><b>${cuenta(t)}</b> ${{ reno: ["conjunto de renos", "conjuntos de renos"], conjunto: ["conjunto nuevo", "conjuntos nuevos"], testeo: ["testeo o apertura", "testeos y aperturas"], escala: ["campaña de escala", "campañas de escala"] }[t][cuenta(t) === 1 ? 0 : 1]}</span>`).join("")}</span></div>
+      <div class="lz-k"><span class="lz-kt">Qué salió</span><span class="lz-que">${tiposCon.map((t) => `<span><b>${cuenta(t)}</b> ${{ reno: ["conjunto de renos", "conjuntos de renos"], conjunto: ["conjunto nuevo", "conjuntos nuevos"], testeo: ["testeo", "testeos"], oferta: ["oferta nueva", "ofertas nuevas"], mercado: ["mercado nuevo", "mercados nuevos"], retesteo: ["re-testeo", "re-testeos"], escala: ["escala horizontal", "escalas horizontales"] }[t][cuenta(t) === 1 ? 0 : 1]}</span>`).join("")}</span></div>
     </div>
     ${dias.length > 1 ? `<div class="lz-card lz-dias"><table><thead><tr><th>Todo lo nuevo, día por día</th>${dias.map((x) => `<th>${diaCorto(x)}</th>`).join("")}<th>Total</th></tr></thead>
       <tbody><tr><td>ROAS</td>${dias.map((x) => `<td class="lz-r ${colR(T.por_dia[x].roas)}">${T.por_dia[x].gasto > 0 ? roasTx(T.por_dia[x].roas) : "—"}</td>`).join("")}<td class="lz-r tot ${colR(T.roas)}">${roasTx(T.roas)}</td></tr>
       <tr><td>Gasto</td>${dias.map((x) => `<td class="num">${usd(T.por_dia[x].gasto)}</td>`).join("")}<td class="num">${usd(T.gasto)}</td></tr>
       <tr><td>Ventas</td>${dias.map((x) => `<td class="num">${T.por_dia[x].ventas}</td>`).join("")}<td class="num">${T.ventas}</td></tr></tbody></table></div>` : ""}
-    <div class="lz-pills lz-tipos" role="tablist"><button type="button" role="tab" aria-selected="${L.tipo === "todo"}" data-tipo="todo">Todo</button>${tiposCon.map((t) => `<button type="button" role="tab" aria-selected="${L.tipo === t}" data-tipo="${t}">${TIPOS[t][0]} <span class="num">${cuenta(t)}</span></button>`).join("")}</div>
+    <div class="lz-pills lz-tipos" role="tablist"><button type="button" role="tab" aria-selected="${L.tipo === "todo"}" data-tipo="todo">Todo</button>${[...new Set([...FIJOS, ...tiposCon])].sort((x, y) => Object.keys(TIPOS).indexOf(x) - Object.keys(TIPOS).indexOf(y)).map((t) => `<button type="button" role="tab" aria-selected="${L.tipo === t}" data-tipo="${t}"${tiposCon.includes(t) ? "" : " disabled"}>${TIPOS[t][0]} <span class="num">${cuenta(t)}</span></button>`).join("")}</div>
     ${tiposCon.filter((t) => L.tipo === "todo" || L.tipo === t).map((t) => `<section class="lz-grupo-t"><div class="lz-gt"><h3>${TIPOS[t][0]} <span class="num">${items.filter((x) => x.tipo === t).length}</span></h3><small>${TIPOS[t][1]}</small></div>
       ${items.filter((x) => x.tipo === t).map((x) => burbuja(x, dias)).join("")}</section>`).join("")}
     ${d.errores?.length ? `<p class="lz-aviso">Faltan datos de: ${esc(d.errores.join(" · "))}</p>` : ""}

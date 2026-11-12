@@ -3938,11 +3938,11 @@ function cargarLanzamientos() {
   if (lzCarga) return lzCarga;
   const css = new Promise((ok) => {
     if ($('link[href^="lanzamientos.css"]')) return ok();
-    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "lanzamientos.css?v=5";
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "lanzamientos.css?v=7";
     l.onload = l.onerror = () => ok(); document.head.appendChild(l);
   });
   const js = new Promise((ok, mal) => {
-    const sc = document.createElement("script"); sc.src = "lanzamientos.js?v=2";
+    const sc = document.createElement("script"); sc.src = "lanzamientos.js?v=4";
     sc.onload = () => window.Lanzamientos ? ok() : mal(new Error("Lanzamientos no arrancó"));
     sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar Lanzamientos. ¿Hay conexión?")); };
     document.head.appendChild(sc);
