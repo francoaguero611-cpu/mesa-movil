@@ -1045,7 +1045,7 @@ function pintarOfertasMesa(gs) {
     <div class="mesa-of-lista">${xs.map(({ g, i }) => { const m = g.metricas || {}, gan = m.ganancia;
       return `<button type="button" class="mesa-of-t${i === S.idx ? " act" : ""}" data-ir-of="${i}"><span class="mo-cab">${g.bandera ? `<span class="ban" aria-hidden="true">${esc(g.bandera)}</span>` : ""}<b>${esc(g.etiqueta || g.oferta || "")}</b></span>
         <span class="mo-e">Ganancia</span><span class="mo-v num ${gan == null ? "" : gan < 0 ? "neg" : "gana"}">${usdG(gan)}</span>
-        <span class="mo-pills"><span class="roas ${colorRoas(m.roas)}">${roasTx(m.roas)}</span><span class="mo-g num">${usdG(m.gasto)} gastados</span></span></button>`; }).join("")}</div>`;
+        <span class="mo-pills"><span class="roas ${colorRoas(m.roas)}">${roasTx(m.roas)}</span><span class="mo-g num">${usdG(m.gasto)} gastados</span></span>${window.MesaOfTend ? window.MesaOfTend(g.clave) : ""}</button>`; }).join("")}</div>`;
   const lista = $(".mesa-of-lista", box); lista.scrollLeft = scroll;
   $$("[data-ir-of]", box).forEach((b) => b.onclick = () => { irA(+b.dataset.irOf); $("#carr")?.scrollIntoView({ behavior: reducido() ? "auto" : "smooth", block: "start" }); });
   $$("[data-of]", box).forEach((b) => b.onclick = () => lista.scrollBy({ left: +b.dataset.of * lista.clientWidth * 0.8, behavior: reducido() ? "auto" : "smooth" }));
@@ -3749,6 +3749,8 @@ const SECCIONES = [
   // (06/11, Lorenzo) Reportes ya no es una sección: lo muestra Jarvis cuando se le pide «resumen» (montarReportes queda por si vuelve)
   { id: "umbrales", nombre: "Umbrales", raiz: "#sec-umb", icono: "M4.5 15.5 C 4.6 10.8, 8 7.2, 12 7.1 C 16.1 7, 19.5 10.6, 19.5 15.4 M12 15.2 L15.4 10.6 M3.8 18.6 H20.2",
     montar: () => montarUmbrales() }, // (02/11) saldo de Whop, pagos rechazados y umbrales de cada cuenta (antes, al final del Dashboard)
+  { id: "lanzamientos", nombre: "Lanzamientos", raiz: "#lz", icono: "M12 20.5 V14.5 M12 14.5 C 9.6 12.4, 9.2 8.6, 12 3.6 C 14.8 8.6, 14.4 12.4, 12 14.5 Z M9.6 12.6 L6.6 15.6 L9.4 16 M14.4 12.6 L17.4 15.6 L14.6 16 M11.9 8.6 L12.1 9.4",
+    montar: () => montarLanzamientos(), ya: () => window.Lanzamientos?.refrescar() }, // (12/11, Lorenzo) solo lo que salió un día (testeos, aperturas, renos) y cómo viene
   { id: "ranking", nombre: "Ranking", raiz: "#rk", icono: "M4.5 6 C 6 5.8, 7.4 5.9, 8.6 6 M4.5 12 C 6.5 11.8, 9 11.9, 11.6 12 M4.5 18 C 7.5 17.8, 11 17.9, 14.6 18 M15.5 8.5 L18.5 5.2 L21 8.4",
     montar: (o) => montarRanking(o), ya: (o) => { if (o.pedido != null) abrirPedido(o.pedido); } },
   { id: "cazador", nombre: "Cazador", raiz: "#caz", icono: "M12 4.2 C 16.5 4, 19.9 7.4, 19.8 12 C 19.7 16.6, 16.4 19.9, 12 19.8 C 7.5 19.7, 4.2 16.5, 4.2 12 C 4.3 7.6, 7.4 4.3, 12.6 4.3 M12 1.8 V7 M12 17 V22.2 M1.8 12 H7 M17 12 H22.2 M11.9 11.6 L12.1 12.4",
@@ -3927,6 +3929,44 @@ async function montarGastos() {
   }
   if (S.vista !== "gastos" || !$("#gst")) return;
   window.Gastos.montar($("#gst"), { login: (msg) => login(msg), toast });
+}
+
+// ---------- Lanzamientos (12/11, Lorenzo): lo que salió un día y cómo viene; lanzamientos.js se carga la primera vez ----------
+let lzCarga = null;
+function cargarLanzamientos() {
+  if (window.Lanzamientos) return Promise.resolve();
+  if (lzCarga) return lzCarga;
+  const css = new Promise((ok) => {
+    if ($('link[href^="lanzamientos.css"]')) return ok();
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "lanzamientos.css?v=1";
+    l.onload = l.onerror = () => ok(); document.head.appendChild(l);
+  });
+  const js = new Promise((ok, mal) => {
+    const sc = document.createElement("script"); sc.src = "lanzamientos.js?v=1";
+    sc.onload = () => window.Lanzamientos ? ok() : mal(new Error("Lanzamientos no arrancó"));
+    sc.onerror = () => { sc.remove(); mal(new Error("No se pudo bajar Lanzamientos. ¿Hay conexión?")); };
+    document.head.appendChild(sc);
+  });
+  lzCarga = Promise.all([css, js]).catch((e) => { lzCarga = null; throw e; });
+  return lzCarga;
+}
+async function montarLanzamientos() {
+  cerrarMenu(); pararRanking();
+  S.vista = "lanzamientos"; ls.set("dash_seccion", "lanzamientos");
+  try { history.replaceState(null, "", location.pathname + location.search + "#lanzamientos"); } catch {}
+  pintarNav();
+  $("#main").innerHTML = `<section class="lz-sec" id="lz" aria-label="Lanzamientos"><p class="vacio"><span class="cargador"></span>Abriendo Lanzamientos…</p></section>`;
+  pintarBarra();
+  window.scrollTo(0, 0);
+  try { await cargarLanzamientos(); }
+  catch (e) {
+    if (S.vista !== "lanzamientos" || !$("#lz")) return;
+    $("#lz").innerHTML = `<div class="err-box" role="alert"><b>No se pudo abrir Lanzamientos.</b> ${esc(e.message)}<div><button type="button" class="btn chico" id="lz-reintentar">Reintentar</button></div></div>`;
+    $("#lz-reintentar").onclick = () => montarLanzamientos();
+    return;
+  }
+  if (S.vista !== "lanzamientos" || !$("#lz")) return;
+  window.Lanzamientos.montar($("#lz"), { login: (msg) => login(msg) });
 }
 
 // ---------- Umbrales (02/11, Lorenzo): sección propia con el saldo de Whop grande, pagos rechazados y la barra de cada cuenta ----------
@@ -4986,7 +5026,7 @@ function fiestaHTML() {
 function iniciar() {
   pintarTema();
   pintarBadges();
-  $("#b-ref").onclick = () => { if (S.vista === "ranking" && $("#rk")) { cargarRanking(true); cargarFabrica(); } else if (S.vista === "cazador") window.Cazador?.refrescar(); else if (S.vista === "creativos") window.Creativos?.refrescar(); else if ($("#carr")) cargar(true); };
+  $("#b-ref").onclick = () => { if (S.vista === "ranking" && $("#rk")) { cargarRanking(true); cargarFabrica(); } else if (S.vista === "cazador") window.Cazador?.refrescar(); else if (S.vista === "creativos") window.Creativos?.refrescar(); else if (S.vista === "lanzamientos") window.Lanzamientos?.refrescar(); else if ($("#carr")) cargar(true); };
   $("#secciones").addEventListener("click", (e) => { const b = e.target.closest("[data-sec]"); if (b) irASeccion(b.dataset.sec); });
   matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", pintarTema);
   $("#b-menu").onclick = (e) => { e.stopPropagation(); $("#menu").hidden ? abrirMenu() : cerrarMenu(); };

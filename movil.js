@@ -16,7 +16,7 @@
     mas: "M5 12 h.01 M12 12 h.01 M19 12 h.01",
     estrella: "M12 3 C 12.6 8.4, 15.6 11.4, 21 12 C 15.6 12.6, 12.6 15.6, 12 21 C 11.4 15.6, 8.4 12.6, 3 12 C 8.4 11.4, 11.4 8.4, 12 3 Z",
   };
-  const MAS = [["cazador", "Cazador", "Ofertas de la Biblioteca"], ["creativos", "Creativos", "Carpetas de entregas"], ["atc", "ATC", "Comentarios, mails y reclamos"], ["gastos", "Gastos", "Lo que gastamos por día"]];
+  const MAS = [["cazador", "Cazador", "Ofertas de la Biblioteca"], ["creativos", "Creativos", "Carpetas de entregas"], ["atc", "ATC", "Comentarios, mails y reclamos"], ["gastos", "Gastos", "Lo que gastamos por día"], ["lanzamientos", "Lanzamientos", "Lo que salió un día y cómo viene"]];
   const ETQ = { presupuesto: "Presupuesto", roas: "ROAS", ganancia: "Ganancia", gasto: "Gastado", facturacion: "Facturación", ventas: "Ventas", margen: "Margen", cpa: "CPA", ticket_promedio: "Ticket" };
 
   function irSec(sec) { const b = $(`#secciones [data-sec="${sec}"]`); if (b) b.click(); window.scrollTo({ top: 0 }); }
