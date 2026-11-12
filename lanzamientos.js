@@ -20,8 +20,8 @@ const diaCorto = (f) => `${DSEM[new Date(f + "T12:00:00Z").getUTCDay()]} ${+f.sl
 const horaAR = (iso) => iso ? new Date(Date.parse(iso) - 3 * 3600e3).toISOString().slice(11, 16) : "";
 const colR = (r) => r == null ? "" : r < 1.3 ? "mal" : r >= 2 ? "bien" : "medio";
 const roasTx = (r) => r == null ? "—" : num(r);
-const TIPOS = { testeo: ["Testeos y aperturas", "Campañas nuevas que salieron ese día"], escala: ["Escala", "Campañas nuevas de winners, CostCap, BidCap…"],
-  reno: ["Renos", "Madre abierta: total de la campaña y abajo solo los conjuntos nuevos"], conjunto: ["Otros conjuntos nuevos", "Conjuntos nuevos en campañas que ya existían"] };
+const TIPOS = { testeo: ["Testeos y aperturas", "Una burbuja por oferta y mercado"], escala: ["Escala", "Campañas nuevas de winners, CostCap, BidCap…"],
+  reno: ["Renos", "Una burbuja por campaña madre: su total y, pegados abajo, solo los conjuntos nuevos"], conjunto: ["Otros conjuntos nuevos", "Conjuntos nuevos en campañas que ya existían"] };
 const ESTADO = { ACTIVE: ["Prendido", "on"], PAUSED: ["Apagado", "off"], CAMPAIGN_PAUSED: ["Campaña apagada", "off"], ADSET_PAUSED: ["Apagado", "off"],
   WITH_ISSUES: ["Con problemas", "mal"], DISAPPROVED: ["Rechazado", "mal"], PENDING_REVIEW: ["En revisión", "rev"], IN_PROCESS: ["Procesando", "rev"] };
 const VER = [["desde", "Desde que salió"], ["dia", "Solo ese día"], ["hoy", "Solo hoy"]];
@@ -70,22 +70,40 @@ function anunciosTx(a) {
   if (a.revision) x.push(`${a.revision} en revisión`);
   return x.join(" · ");
 }
-function filasItem(it, dias) {
-  const abierta = !L.cerradas.has(it.id);
-  const sub = [it.cuenta, it.presupuesto ? `${it.tipo_presupuesto} ${usd(it.presupuesto)}/día` : it.tipo_presupuesto, it.nueva && it.inicio ? `arrancó ${horaAR(it.inicio)}` : ""].filter(Boolean).join(" · ");
-  const sets = it.conjuntos || [];
-  const verSets = !it.nueva || sets.length > 1;
-  let h = `<tr class="lz-camp${it.nueva ? "" : " madre"}" data-id="${esc(it.id)}">
-    <td class="lz-nom">${verSets ? `<button type="button" class="lz-ab" aria-expanded="${abierta}" aria-label="${abierta ? "Cerrar" : "Abrir"} conjuntos">${abierta ? "▾" : "▸"}</button>` : ""}
-      <div><a href="${linkMeta(it.act, it.id)}" target="_blank" rel="noopener">${esc(it.nombre)}</a>
-      <small>${esc(sub)}${it.nueva ? "" : " · <i>total de la campaña</i>"}${it.nueva && sets.length === 1 ? ` · ${anunciosTx(sets[0].anuncios)}` : ""}</small></div></td>
-    <td>${chipEstado(it.estado)}</td>${filaMet(it.metricas, dias)}</tr>`;
-  if (verSets && abierta) for (const s of sets) {
-    const sub2 = [s.creado ? `creado ${horaAR(s.creado)}` : "", s.inicio && s.inicio !== s.creado ? `arranca ${diaCorto(isoAR(Date.parse(s.inicio)))} ${horaAR(s.inicio)}` : "", s.minimo ? `mínimo ${usd(s.minimo)}` : "", anunciosTx(s.anuncios)].filter(Boolean).join(" · ");
-    h += `<tr class="lz-set"><td class="lz-nom"><span class="lz-rama" aria-hidden="true"></span><div><a href="${linkMeta(it.act, s.id, "set")}" target="_blank" rel="noopener">${esc(s.nombre)}</a><small>${sub2}</small></div></td>
-      <td>${chipEstado(s.estado)}</td>${filaMet(s.metricas, dias)}</tr>`;
+// (12/11 b, Lorenzo: «una burbuja aparte para cada campaña, que no se mezclen; la madre abierta con sus renos pegadas
+// en la misma burbuja, y abajo la siguiente campaña»). Una tarjeta por campaña; adentro, la fila de la campaña y las de sus conjuntos nuevos.
+function filaDias(nombre, sub, st, m, dias, cls, link) {
+  return `<tr class="${cls}"><td class="lz-nom">${cls === "lz-set" ? '<span class="lz-rama" aria-hidden="true"></span>' : ""}<div>${link ? `<a href="${link}" target="_blank" rel="noopener">${esc(nombre)}</a>` : `<b>${esc(nombre)}</b>`}${sub ? `<small>${sub}</small>` : ""}</div></td>
+    <td>${chipEstado(st)}</td>${filaMet(m, dias)}</tr>`;
+}
+function sumaSets(sets) {
+  const T = { gasto: 0, ventas: 0, facturacion: 0 };
+  for (const s of sets) { T.gasto += s.metricas.gasto; T.ventas += s.metricas.ventas; T.facturacion += s.metricas.facturacion; }
+  return { ...T, roas: T.gasto > 0 ? T.facturacion / T.gasto : null };
+}
+function burbuja(it, dias) {
+  const sets = it.conjuntos || [], m = it.metricas;
+  const madre = !it.nueva;
+  const ban = (/^[\p{Extended_Pictographic}\p{Regional_Indicator}\s]+/u.exec(it.nombre) || [""])[0].trim();
+  const nombre = it.nombre.slice(it.nombre.indexOf(ban) + ban.length).trim() || it.nombre;
+  const sub = [it.cuenta, it.presupuesto ? `${it.tipo_presupuesto} ${usd(it.presupuesto)}/día` : it.tipo_presupuesto, !madre && it.inicio ? `arrancó ${horaAR(it.inicio)}` : ""].filter(Boolean).join(" · ");
+  const subSet = (s) => [s.creado ? `creado ${horaAR(s.creado)}` : "", s.inicio && s.inicio !== s.creado ? `arranca ${diaCorto(isoAR(Date.parse(s.inicio)))} ${horaAR(s.inicio)}` : "", s.minimo ? `mínimo ${usd(s.minimo)}` : "", anunciosTx(s.anuncios)].filter(Boolean).join(" · ");
+  // en las madres lo importante son las renos: el número grande es el de los conjuntos nuevos
+  const sm = madre ? sumaSets(sets) : m;
+  let filas = "";
+  if (madre) {
+    filas += filaDias("Total de la campaña madre", "todos sus conjuntos, viejos y nuevos", it.estado, m, dias, "lz-camp madre", linkMeta(it.act, it.id));
+    for (const s of sets) filas += filaDias(s.nombre, subSet(s), s.estado, s.metricas, dias, "lz-set", linkMeta(it.act, s.id, "set"));
+  } else {
+    filas += filaDias("Campaña", sets.length === 1 ? anunciosTx(sets[0].anuncios) : "", it.estado, m, dias, "lz-camp", linkMeta(it.act, it.id));
+    if (sets.length > 1) for (const s of sets) filas += filaDias(s.nombre, subSet(s), s.estado, s.metricas, dias, "lz-set", linkMeta(it.act, s.id, "set"));
   }
-  return h;
+  return `<article class="lz-bur ${it.tipo}">
+    <header class="lz-bh"><div class="lz-bt">${ban ? `<span class="lz-ban" aria-hidden="true">${esc(ban)}</span>` : ""}<div><a href="${linkMeta(it.act, it.id)}" target="_blank" rel="noopener"><h4>${esc(nombre)}</h4></a><small>${esc(sub)}</small></div></div>
+      <div class="lz-bn"><span class="lz-big ${colR(sm.roas)}"><small>${madre ? "ROAS renos" : "ROAS"}</small>${roasTx(sm.roas)}</span>
+        <span class="lz-mini"><span><b class="num">${usd(sm.gasto)}</b> gasto</span><span><b class="num">${sm.ventas || 0}</b> ventas</span></span></div></header>
+    <div class="lz-tabla"><table><thead><tr><th></th><th>Estado</th><th>Gasto</th><th>Ventas</th>${dias.map((x) => `<th class="lz-r">ROAS ${diaCorto(x)}</th>`).join("")}<th class="lz-r">Total</th><th class="lz-x">Pagos inic.</th><th class="lz-x">CPA</th></tr></thead>
+    <tbody>${filas}</tbody></table></div></article>`;
 }
 
 function pintar() {
@@ -125,18 +143,16 @@ function pintar() {
       <tr><td>Gasto</td>${dias.map((x) => `<td class="num">${usd(T.por_dia[x].gasto)}</td>`).join("")}<td class="num">${usd(T.gasto)}</td></tr>
       <tr><td>Ventas</td>${dias.map((x) => `<td class="num">${T.por_dia[x].ventas}</td>`).join("")}<td class="num">${T.ventas}</td></tr></tbody></table></div>` : ""}
     <div class="lz-pills lz-tipos" role="tablist"><button type="button" role="tab" aria-selected="${L.tipo === "todo"}" data-tipo="todo">Todo</button>${tiposCon.map((t) => `<button type="button" role="tab" aria-selected="${L.tipo === t}" data-tipo="${t}">${TIPOS[t][0]} <span class="num">${cuenta(t)}</span></button>`).join("")}</div>
-    ${tiposCon.filter((t) => L.tipo === "todo" || L.tipo === t).map((t) => `<div class="lz-card"><div class="lz-cab"><h3>${TIPOS[t][0]} <small>${TIPOS[t][1]}</small></h3></div>
-      <div class="lz-tabla"><table><thead><tr><th>${t === "reno" || t === "conjunto" ? "Campaña madre / conjuntos nuevos" : "Campaña"}</th><th>Estado</th><th>Gasto</th><th>Ventas</th>${dias.map((x) => `<th class="lz-r">ROAS ${diaCorto(x)}</th>`).join("")}<th class="lz-r">ROAS total</th><th class="lz-x">Pagos inic.</th><th class="lz-x">CPA</th></tr></thead>
-      <tbody>${items.filter((x) => x.tipo === t).map((x) => filasItem(x, dias)).join("")}</tbody></table></div></div>`).join("")}
+    ${tiposCon.filter((t) => L.tipo === "todo" || L.tipo === t).map((t) => `<section class="lz-grupo-t"><div class="lz-gt"><h3>${TIPOS[t][0]} <span class="num">${items.filter((x) => x.tipo === t).length}</span></h3><small>${TIPOS[t][1]}</small></div>
+      ${items.filter((x) => x.tipo === t).map((x) => burbuja(x, dias)).join("")}</section>`).join("")}
     ${d.errores?.length ? `<p class="lz-aviso">Faltan datos de: ${esc(d.errores.join(" · "))}</p>` : ""}
-    <p class="lz-nota">Salió = el conjunto empieza a correr ese día (hora AR): las renos armadas a la noche cuentan para el día en que arrancan. Ventas = la mayor entre el pixel y la tienda (con post-venta). ROAS en rojo = menor a 1,3.</p>`;
+    <p class="lz-nota">Salió = la fecha del nombre («12.11 CBO…», «12.11 Renovaciones»); si no tiene, el día en que arranca. Ventas = la mayor entre el pixel y la tienda (con post-venta). ROAS en rojo = menor a 1,3.</p>`;
   }
   R.innerHTML = cab + cuerpo;
   $$("[data-fecha]", R).forEach((b) => b.onclick = () => elegirFecha(b.dataset.fecha));
   $("#lz-fecha", R)?.addEventListener("change", (e) => { if (e.target.value) elegirFecha(e.target.value); });
   $$("[data-ver]", R).forEach((b) => b.onclick = () => { L.ver = b.dataset.ver; ls.set("lz_ver", L.ver); cargar(); });
   $$("[data-tipo]", R).forEach((b) => b.onclick = () => { L.tipo = b.dataset.tipo; pintar(); });
-  $$(".lz-ab", R).forEach((b) => b.onclick = () => { const id = b.closest("tr").dataset.id; L.cerradas.has(id) ? L.cerradas.delete(id) : L.cerradas.add(id); pintar(); });
   $("#lz-re", R)?.addEventListener("click", () => cargar(true));
 }
 function elegirFecha(f) {
