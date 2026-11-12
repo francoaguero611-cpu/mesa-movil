@@ -3744,13 +3744,13 @@ function eventoPendiente() {
 const SECCIONES = [
   { id: "dash", nombre: "Dashboard", raiz: "#carr", icono: "M4 20 C 9 19.6, 15 20.2, 20.5 19.8 M6.5 17 V11.5 M11.5 17 V6.5 M16.5 17 V9.5",
     montar: () => { try { history.replaceState(null, "", location.pathname + location.search); } catch {} montar(); window.scrollTo(0, 0); } },
+  { id: "lanzamientos", nombre: "Lanzamientos", raiz: "#lz", icono: "M12 20.5 V14.5 M12 14.5 C 9.6 12.4, 9.2 8.6, 12 3.6 C 14.8 8.6, 14.4 12.4, 12 14.5 Z M9.6 12.6 L6.6 15.6 L9.4 16 M14.4 12.6 L17.4 15.6 L14.6 16 M11.9 8.6 L12.1 9.4",
+    montar: () => montarLanzamientos(), ya: () => window.Lanzamientos?.refrescar() }, // (12/11, Lorenzo) solo lo que salió un día (testeos, aperturas, renos) y cómo viene
   { id: "gastos", nombre: "Gastos", raiz: "#gst", icono: "M12 3.2 V20.8 M16.4 6.6 C 15.2 5.4, 13.7 5, 12 5 C 9.6 5, 7.7 6.3, 7.7 8.4 C 7.7 13, 16.6 10.8, 16.6 15.6 C 16.6 17.8, 14.6 19, 12 19 C 10 19, 8.4 18.4, 7.2 17.2",
     montar: () => montarGastos() }, // (11/11, Lorenzo) gastos de la empresa por día: RunPod, APIMart, ElevenLabs, Gemini, AWS y suscripciones
   // (06/11, Lorenzo) Reportes ya no es una sección: lo muestra Jarvis cuando se le pide «resumen» (montarReportes queda por si vuelve)
   { id: "umbrales", nombre: "Umbrales", raiz: "#sec-umb", icono: "M4.5 15.5 C 4.6 10.8, 8 7.2, 12 7.1 C 16.1 7, 19.5 10.6, 19.5 15.4 M12 15.2 L15.4 10.6 M3.8 18.6 H20.2",
     montar: () => montarUmbrales() }, // (02/11) saldo de Whop, pagos rechazados y umbrales de cada cuenta (antes, al final del Dashboard)
-  { id: "lanzamientos", nombre: "Lanzamientos", raiz: "#lz", icono: "M12 20.5 V14.5 M12 14.5 C 9.6 12.4, 9.2 8.6, 12 3.6 C 14.8 8.6, 14.4 12.4, 12 14.5 Z M9.6 12.6 L6.6 15.6 L9.4 16 M14.4 12.6 L17.4 15.6 L14.6 16 M11.9 8.6 L12.1 9.4",
-    montar: () => montarLanzamientos(), ya: () => window.Lanzamientos?.refrescar() }, // (12/11, Lorenzo) solo lo que salió un día (testeos, aperturas, renos) y cómo viene
   { id: "ranking", nombre: "Ranking", raiz: "#rk", icono: "M4.5 6 C 6 5.8, 7.4 5.9, 8.6 6 M4.5 12 C 6.5 11.8, 9 11.9, 11.6 12 M4.5 18 C 7.5 17.8, 11 17.9, 14.6 18 M15.5 8.5 L18.5 5.2 L21 8.4",
     montar: (o) => montarRanking(o), ya: (o) => { if (o.pedido != null) abrirPedido(o.pedido); } },
   { id: "cazador", nombre: "Cazador", raiz: "#caz", icono: "M12 4.2 C 16.5 4, 19.9 7.4, 19.8 12 C 19.7 16.6, 16.4 19.9, 12 19.8 C 7.5 19.7, 4.2 16.5, 4.2 12 C 4.3 7.6, 7.4 4.3, 12.6 4.3 M12 1.8 V7 M12 17 V22.2 M1.8 12 H7 M17 12 H22.2 M11.9 11.6 L12.1 12.4",

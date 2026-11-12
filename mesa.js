@@ -122,7 +122,7 @@ const obsIsla = new MutationObserver(() => { obsIsla.disconnect(); try { isla();
 function mirarIsla() { const b = $("#barra"); if (b && !b.dataset.msObs) { b.dataset.msObs = "1"; obsIsla.observe(b, OPC_ISLA); } }
 
 // ---------- encabezado como la maqueta ----------
-const GRUPO_DE = { dash: "Resumen", reportes: "Campañas", umbrales: "Campañas", lanzamientos: "Campañas", ranking: "Campañas", cazador: "Producción", creativos: "Producción", atc: "Ayuda" };
+const GRUPO_DE = { dash: "Resumen", reportes: "Campañas", umbrales: "Campañas", lanzamientos: "Resumen", ranking: "Campañas", cazador: "Producción", creativos: "Producción", atc: "Ayuda" };
 function encabezado() {
   const h1 = $(".top .marca h1"), act = $('#secciones [data-sec][aria-pressed="true"]');
   if (h1) { const g = GRUPO_DE[act?.dataset.sec] || "Resumen"; if (h1.dataset.grupo !== g) h1.dataset.grupo = g; }
