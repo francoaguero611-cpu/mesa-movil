@@ -4459,15 +4459,16 @@ function pintarOfertas() {
     return;
   }
   const gs = gruposRk();
-  if (!gs.some((g) => (g.anuncios || []).length)) { cont.innerHTML = `<div class="vacio">No hay videos con gasto en este período.</div>`; return; }
-  cont.innerHTML = gs.map(ofertaHTML).join("");
+  if (!gs.some((g) => (g.anuncios || []).length)) { cont.innerHTML = `<div class="vacio">Ningún video llegó a ${d.min_ventas || 5} ventas en este período. Probá con 7 o 30 días.</div>`; return; }
+  cont.innerHTML = `<p class="rk-criterio">Solo videos con <b>${d.min_ventas || 5}+ ventas</b>, ordenados por la <b>ganancia</b> que dejaron (facturación menos comisiones aprox. y gasto): mucho volumen con ROAS sano va antes que pocas ventas con ROAS alto.</p>` + gs.map((g, gi) => ofertaHTML({ ...g, min_ventas: d.min_ventas }, gi)).join("");
   $$(".rk-slider", cont).forEach(flechasSlider);
 }
 function subOferta(g) {
   const xs = g.anuncios || [];
   const rec = xs.filter((a) => a.recomendado).length;
   const n = xs.filter((a) => RK.sel.has(claveAd(g, a))).length;
-  return `${pl(xs.length, "video")}${rec ? ` · ${pl(rec, "recomendado")}` : ""}${n ? ` · <b>${pl(n, "elegido")}</b>` : ""}`;
+  const oc = g.ocultos ? ` · <span title="Con 1 a 4 ventas no hay patrón todavía: no se muestran">${g.ocultos} con menos de ${g.min_ventas || 5} ventas, ocultos</span>` : "";
+  return `${pl(xs.length, "video")} con ${g.min_ventas || 5}+ ventas${rec ? ` · ${pl(rec, "recomendado")}` : ""}${n ? ` · <b>${pl(n, "elegido")}</b>` : ""}${oc}`;
 }
 function ofertaHTML(g, gi) {
   const xs = g.anuncios || [];
@@ -4481,7 +4482,7 @@ function ofertaHTML(g, gi) {
     <svg class="rk-garabato" viewBox="0 0 160 12" aria-hidden="true"><path d="M2 8 C 30 3, 52 11, 80 6 S 130 3, 158 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
     ${g.sugerencia ? `<div class="rk-sug">✦ <b>Más renovaciones que iteraciones</b> — ${esc(g.sugerencia.motivo)}</div>` : ""}
     ${g.no_renovar ? `<div class="rk-norenovar"><span class="rk-nr-ico ev-ico-chico peligro">${icoEvento("x")}</span><div><b>NO RENOVARÍA</b><span>${esc(g.no_renovar)}</span></div></div>` : ""}
-    ${xs.length ? `<div class="rk-slider" role="list" aria-label="Videos de ${esc(et)}, de mejor a peor">${xs.map((a, i) => tarjetaRk(g, a, i)).join("")}</div>` : `<div class="vacio chico">Sin videos con gasto en este período.</div>`}
+    ${xs.length ? `<div class="rk-slider" role="list" aria-label="Videos de ${esc(et)}, de más ganancia a menos">${xs.map((a, i) => tarjetaRk(g, a, i)).join("")}</div>` : `<div class="vacio chico">Ningún video llegó a ${g.min_ventas || 5} ventas en este período. Probá con 7 o 30 días.</div>`}
   </section>`;
 }
 function tarjetaRk(g, a, i) {
@@ -4510,6 +4511,7 @@ function tarjetaRk(g, a, i) {
         <div><dt>Gasto</dt><dd class="num">${usdG(a.gasto)}</dd></div>
         <div><dt>ROAS</dt><dd class="rk-roas">${chipRoas(a.roas)}${svgTend(a.tendencia)}</dd></div>
         <div><dt>CPA</dt><dd class="num">${usdG(cpa)}</dd></div>
+        ${a.ganancia != null ? `<div class="rk-gan${a.ganancia < 0 ? " neg" : ""}"><dt>Ganancia aprox.</dt><dd class="num">${usdG(a.ganancia)}</dd></div>` : ""}
       </dl>
       ${a.motivo ? `<p class="rk-motivo">${esc(a.motivo)}</p>` : ""}
     </div>

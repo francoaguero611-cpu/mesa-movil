@@ -800,6 +800,10 @@ table.camp tbody tr.fila.sel td { background: var(--marca); }
 .rk-mets { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; margin: 6px 0 0; padding-top: 7px; border-top: 1px solid var(--linea); }
 .rk-card.sel .rk-mets { border-top-color: color-mix(in srgb, var(--marca-borde) 50%, transparent); }
 .rk-mets div { min-width: 0; }
+.rk-mets .rk-gan { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline; padding-top: 5px; border-top: 1px dashed var(--linea); }
+.rk-mets .rk-gan dd { color: var(--verde, #1f9d55); font-size: 15px; }
+.rk-mets .rk-gan.neg dd { color: var(--rojo, #d64545); }
+.rk-criterio { margin: 0 0 10px; font-size: 12.5px; color: var(--mut); line-height: 1.4; }
 .rk-mets dt { font-size: 10.5px; color: var(--mut); text-transform: uppercase; letter-spacing: .5px; line-height: 1.1; }
 .rk-mets dd { margin: 1px 0 0; font-weight: 700; font-size: 14px; white-space: nowrap; }
 .rk-mets .mon { font-size: .76em; opacity: .7; margin-right: 2px; font-weight: 600; }
