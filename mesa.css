@@ -511,3 +511,98 @@ html body .camp th.c-que_hacer, html body .camp td.c-que_hacer { min-width: 0 !i
 .mesa-of-t .mo-tt b { font-weight: 600; }
 .mesa-of-t .mo-tt .num { color: var(--tx-2); font-size: 11.5px; }
 .mesa-of-t .mo-tg { grid-column: 2; justify-self: end; font-size: 11px; color: var(--mut); }
+
+/* =====================================================================================================
+   UMBRALES v3 (15/11, Lorenzo) — «parece una sección de nenes»: sobrio, sin emojis ni semáforos.
+   Arriba: saldo EtherFi · cuánto dura · último cobro que se paga + línea de tiempo de cobros.
+   Abajo: filas finas por cuenta. TODOS los rellenos con el degradé de Ganancia neta (var(--torna)).
+   ===================================================================================================== */
+html body .umb-pagina > .whop-barra { display: none; }
+html body #sec-umb.umb-full { max-width: 1180px; }
+.uz-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+.uz-top .umb-tit { margin: 0; font-weight: 500; letter-spacing: -.4px; }
+.uz-leido { font-size: 12px; }
+/* bloque principal */
+.uz-heroe { background: var(--g-vidrio); border: 1px solid var(--linea); border-radius: 22px; padding: 22px 24px 18px; box-shadow: var(--g-sombra); margin-bottom: 26px; }
+.uz-tres { display: grid; grid-template-columns: 1.1fr 1fr 1.2fr; gap: 0; }
+.uz-b { padding: 0 22px; border-left: 1px solid var(--linea); min-width: 0; }
+.uz-b:first-child { padding-left: 0; border-left: 0; }
+.uz-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--mut); margin-bottom: 8px; }
+.uz-val { font-size: clamp(24px, 2.6vw, 34px); font-weight: 500; letter-spacing: -1px; line-height: 1.05; color: var(--tx); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.uz-b:first-child .uz-val { background: var(--torna); -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: 600; }
+.uz-sub { margin-top: 6px; font-size: 12.5px; color: var(--tx-2); line-height: 1.4; }
+.uz-aviso { color: var(--mal); }
+/* línea de tiempo */
+.uz-linea { margin: 32px 0 6px; }
+.uz-pista { position: relative; height: 10px; border-radius: 99px; background: rgba(255,255,255,.06); }
+.uz-cub { position: absolute; inset: 0 auto 0 0; border-radius: 99px; background: var(--torna); box-shadow: 0 0 18px -6px rgba(216,210,246,.55); transition: width 1s var(--sale); }
+.uz-pt { position: absolute; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: #111114; box-shadow: 0 0 0 1.5px rgba(17,17,20,.25); cursor: help; }
+.uz-pt.no { background: transparent; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.35); }
+.uz-pt:hover { transform: scale(1.7); }
+.uz-fin { position: absolute; top: -7px; bottom: -7px; width: 2px; margin-left: -1px; background: var(--tx); border-radius: 2px; }
+.uz-fin em { position: absolute; bottom: calc(100% + 4px); left: 50%; transform: translateX(-50%); font-style: normal; font-size: 11px; color: var(--tx); white-space: nowrap; letter-spacing: .3px; }
+.uz-eje { position: relative; height: 18px; margin-top: 8px; }
+.uz-tk { position: absolute; transform: translateX(-50%); font-size: 10.5px; color: var(--mut-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.uz-tk0 { transform: none; left: 0; }
+.uz-nota { margin: 12px 0 0; font-size: 13.5px; color: var(--tx-2); line-height: 1.5; }
+.uz-nota b { color: var(--tx); font-weight: 600; }
+.uz-heroe.corto .uz-nota > b:first-child { background: var(--torna); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.uz-pie-h { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--linea); font-size: 12px; color: var(--mut); }
+.uz-pie-h b { color: var(--tx-2); font-weight: 500; }
+/* listas de cuentas */
+.uz-grupo { margin-bottom: 26px; }
+.uz-gtit { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 0 4px 10px; }
+.uz-gtit h3 { margin: 0; font-size: 14px; font-weight: 600; color: var(--tx); letter-spacing: 0; }
+.uz-gtit .mut { font-size: 12px; }
+.uz-cab, .uz-fila { display: grid; grid-template-columns: minmax(150px, 1.4fr) minmax(120px, 2fr) 150px 150px 100px; align-items: center; gap: 18px; padding: 0 18px; }
+.uz-cab { font-size: 10.5px; text-transform: uppercase; letter-spacing: 1px; color: var(--mut-2); margin-bottom: 6px; }
+.uz-cab span:nth-child(n+3), .uz-fila > :nth-child(n+3):not(.uz-form) { text-align: right; justify-self: end; }
+.uz-lista { list-style: none; margin: 0; padding: 0; border: 1px solid var(--linea); border-radius: 18px; background: var(--g-vidrio); overflow: hidden; }
+.uz-fila { min-height: 52px; padding-top: 8px; padding-bottom: 8px; border-top: 1px solid var(--linea); transition: background .25s; }
+.uz-fila:first-child { border-top: 0; }
+.uz-fila:hover { background: rgba(255,255,255,.025); }
+.uz-nom { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.uz-nom b { font-weight: 500; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.uz-nom small { font-size: 11px; color: var(--mut-2); font-family: var(--f-mono); }
+.uz-barra { position: relative; display: block; height: 6px; border-radius: 99px; background: rgba(255,255,255,.07); overflow: hidden; }
+.uz-barra.sin { background: repeating-linear-gradient(90deg, rgba(255,255,255,.07) 0 6px, transparent 6px 10px); }
+.uz-rel { position: absolute; inset: 0 auto 0 0; border-radius: 99px; background: var(--torna); background-size: 300px 100%; transition: width 1.1s var(--sale); }
+.uz-monto { font-size: 13px; color: var(--tx); white-space: nowrap; }
+.uz-u { all: unset; cursor: pointer; color: var(--tx-2); border-bottom: 1px dashed rgba(255,255,255,.18); }
+.uz-u:hover, .uz-u:focus-visible { color: var(--tx); border-bottom-color: var(--tx-2); }
+.uz-cobra { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.25; }
+.uz-cobra b { font-weight: 500; font-size: 13px; white-space: nowrap; }
+.uz-cobra small, .uz-ritmo small { font-size: 11px; color: var(--mut); }
+.uz-fila.pronto .uz-cobra b { background: var(--torna); -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: 600; }
+.uz-ritmo { font-size: 13px; color: var(--tx-2); white-space: nowrap; }
+.uz-form { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 4px 0 6px; }
+.uz-form .campo { width: 140px; }
+.uz-form .mut { font-size: 11.5px; }
+/* pagos rechazados: una línea sobria */
+html body #sec-umb .pagos { margin-bottom: 18px; }
+html body #sec-umb .pagos.ok { display: none; }
+html body #sec-umb .pagos-pleg { border: 1px solid rgba(245,154,166,.22); border-radius: 16px; padding: 12px 16px; background: rgba(245,154,166,.04); }
+html body #sec-umb .pagos-pleg h3 { font-size: 13.5px; font-weight: 600; }
+.uz-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--mal); margin-right: 7px; vertical-align: 1px; }
+.uz-dot.gracia { background: var(--ojo); }
+/* compu angosta / Jarvis abierto */
+@media (max-width: 980px) {
+  .uz-cab, .uz-fila { grid-template-columns: minmax(130px, 1.3fr) minmax(90px, 1.4fr) 130px 130px; }
+  .uz-cab span:nth-child(5), .uz-ritmo { display: none; }
+}
+/* celular */
+@media (max-width: 760px) {
+  .uz-heroe { padding: 18px 16px 14px; border-radius: 20px; }
+  .uz-tres { grid-template-columns: 1fr 1fr; row-gap: 16px; }
+  .uz-b { padding: 0 14px; }
+  .uz-b:first-child { grid-column: 1 / -1; padding: 0; }
+  .uz-b:nth-child(2) { padding-left: 0; border-left: 0; }
+  .uz-val { font-size: 22px; }
+  .uz-b:first-child .uz-val { font-size: 34px; }
+  .uz-cab { display: none; }
+  .uz-fila { grid-template-columns: 1fr auto; grid-template-areas: "nom cobra" "barra barra" "monto ritmo"; row-gap: 8px; column-gap: 12px; padding: 12px 16px; }
+  .uz-nom { grid-area: nom; } .uz-cobra { grid-area: cobra; } .uz-barra { grid-area: barra; }
+  .uz-monto { grid-area: monto; justify-self: start !important; text-align: left !important; font-size: 12px; }
+  .uz-ritmo { grid-area: ritmo; display: block; font-size: 12px; }
+  .uz-cobra { flex-direction: row; gap: 6px; align-items: baseline; }
+}
