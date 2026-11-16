@@ -1018,10 +1018,28 @@ function metricasHTML(g) {
       ${c("Gasto en Meta", usdG(m.gasto), "ancha", "gasto", m.gasto, true)}
       ${c("CPA", m.ventas ? usdG(m.gasto / m.ventas) : "—")}
       ${c("Ticket promedio", m.ventas ? usdG(m.facturacion / m.ventas) : "—")}
-      ${c("% Post-compra", m.pct_post != null ? pct(m.pct_post) : "—")}
+      ${postVentaHTML(m)}
     </div>
     ${S.secAbierto ? secundariasHTML(g) : ""}
     <div class="sec-fila"><button type="button" class="sec-link" data-sec aria-expanded="${!!S.secAbierto}">${S.secAbierto ? "Ocultar métricas secundarias" : "Ver métricas secundarias"}<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>`;
+}
+// (16/11, Lorenzo) fila 2: «Post-venta ×N» = (facturación front + post) ÷ front de esos clientes, con «+US$ X por venta»
+const xTx = (n) => n == null || isNaN(n) ? "—" : "×" + NF2.format(n);
+function postVentaHTML(m) {
+  const sub = m.post_por_venta != null ? `+${usdG(m.post_por_venta)} por venta` : "";
+  return `<div class="met boceto"><div class="lbl">Post-venta</div><div class="v-fila"><div class="val num">${xTx(m.post_x)}</div></div>${sub ? `<div class="sub num pv-sub">${sub}</div>` : ""}</div>`;
+}
+// (16/11, Lorenzo) «Conversión por paso» (solo por oferta × mercado): OTO = compras ÷ ventas front; DS = compras ÷ (ventas front − OTO del paso)
+const nombreCorto = (t) => String(t || "").split(" · ")[0].replace(/\s*\([^)]*\)\s*$/, "").trim();
+function pasosHTML(m) {
+  const ps = (m.pasos || []).filter((p) => p.titulo || p.oto_n || p.ds_n);
+  if (!ps.length) return "";
+  const pc = (x) => x == null ? "—" : NF1.format(x * 100) + " %";
+  const celda = (v, n) => `<td><span class="num">${pc(v)}</span><small class="num">${ent(n)}</small></td>`;
+  return `<div class="met met-chica boceto pv-pasos"><div class="lbl">Conversión por paso</div>
+    <table><thead><tr><th></th><th>OTO</th><th>DS</th></tr></thead><tbody>
+    ${ps.map((p, i) => `<tr><th scope="row" title="${esc(p.titulo || "")}"><b>${i + 1}</b>${esc(nombreCorto(p.titulo) || "—")}</th>${celda(p.oto, p.oto_n)}${celda(p.ds, p.ds_n)}</tr>`).join("")}
+    </tbody></table></div>`;
 }
 // (03/11, Lorenzo) métricas secundarias del grupo (las de Ads Manager que no están arriba), sumadas de sus campañas
 function secundariasHTML(g) {
@@ -1036,15 +1054,23 @@ function secundariasHTML(g) {
   const dv = (a, b) => b ? a / b : null, n = (x) => x == null ? "—" : ent(Math.round(x)), p = (x) => x == null ? "—" : pct(x), u = (x) => x == null ? "—" : usdG(x);
   const m0 = g.metricas || {};
   // (06/11, Lorenzo) por orden de importancia
-  const M = [["Ventas", m0.ventas != null ? ent(m0.ventas) : "—", "compras reales"], ["Costo por pago iniciado", u(dv(T.g, T.pi)), "gasto ÷ pagos iniciados"],
-    ["Conv. de la landing", p(dv(T.v, T.vis)), "ventas ÷ visitas"], ["Costo por carrito", u(dv(T.g, T.car)), "gasto ÷ carritos"],
+  // (16/11, Lorenzo) bloque post-venta después de Ventas: US$ post-venta, por venta, ticket con post-venta, % clientes, % de la facturación, % Order bump
+  const M = [["Ventas", m0.ventas != null ? ent(m0.ventas) : "—", "compras reales"],
+    ["US$ post-venta", u(m0.usd_post), "OTO + downsells"], ["Post-venta por venta", u(m0.post_por_venta), "post ÷ ventas front"],
+    ["Ticket con post-venta", u(m0.ticket_post), "(front + post) ÷ ventas"],
+    ["% clientes con post-venta", m0.pct_post != null ? pct1(m0.pct_post) : "—", m0.con_post != null ? `${ent(m0.con_post)} de ${ent(m0.ventas_principales ?? m0.ventas)} ventas` : ""],
+    ["% de la facturación", m0.pct_fact_post != null ? pct1(m0.pct_fact_post) : "—", "post ÷ total"],
     ["% Order bump", m0.pct_bump != null ? pct(m0.pct_bump) : "—", m0.con_bump != null ? `${ent(m0.con_bump)} de ${ent(m0.ventas_principales ?? m0.ventas)} ventas` : ""],
+    ["__pasos__"],
+    ["Costo por pago iniciado", u(dv(T.g, T.pi)), "gasto ÷ pagos iniciados"],
+    ["Conv. de la landing", p(dv(T.v, T.vis)), "ventas ÷ visitas"], ["Costo por carrito", u(dv(T.g, T.car)), "gasto ÷ carritos"],
     ["CTR", p(dv(T.cl, T.imp)), "clics ÷ impresiones"], ["CPM", u(T.imp ? (T.g / T.imp) * 1000 : null), "costo por mil"], ["CPC", u(dv(T.g, T.cl)), "costo por clic"],
     ["Retención 3 s", p(T.hi ? T.hw / T.hi : null), "vieron los primeros 3 s"], ["Conv. del checkout", p(dv(T.v, T.pi)), "ventas ÷ pagos iniciados"],
     ["Costo por visita", u(dv(T.g, T.vis)), "gasto ÷ visitas"], ["Pagos iniciados", n(T.pi), "llegaron al checkout"], ["Carritos", n(T.car), "agregaron al carrito"],
     ["Visitas a la landing", n(T.vis), "cargaron la página"], ["Frecuencia", T.alc ? NF2.format(T.fi / T.alc) : "—", "veces que lo ve cada uno"], ["Impresiones", n(T.imp), "veces que se mostró"],
     ["Clics", n(T.cl), "en el enlace"], ["Video completo", p(T.ri ? T.rw / T.ri : null), "ThruPlay ÷ impresiones"]];
-  return `<div class="sec-grid">${M.map(([l, v, sub]) => `<div class="met met-chica boceto"><div class="lbl">${l}</div><div class="val num">${v}</div><div class="sub">${sub}</div></div>`).join("")}</div>`;
+  return `<div class="sec-grid">${M.map(([l, v, sub]) => l === "__pasos__" ? (g.clave !== "todas" ? pasosHTML(m0) : "")
+    : `<div class="met met-chica boceto"><div class="lbl">${l}</div><div class="val num">${v}</div><div class="sub">${sub}</div></div>`).join("")}</div>`;
 }
 document.addEventListener("click", (e) => { const b = e.target.closest && e.target.closest("[data-sec]"); if (!b) return; S.secAbierto = !S.secAbierto; pintarCarrusel(); });
 function pintarCarrusel() {

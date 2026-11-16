@@ -606,3 +606,20 @@ html body #sec-umb .pagos-pleg h3 { font-size: 13.5px; font-weight: 600; }
   .uz-ritmo { grid-area: ritmo; display: block; font-size: 12px; }
   .uz-cobra { flex-direction: row; gap: 6px; align-items: baseline; }
 }
+
+/* (16/11, Lorenzo) Post-venta: subtexto de la fila 2 y grilla «Conversión por paso» (OTO1..4 × OTO/DS) en las secundarias */
+html body .mesa-fila2 .met .pv-sub { margin-top: 0; font: 400 11.5px var(--f-mono); color: var(--mut-2); }
+html body .carr .sec-grid .met.pv-pasos { grid-column: span 2; grid-row: span 2; padding: 10px 12px 8px; gap: 4px; }
+.pv-pasos table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
+.pv-pasos th, .pv-pasos td { padding: 2px 0; text-align: right; font-weight: 400; white-space: nowrap; }
+.pv-pasos thead th { font: 500 10.5px var(--f-mono); color: var(--mut-2); letter-spacing: .4px; padding-bottom: 3px; }
+.pv-pasos thead th:first-child, .pv-pasos tbody th { text-align: left; }
+.pv-pasos thead th:not(:first-child), .pv-pasos td { width: 27%; }
+.pv-pasos tbody th { overflow: hidden; text-overflow: ellipsis; color: var(--mut); padding-right: 6px; }
+.pv-pasos tbody th b { font: 600 10.5px var(--f-mono); color: var(--mut-2); margin-right: 6px; }
+.pv-pasos tbody tr + tr > * { border-top: 1px solid color-mix(in srgb, currentColor 8%, transparent); }
+.pv-pasos td .num { font-size: 13.5px; font-weight: 500; }
+.pv-pasos td small { font: 400 10px var(--f-mono); color: var(--mut-2); margin-left: 4px; display: inline-block; min-width: 2.2em; text-align: right; }
+html body .carr .sec-grid:has(.pv-pasos) { grid-auto-flow: row dense; } /* que no quede un hueco al lado de «% Order bump» */
+@media (max-width: 720px) { html body .carr .sec-grid .met.pv-pasos { grid-row: auto; } }
+html.ms-cel body .carr .sec-grid .met.pv-pasos { grid-row: auto; }
