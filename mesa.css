@@ -623,3 +623,6 @@ html body .carr .sec-grid .met.pv-pasos { grid-column: span 2; grid-row: span 2;
 html body .carr .sec-grid:has(.pv-pasos) { grid-auto-flow: row dense; } /* que no quede un hueco al lado de «% Order bump» */
 @media (max-width: 720px) { html body .carr .sec-grid .met.pv-pasos { grid-row: auto; } }
 html.ms-cel body .carr .sec-grid .met.pv-pasos { grid-row: auto; }
+/* (23/11, Lorenzo) ROAS y Margen principales en blanco, y sus tendencias también (nunca rojo) */
+html body .carr .met.k-blanca .val, html body .carr .met.k-blanca .val .chip-roas { color: var(--tx); text-shadow: none; }
+.mesa-fila1 .met.k-blanca .ms-graf, .mesa-fila1 .met.k-blanca .ms-graf.baja, .mesa-fila1 .met.k-blanca .ms-graf.sube { color: var(--tx); }

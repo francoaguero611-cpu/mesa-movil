@@ -1011,8 +1011,8 @@ function metricasHTML(g) {
     <div class="mesa-fila1">
       ${c("Ganancia neta", usdG(gan), "heroe " + (gan == null ? "" : gan < 0 ? "neg" : "gana"), "ganancia", gan)}
       ${c("Facturación", usdG(m.facturacion), "", "facturacion", m.facturacion)}
-      ${c("ROAS", `<span class="roas ${colorRoas(m.roas)} chip-roas">${roasTx(m.roas)}</span>`, "", "roas", m.roas)}
-      ${c("Margen", pct(m.margen), m.margen != null && m.margen < 0 ? "neg" : "", "margen", m.margen)}
+      ${c("ROAS", `<span class="roas chip-roas">${roasTx(m.roas)}</span>`, "k-blanca", "roas", m.roas)}
+      ${c("Margen", pct(m.margen), "k-blanca", "margen", m.margen)}
     </div>
     <div class="mesa-fila2">
       ${c("Gasto en Meta", usdG(m.gasto), "ancha", "gasto", m.gasto, true)}
