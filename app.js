@@ -286,6 +286,10 @@ function pintarMenu() {
       <span>Modo oscuro<br><small>${document.documentElement.getAttribute("data-theme") ? "elegido a mano" : "sigue al sistema"}</small></span>
       <span class="toggle-chico" aria-hidden="true" ${temaEfectivo() === "dark" ? 'aria-checked="true"' : ""}><span class="mini"></span></span>
     </button>
+    <button class="item" role="menuitemcheckbox" aria-checked="${!document.documentElement.classList.contains("sin-tend")}" id="mi-tend">
+      <span>Tendencias<br><small>gráfico en las métricas principales</small></span>
+      <span class="toggle-chico" aria-hidden="true" ${!document.documentElement.classList.contains("sin-tend") ? 'aria-checked="true"' : ""}><span class="mini"></span></span>
+    </button>
     <button class="item" role="menuitem" id="mi-reglas"><span>Reglas<br><small>ver y editar las automáticas</small></span><span aria-hidden="true">⚙</span></button>
     <button class="item" role="menuitem" id="mi-costos"><span>Costos<br><small>qué % cobra cada uno y el ROAS de equilibrio</small></span><span aria-hidden="true">%</span></button>
     <button class="item" role="menuitem" id="mi-log"><span>Registro de acciones<br><small>últimas 50</small></span><span aria-hidden="true">📜</span></button>
@@ -296,6 +300,7 @@ function pintarMenu() {
     <hr>
     ${DEMO ? `<a class="item" role="menuitem" href="${location.pathname}"><span>Salir del demo</span><span aria-hidden="true">↩</span></a>` : `<button class="item" role="menuitem" id="mi-salir"><span>Salir</span><span aria-hidden="true">↩</span></button>`}`;
   $("#mi-dry").onclick = () => { if (DRY_URL) return; ls.set("dash_dry", dryOn() ? "0" : "1"); pintarBadges(); pintarMenu(); toast(dryOn() ? "Modo prueba prendido: las escrituras van con dry=1." : "Modo prueba apagado: las escrituras tocan Meta de verdad."); };
+  $("#mi-tend").onclick = () => { const sin = document.documentElement.classList.toggle("sin-tend"); ls.set("ms_sin_tend", sin ? "1" : "0"); pintarMenu(); $("#mi-tend").focus(); };
   $("#mi-log").onclick = () => { cerrarMenu(); verRegistro(); };
   $("#mi-costos").onclick = () => { cerrarMenu(); verCostos(); };
   $("#mi-reglas").onclick = () => { cerrarMenu(); verReglas(); };
@@ -1072,6 +1077,8 @@ function secundariasHTML(g) {
   return `<div class="sec-grid">${M.map(([l, v, sub]) => l === "__pasos__" ? (g.clave !== "todas" ? pasosHTML(m0) : "")
     : `<div class="met met-chica boceto"><div class="lbl">${l}</div><div class="val num">${v}</div><div class="sub">${sub}</div></div>`).join("")}</div>`;
 }
+// (24/11, Lorenzo) switch «Tendencias» en el menú de hamburguesa: saca/pone el gráfico de las métricas principales; se recuerda en este navegador
+try { if (localStorage.getItem("ms_sin_tend") === "1") document.documentElement.classList.add("sin-tend"); } catch {}
 document.addEventListener("click", (e) => { const b = e.target.closest && e.target.closest("[data-sec]"); if (!b) return; S.secAbierto = !S.secAbierto; pintarCarrusel(); });
 function pintarCarrusel() {
   const t = $("#tarjetas"); if (!t) return;

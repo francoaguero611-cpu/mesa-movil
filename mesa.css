@@ -626,3 +626,7 @@ html.ms-cel body .carr .sec-grid .met.pv-pasos { grid-row: auto; }
 /* (23/11, Lorenzo) ROAS y Margen principales en blanco, y sus tendencias también (nunca rojo) */
 html body .carr .met.k-blanca .val, html body .carr .met.k-blanca .val .chip-roas { color: var(--tx); text-shadow: none; }
 .mesa-fila1 .met.k-blanca .ms-graf, .mesa-fila1 .met.k-blanca .ms-graf.baja, .mesa-fila1 .met.k-blanca .ms-graf.sube { color: var(--tx); }
+
+/* (24/11, Lorenzo) botón «Ocultar tendencia»: saca el gráfico de las 4 tarjetas grandes y el texto de Gasto */
+html.sin-tend .mesa-fila1 .ms-graf, html.sin-tend .mesa-fila1 .ms-punto, html.sin-tend .mesa-fila1 .ms-guia, html.sin-tend .mesa-fila1 .ms-tip, html.sin-tend .mesa-fila2 .ms-tend { display: none !important; }
+html.sin-tend body .mesa-fila1 .met { min-height: 0; padding-bottom: 18px; cursor: default; }
