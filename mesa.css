@@ -629,4 +629,5 @@ html body .carr .met.k-blanca .val, html body .carr .met.k-blanca .val .chip-roa
 
 /* (24/11, Lorenzo) botón «Ocultar tendencia»: saca el gráfico de las 4 tarjetas grandes y el texto de Gasto */
 html.sin-tend .mesa-fila1 .ms-graf, html.sin-tend .mesa-fila1 .ms-punto, html.sin-tend .mesa-fila1 .ms-guia, html.sin-tend .mesa-fila1 .ms-tip, html.sin-tend .mesa-fila2 .ms-tend { display: none !important; }
-html.sin-tend body .mesa-fila1 .met { min-height: 0; padding-bottom: 18px; cursor: default; }
+html.sin-tend body .mesa-fila1 .met { min-height: 160px; padding-bottom: 24px; justify-content: space-between; cursor: default; }
+html.sin-tend.ms-cel body .mesa-fila1 .met { min-height: 124px; padding-bottom: 14px; }
