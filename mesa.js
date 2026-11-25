@@ -133,12 +133,26 @@ function encabezado() {
   const ctl = $("#main .controles");
   if (ctl && $("#carr")) {
     let cab = $(".ms-cab", ctl);
-    if (!cab) { cab = document.createElement("div"); cab.className = "ms-cab"; cab.innerHTML = `<div class="vivo"><i></i><span>Última lectura: <b class="num"></b></span></div><h3>Resultados<br><b>en vivo</b></h3>`; ctl.prepend(cab); }
+    if (!cab) { cab = document.createElement("div"); cab.className = "ms-cab"; cab.innerHTML = `<div class="vivo"><i></i><span>Última lectura: <b class="num"></b></span></div><h3>Resultados<br><b>en vivo</b><button type="button" class="ms-priv" aria-pressed="false" aria-label="Modo grabación: ocultar nombres de ofertas y campañas"></button></h3>`; ctl.prepend(cab); pintarPriv(); }
     const t = ($("#hora", ctl)?.textContent || "").trim(), hh = (t.match(/\d{1,2}:\d{2}/) || [""])[0];
     const tx = /sin conexi/i.test(t) ? `sin conexión · ${hh}` : hh || "…";
     const bb = $(".vivo b", cab); if (bb && bb.textContent !== tx) bb.textContent = tx;
   }
 }
+
+// (25/11, Lorenzo) ojito «modo grabación»: tapa nombres de ofertas, banderas, campañas, saldos y avisos (para grabar marca personal)
+const OJO_A = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>`;
+const OJO_C = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7c2 0 3.7.7 5.1 1.6M22 12s-3.5 7-10 7c-2 0-3.7-.7-5.1-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="M3 3l18 18"/></svg>`;
+function pintarPriv() {
+  const on = document.documentElement.classList.contains("modo-priv");
+  $$(".ms-priv").forEach((b) => { b.innerHTML = on ? OJO_C : OJO_A; b.setAttribute("aria-pressed", String(on)); b.title = on ? "Modo grabación prendido: tocá para ver todo" : "Modo grabación: ocultar nombres"; });
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest && e.target.closest(".ms-priv"); if (!b) return;
+  const on = document.documentElement.classList.toggle("modo-priv");
+  try { localStorage.setItem("ms_priv", on ? "1" : "0"); } catch {}
+  pintarPriv(); if (window.MesaPriv) window.MesaPriv();
+});
 
 // ---------- 6) entradas al deslizar ----------
 let io = null;

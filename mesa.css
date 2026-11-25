@@ -631,3 +631,13 @@ html body .carr .met.k-blanca .val, html body .carr .met.k-blanca .val .chip-roa
 html.sin-tend .mesa-fila1 .ms-graf, html.sin-tend .mesa-fila1 .ms-punto, html.sin-tend .mesa-fila1 .ms-guia, html.sin-tend .mesa-fila1 .ms-tip, html.sin-tend .mesa-fila2 .ms-tend { display: none !important; }
 html.sin-tend body .mesa-fila1 .met { min-height: 160px; padding-bottom: 24px; justify-content: flex-start; gap: 22px; cursor: default; }
 html.sin-tend.ms-cel body .mesa-fila1 .met { min-height: 124px; padding-bottom: 14px; }
+
+/* (25/11) modo grabación: ojito al lado de «Resultados en vivo» */
+.ms-priv { display: inline-grid; place-items: center; width: 40px; height: 40px; margin-left: 12px; vertical-align: middle; border: 1px solid rgba(255,255,255,.14); border-radius: 50%; background: rgba(255,255,255,.04); color: var(--mut-2); cursor: pointer; transition: color .2s, background .2s, transform .15s; }
+.ms-priv:hover { color: var(--tx); background: rgba(255,255,255,.08); }
+.ms-priv:active { transform: scale(.94); }
+.ms-priv[aria-pressed="true"] { color: var(--tx); background: rgba(255,255,255,.12); }
+.ms-priv:focus-visible { outline: 3px solid var(--foco, #8fb8ff); outline-offset: 2px; }
+html.modo-priv .seccion-camp, html.modo-priv .seccion-prob, html.modo-priv #avisos, html.modo-priv #whop-barra,
+html.modo-priv .av-pop, html.modo-priv .av-pop-fondo, html.modo-priv #toasts, html.modo-priv .mesa-of-t .ban,
+html.modo-priv .uz-heroe, html.modo-priv .ms-ether { display: none !important; }

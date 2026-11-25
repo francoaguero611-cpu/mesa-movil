@@ -1084,19 +1084,29 @@ function pintarCarrusel() {
   const t = $("#tarjetas"); if (!t) return;
   const gs = grupos(); const g = grupoActual(); const n = gs.length;
   const d = S.datos[S.periodo];
-  $("#etiqueta").innerHTML = `${g.bandera ? `<span class="ban" aria-hidden="true">${esc(g.bandera)}</span>` : ""}<h2>${esc(g.etiqueta || g.oferta || "Todas")}</h2>${g.clave === "todas" ? `<small>general</small>` : ""}`;
+  const al = aliasPriv(gs), P = modoPriv();
+  $("#etiqueta").innerHTML = `${g.bandera && !P ? `<span class="ban" aria-hidden="true">${esc(g.bandera)}</span>` : ""}<h2>${esc(P ? al(g) : g.etiqueta || g.oferta || "Todas")}</h2>${g.clave === "todas" ? `<small>general</small>` : ""}`;
   if (!d) t.innerHTML = `<div class="met boceto esqueleto" style="grid-column:1/-1"></div>`;
   else t.innerHTML = metricasHTML(g);
   if (S.dir && !reducido()) { t.classList.remove("entra-der", "entra-izq"); void t.offsetWidth; t.classList.add(S.dir > 0 ? "entra-der" : "entra-izq"); }
   S.dir = 0;
   $("#b-prev").disabled = S.idx <= 0;
   $("#b-next").disabled = S.idx >= n - 1;
-  $("#pos").innerHTML = (n > 1 && n <= 16 ? `<div class="puntos">${gs.map((x, i) => `<button type="button" class="punto" data-ir="${i}" aria-label="Ir a ${esc(x.etiqueta)}" ${i === S.idx ? 'aria-current="true"' : ""}></button>`).join("")}</div>` : "") + `<span class="contador num">${S.idx + 1} / ${n}</span>`;
+  $("#pos").innerHTML = (n > 1 && n <= 16 ? `<div class="puntos">${gs.map((x, i) => `<button type="button" class="punto" data-ir="${i}" aria-label="Ir a ${esc(P ? al(x) : x.etiqueta)}" ${i === S.idx ? 'aria-current="true"' : ""}></button>`).join("")}</div>` : "") + `<span class="contador num">${S.idx + 1} / ${n}</span>`;
   $$("[data-ir]").forEach((b) => b.onclick = () => irA(+b.dataset.ir));
   pintarOfertasMesa(gs);
   const sg = $("#sel-grupo");
-  if (sg) sg.innerHTML = gs.map((x, i) => `<option value="${i}"${i === S.idx ? " selected" : ""}>${esc((x.bandera ? x.bandera + " " : "") + (x.etiqueta || x.oferta || "Todas"))}</option>`).join("");
+  if (sg) sg.innerHTML = gs.map((x, i) => `<option value="${i}"${i === S.idx ? " selected" : ""}>${esc(P ? al(x) : (x.bandera ? x.bandera + " " : "") + (x.etiqueta || x.oferta || "Todas"))}</option>`).join("");
 }
+// (25/11, Lorenzo) modo grabación (ojito al lado de «Resultados en vivo»): sin nombres de ofertas, banderas, campañas ni avisos;
+// cada oferta pasa a «Oferta 1, 2…» según su ganancia. Solo quedan los números.
+function modoPriv() { return document.documentElement.classList.contains("modo-priv"); }
+function aliasPriv(gs) {
+  const m = new Map();
+  gs.filter((g) => g.clave !== "todas").sort((a, b) => (b.metricas?.ganancia ?? -Infinity) - (a.metricas?.ganancia ?? -Infinity)).forEach((g, k) => m.set(g.clave, "Oferta " + (k + 1)));
+  return (g) => g.clave === "todas" ? "Todas" : m.get(g.clave) || "Oferta";
+}
+window.MesaPriv = () => { try { pintarCarrusel(); } catch {} };
 // (06/11, Lorenzo) «Por oferta»: una tarjeta por oferta con su ganancia, ROAS y gasto; tocarla muestra esa oferta arriba
 function pintarOfertasMesa(gs) {
   const box = $("#mesa-of"); if (!box) return;
@@ -1105,9 +1115,10 @@ function pintarOfertasMesa(gs) {
     .sort((a, b) => (b.g.metricas?.ganancia ?? -Infinity) - (a.g.metricas?.ganancia ?? -Infinity));
   if (!xs.length || !S.datos[S.periodo]) { box.innerHTML = ""; return; }
   const scroll = $(".mesa-of-lista", box)?.scrollLeft || 0;
+  const al = aliasPriv(gs), P = modoPriv();
   box.innerHTML = `<div class="mesa-of-cab"><h3>Por oferta <small>${xs.length} ofertas</small></h3><span class="mesa-of-fl"><button type="button" class="btn icono chico" data-of="-1" aria-label="Ofertas anteriores">‹</button><button type="button" class="btn icono chico" data-of="1" aria-label="Más ofertas">›</button></span></div>
     <div class="mesa-of-lista">${xs.map(({ g, i }) => { const m = g.metricas || {}, gan = m.ganancia;
-      return `<button type="button" class="mesa-of-t${i === S.idx ? " act" : ""}" data-ir-of="${i}"><span class="mo-cab">${g.bandera ? `<span class="ban" aria-hidden="true">${esc(g.bandera)}</span>` : ""}<b>${esc(g.etiqueta || g.oferta || "")}</b></span>
+      return `<button type="button" class="mesa-of-t${i === S.idx ? " act" : ""}" data-ir-of="${i}"><span class="mo-cab">${g.bandera && !P ? `<span class="ban" aria-hidden="true">${esc(g.bandera)}</span>` : ""}<b>${esc(P ? al(g) : g.etiqueta || g.oferta || "")}</b></span>
         <span class="mo-e">Ganancia</span><span class="mo-v num ${gan == null ? "" : gan < 0 ? "neg" : "gana"}">${usdG(gan)}</span>
         <span class="mo-pills"><span class="roas ${colorRoas(m.roas)}">${roasTx(m.roas)}</span><span class="mo-g num">${usdG(m.gasto)} gastados</span></span>${window.MesaOfTend ? window.MesaOfTend(g.clave) : ""}</button>`; }).join("")}</div>`;
   const lista = $(".mesa-of-lista", box); lista.scrollLeft = scroll;
